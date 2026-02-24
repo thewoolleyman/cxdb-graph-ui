@@ -1,2 +1,41 @@
+# Environment variables (secrets — never commit)
+.env
+
+# Claude Code local config (skills are tracked, settings are not)
+.claude/settings.local.json
+.claude/memory/
+
+# OpenCode runtime (node_modules, lock files — only commands/ is committed)
+.opencode/node_modules/
+.opencode/package.json
+.opencode/bun.lock
+.opencode/.gitignore
+
+# IDE
 .idea/
-.claude/
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Go binary output
+/cxdb-graph-ui
+*.exe
+
+### macOS template
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk

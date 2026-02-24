@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+failed=0
+
+run_step() {
+  local label="$1"
+  shift
+  echo "==> ${label}"
+  if "$@"; then
+    echo "    ✓ passed"
+  else
+    echo "    ✗ FAILED"
+    failed=1
+  fi
+  echo
+}
+
+# Go vet
+run_step "go vet" go vet "${REPO_ROOT}/..."
+
+# Go tests
+run_step "go test" go test "${REPO_ROOT}/..."
+
+if [ "$failed" -ne 0 ]; then
+  echo "Some steps failed."
+  exit 1
+fi
+
+echo "All checks passed."

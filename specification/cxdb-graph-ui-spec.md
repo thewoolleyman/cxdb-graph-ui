@@ -106,18 +106,18 @@ If no `--cxdb` flags are provided, the default (`http://127.0.0.1:9010`) is used
 
 ```bash
 # Single pipeline, default CXDB
-go run ui/main.go --dot /path/to/pipeline-lab-bench.dot
+go run ui/main.go --dot /path/to/pipeline-alpha.dot
 
 # Multiple pipelines, single CXDB
 go run ui/main.go \
-  --dot /path/to/pipeline-lab-bench.dot \
-  --dot /path/to/pipeline-hangar.dot \
-  --dot /path/to/pipeline-orchestration.dot
+  --dot /path/to/pipeline-alpha.dot \
+  --dot /path/to/pipeline-beta.dot \
+  --dot /path/to/pipeline-gamma.dot
 
 # Multiple pipelines, multiple CXDB instances
 go run ui/main.go \
-  --dot /path/to/pipeline-lab-bench.dot \
-  --dot /path/to/pipeline-hangar.dot \
+  --dot /path/to/pipeline-alpha.dot \
+  --dot /path/to/pipeline-beta.dot \
   --cxdb http://127.0.0.1:9010 \
   --cxdb http://127.0.0.1:9011
 
@@ -135,7 +135,7 @@ Serves `index.html` from the same directory as `main.go`. Returns 404 if the fil
 
 #### `GET /dots/{name}` — DOT Files
 
-Serves DOT files registered via `--dot` flags. The `{name}` is the base filename (e.g., `pipeline-lab-bench.dot`).
+Serves DOT files registered via `--dot` flags. The `{name}` is the base filename (e.g., `pipeline-alpha.dot`).
 
 - The server builds a map from base filename to absolute path at startup.
 - Only filenames registered via `--dot` are servable. Requests for unregistered names return 404.

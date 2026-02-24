@@ -119,8 +119,8 @@ Then turns from all matching contexts contribute to the status map
 ### Scenario: Context matched to pipeline via RunStarted turn
 ```
 Given CXDB contains a context whose first turn is a RunStarted event
-  And RunStarted.data.graph_name == "lab_bench_pipeline"
-  And the UI has loaded a DOT file with "digraph lab_bench_pipeline {"
+  And RunStarted.data.graph_name == "alpha_pipeline"
+  And the UI has loaded a DOT file with "digraph alpha_pipeline {"
 When the UI runs pipeline discovery
 Then the context is associated with that pipeline tab
   And its turns are used for the status overlay
@@ -136,7 +136,7 @@ Then the context is ignored for status overlay purposes
 
 ### Scenario: Context-to-pipeline mapping is cached
 ```
-Given the UI has already discovered context 33 on CXDB-0 belongs to lab_bench_pipeline
+Given the UI has already discovered context 33 on CXDB-0 belongs to alpha_pipeline
 When the next poll cycle runs
 Then the UI does NOT re-fetch the RunStarted turn for (CXDB-0, context 33)
   And only fetches RunStarted for newly appeared context IDs
@@ -145,20 +145,20 @@ Then the UI does NOT re-fetch the RunStarted turn for (CXDB-0, context 33)
 ### Scenario: Pipeline discovered across multiple CXDB instances
 ```
 Given two CXDB instances are configured
-  And CXDB-0 contains a context whose RunStarted.graph_name == "lab_bench_pipeline"
-  And CXDB-1 contains a context whose RunStarted.graph_name == "hangar_pipeline"
+  And CXDB-0 contains a context whose RunStarted.graph_name == "alpha_pipeline"
+  And CXDB-1 contains a context whose RunStarted.graph_name == "beta_pipeline"
   And DOT files for both pipelines are loaded
 When the UI runs pipeline discovery
-Then the lab_bench_pipeline tab shows status from CXDB-0's context
-  And the hangar_pipeline tab shows status from CXDB-1's context
+Then the alpha_pipeline tab shows status from CXDB-0's context
+  And the beta_pipeline tab shows status from CXDB-1's context
   And no manual pairing was required
 ```
 
 ### Scenario: Same pipeline on multiple CXDB instances
 ```
 Given two CXDB instances are configured
-  And both contain contexts whose RunStarted.graph_name == "lab_bench_pipeline"
-When the UI displays the lab_bench_pipeline tab
+  And both contain contexts whose RunStarted.graph_name == "alpha_pipeline"
+When the UI displays the alpha_pipeline tab
 Then turns from both CXDB instances are merged into the status overlay
 ```
 

@@ -1,0 +1,102 @@
+# Dependencies
+
+This project uses [Kilroy](https://github.com/danshapiro/kilroy), an AI software factory CLI built on
+[Attractor](https://github.com/strongdm/attractor) by strongDM ([product page](https://factory.strongdm.ai/products/attractor)).
+
+We are currently based on a [fork of Kilroy](https://github.com/thewoolleyman/kilroy) which includes
+patches for bugs and features encountered during development. These patches have been submitted as
+upstream PRs to the [main Kilroy repo](https://github.com/danshapiro/kilroy).
+
+Clone Kilroy as a peer directory (`../kilroy` relative to this repo) so that LLM agents can read its
+source and so you can diagnose or fix new bugs directly.
+
+---
+
+# Purpose of this repo
+
+A local web dashboard that renders [Attractor](https://github.com/strongdm/attractor) pipeline DOT files
+as interactive SVG graphs with real-time execution status from [CXDB](https://github.com/strongdm/cxdb).
+
+The DOT graph is the pipeline definition; CXDB holds the execution trace. The UI overlays one on the
+other — nodes are colored by their execution state, and clicking a node shows its CXDB activity.
+
+**Tech stack:** Go (standard library only) HTTP server + single HTML file with vanilla JavaScript and
+Graphviz WASM (CDN-loaded). No build toolchain, no npm, no framework.
+
+---
+
+## Skills (`.claude/skills/`)
+
+Slash-command skills that automate specification and Kilroy pipeline workflows.
+
+| Skill | What it does |
+|---|---|
+| `spec:critique` | Critiques the spec against its goals, invariants, and holdout scenarios. Writes versioned critique files to `specification/critiques/`. |
+| `spec:revise` | Revises the spec based on unacknowledged critique feedback. Edits the spec in place and writes acknowledgement files. |
+
+---
+
+## Specification
+
+| Path | Purpose |
+|---|---|
+| `specification/cxdb-graph-ui-spec.md` | **The specification.** Complete architectural spec covering server, DOT rendering, CXDB integration, status overlay, detail panel, UI layout, invariants, non-goals, and definition of done. |
+| `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` | Behavioral test scenarios (Given/When/Then) covering DOT rendering, CXDB status overlay, pipeline discovery, detail panel, connection handling, and server operations. |
+| `specification/critiques/` | Iterative critique/acknowledgement pairs used during spec refinement. |
+
+---
+
+## Kilroy (`../kilroy`)
+
+Go CLI for running AI software-factory pipelines. Converts English requirements into checkpoint-aware pipelines executed by AI agents in isolated git worktrees.
+
+**Core flow:** YAML config + prompt files → deterministic `compile_dot.rb` → Graphviz DOT graph → `validate` → `run` (node-by-node in worktree with checkpoint commits) → `resume` on failure. The LLM-based `ingest` command is only used in bootstrap mode (no config YAML exists).
+
+**Key directories:**
+
+| Path | What's there |
+|---|---|
+| `cmd/kilroy/` | CLI entry points: `ingest`, `validate`, `run`, `resume`, `status`, `stop`, `serve` |
+| `internal/attractor/` | Pipeline engine: DOT parser, execution engine, validation, runtime state, checkpointing, model stylesheets |
+| `internal/agent/` | Coding agent loop: turn-based LLM + tool execution, provider-specific toolsets, event-driven |
+| `internal/llm/` | Unified LLM client: provider-agnostic interface across OpenAI, Anthropic, Google, etc. |
+| `internal/cxdb/` | Execution database integration: run history, typed events, artifact storage |
+
+**Build:** `go build -o ./kilroy ./cmd/kilroy` | **Test:** `go test ./...` | **Validate:** `./kilroy attractor validate --graph <file.dot>`
+
+---
+
+## Scripts (`script/`)
+
+Shell scripts for environment setup, infrastructure management, and testing.
+
+| Script | What it does |
+|---|---|
+| `setup.sh` | One-time workspace bootstrap: downloads Go modules (if go.mod exists), clones the CXDB repo, and builds the CXDB Docker image. Pass `--rebuild-cxdb` to force a Docker image rebuild. |
+| `start-cxdb.sh` | Starts the CXDB Docker container by delegating to `../kilroy/script/start-cxdb.sh` with line-buffered output for real-time logging. |
+| `stop-cxdb.sh` | Stops the CXDB Docker container (`kilroy-cxdb`). Respects `KILROY_CXDB_CONTAINER_NAME` env var. |
+| `start-cxdb-ui.sh` | Opens the CXDB web UI by delegating to `../kilroy/script/start-cxdb-ui.sh`. Forces the UI URL to port 9020 (nginx frontend) instead of 9010 (raw API). |
+| `smoke-test-suite-full` | Runs the full smoke test suite: `go vet ./...` and `go test ./...`. Exits non-zero on any failure. |
+
+---
+
+## Path conventions
+
+All paths in run configs and pipeline configs MUST be portable:
+- **Never** hardcode absolute paths (e.g. `/Users/cwoolley/workspace/...`)
+- `repo.path` in run YAMLs: use `.` (self) or `../sibling-repo` (resolved from CWD at invocation)
+- `modeldb` paths: use `../kilroy/...` (resolved from CWD at invocation)
+
+---
+
+## Attractor (`../attractor`)
+
+Three NLSpecs (Natural Language Specifications) that define the architecture Kilroy implements. These are the canonical design documents — treat them as authoritative.
+
+| Spec | What it defines |
+|---|---|
+| `attractor-spec.md` | Pipeline orchestration using Graphviz DOT. Node types (LLM tasks, human review, conditionals, parallel), state management, validation/linting, model stylesheets, condition expressions. |
+| `coding-agent-loop-spec.md` | Autonomous coding agent: agentic loop (LLM call → tool exec → repeat), provider-aligned toolsets (use each provider's native tools), execution environments (local/Docker/K8s), subagent spawning, loop detection, steering/interruption. |
+| `unified-llm-spec.md` | Provider-agnostic LLM SDK. Single interface across all providers, streaming-first, middleware/interceptor pattern, structured outputs. Four layers: provider spec → utilities → core client → high-level API. |
+
+**Architecture stack:** Unified LLM Client (bottom) → Coding Agent Loop (middle) → Pipeline Orchestration (top). Changes to Kilroy should align with these specs.

@@ -1,0 +1,30 @@
+version: 1
+
+repo:
+  path: .
+
+cxdb:
+  binary_addr: 127.0.0.1:9009
+  http_base_url: http://127.0.0.1:9010
+  autostart:
+    enabled: false
+
+modeldb:
+  openrouter_model_info_path: ../kilroy/internal/attractor/modeldb/pinned/openrouter_models.json
+  openrouter_model_info_update_policy: pinned
+
+llm:
+  cli_profile: real
+  providers:
+    anthropic:
+      backend: api
+      failover: []
+
+git:
+  require_clean: false
+  run_branch_prefix: attractor/run
+  commit_per_node: true
+
+setup:
+  timeout_ms: 300000
+  commands: []
