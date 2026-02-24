@@ -17,11 +17,13 @@ Then the pipeline DOT file is fetched from /dots/pipeline.dot
 ```
 Given the server was started with multiple --dot flags
   And the UI is showing the first pipeline graph
+  And the second pipeline has been polled at least once
 When the user clicks the second pipeline's tab
 Then the UI fetches the second DOT file from /dots/
   And renders the second pipeline graph, replacing the previous SVG
   And the second tab is visually active
-  And the previous CXDB status overlay is cleared
+  And the cached status map for the second pipeline is immediately reapplied
+  And nodes are not shown as all-gray between tab switch and next poll
 ```
 
 ### Scenario: Nodes rendered with correct shapes

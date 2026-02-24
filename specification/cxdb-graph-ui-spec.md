@@ -261,7 +261,7 @@ The title contains `source->target` with HTML entity encoding for `->` (`&#45;&g
 
 When multiple DOT files are provided via `--dot`, the UI renders a tab bar. Each tab is labeled with the DOT file's graph ID (extracted from the `digraph <name> {` declaration) or the filename if parsing fails.
 
-Switching tabs fetches the DOT file fresh, re-renders the SVG, and clears the CXDB status overlay. The status overlay rebuilds on the next poll cycle.
+Switching tabs fetches the DOT file fresh and re-renders the SVG. If a cached status map exists for the newly selected pipeline (from a previous poll cycle), it is immediately reapplied to the new SVG. Otherwise, all nodes start as pending. The next poll cycle refreshes the status with live data. This avoids a gray flash when switching between tabs for pipelines that have already been polled.
 
 ### 4.5 Initialization Sequence
 
@@ -271,7 +271,7 @@ When the browser loads `index.html`, the following sequence executes:
 2. **Fetch DOT file list** — `GET /api/dots` returns available DOT filenames. Build the tab bar.
 3. **Fetch CXDB instance list** — `GET /api/cxdb/instances` returns configured CXDB URLs.
 4. **Render first pipeline** — Fetch the first DOT file via `GET /dots/{name}`, render it as SVG.
-5. **Start polling** — Trigger the first CXDB poll immediately (t=0). Subsequent polls run every 3 seconds via `setInterval`. The first poll triggers pipeline discovery for all contexts.
+5. **Start polling** — Trigger the first CXDB poll immediately (t=0). After each poll completes, schedule the next poll 3 seconds later via `setTimeout`. The first poll triggers pipeline discovery for all contexts.
 
 Steps 2 and 3 run in parallel. Step 4 requires steps 1 and 2 to complete. Step 5 requires step 3 to complete but does not block on step 4.
 
@@ -385,12 +385,15 @@ FUNCTION discoverPipelines(cxdbInstances, knownMappings):
         FOR EACH context IN contexts:
             key = (index, context.context_id)
             IF key IN knownMappings:
-                CONTINUE  -- already discovered
+                CONTINUE  -- already discovered (positive or negative)
 
             firstTurn = fetchTurns(index, context.context_id, limit=1, order=asc)
             IF firstTurn.declared_type.type_id == "com.kilroy.attractor.RunStarted":
                 graphName = firstTurn.data.graph_name
-                knownMappings[key] = graphName
+                runId = firstTurn.data.run_id
+                knownMappings[key] = { graphName, runId }
+            ELSE:
+                knownMappings[key] = null  -- not an Attractor context
 
     RETURN knownMappings
 ```
@@ -399,7 +402,7 @@ The `graph_name` from the `RunStarted` turn is matched against the graph ID in e
 
 The `RunStarted` turn also contains a `run_id` field that uniquely identifies the pipeline run. All contexts belonging to the same run (e.g., parallel branches) share the same `run_id`. The discovery algorithm records both `graph_name` and `run_id` for each context.
 
-**Caching.** The context-to-pipeline mapping is cached in memory, keyed by `(cxdb_index, context_id)`. The `RunStarted` turn is immutable — once a context is mapped, it is never re-fetched. Only newly appeared context IDs trigger discovery requests.
+**Caching.** The context-to-pipeline mapping is cached in memory, keyed by `(cxdb_index, context_id)`. Both positive results (RunStarted contexts mapped to a pipeline) and negative results (non-Attractor contexts stored as `null`) are cached. The first turn of a context is immutable — once a context is classified, it is never re-fetched. Only newly appeared context IDs trigger discovery requests. This prevents repeated fetches of non-Attractor contexts that share a CXDB instance.
 
 **Multiple runs of the same pipeline.** When CXDB contains contexts from multiple runs of the same pipeline (same `graph_name`, different `run_id`), the UI uses only the most recent run. The most recent run is determined by the highest `created_at_unix_ms` among the `RunStarted` contexts for that pipeline. Contexts from older runs are ignored for status overlay purposes. This prevents stale data from a completed run from conflicting with an in-progress run.
 
@@ -411,15 +414,19 @@ The `RunStarted` turn also contains a `run_id` field that uniquely identifies th
 
 ### 6.1 Polling
 
-The UI polls all configured CXDB instances every 3 seconds using `setInterval`. Each poll cycle:
+The UI polls all configured CXDB instances every 3 seconds. Each poll cycle:
 
-1. For each CXDB instance, fetch `GET /api/cxdb/{i}/v1/contexts` — get context lists
+1. For each CXDB instance, fetch `GET /api/cxdb/{i}/v1/contexts` — get context lists. If an instance is unreachable (502), skip it and retain its per-context status maps from the last successful poll.
 2. Run pipeline discovery for any new `(index, context_id)` pairs (Section 5.5)
 3. For each context matching the active pipeline (across all instances), fetch recent turns: `GET /api/cxdb/{i}/v1/contexts/{id}/turns?limit=100&order=desc`
-4. Run `buildContextStatusMap` per context, then `mergeStatusMaps` across contexts (Section 6.2)
+4. Run `buildContextStatusMap` per context, then `mergeStatusMaps` across contexts (Section 6.2). Per-context status maps from unreachable instances are included in the merge using their cached values.
 5. Apply CSS classes to SVG nodes (Section 6.3)
 
+**Poll scheduling.** The poller uses `setTimeout` (not `setInterval`). After a poll cycle completes, the next poll is scheduled 3 seconds later. This prevents overlapping poll cycles when CXDB instances respond slowly — at most one poll cycle is in flight at any time. The effective interval is 3 seconds plus poll execution time.
+
 The polling interval is constant. It does not adapt to pipeline activity or CXDB load. Requests to different CXDB instances within a single poll cycle are issued in parallel.
+
+**Status caching on failure.** The UI retains per-context status maps from the last successful poll. When a CXDB instance is unreachable, its contexts' status maps are not discarded — they participate in the merge using cached values. This ensures that status is preserved (not reverted to "pending") when a CXDB instance goes down temporarily. Cached status maps are only replaced when fresh data is successfully fetched for that context.
 
 **Turn fetch limit.** Each context poll fetches at most 100 recent turns (`limit=100, order=desc`). This is sufficient for status computation because `StageStarted`/`StageFinished`/`StageFailed` lifecycle turns appear at node boundaries, and a pipeline with fewer than ~50 nodes will have all lifecycle events within 100 turns. For very long-running nodes that generate many turns, older turns outside the window are irrelevant — the most recent lifecycle turn for each node determines its status.
 
@@ -506,10 +513,9 @@ FUNCTION mergeStatusMaps(dotNodeIds, perContextMaps):
             IF PRECEDENCE[contextStatus.status] > PRECEDENCE[merged[nodeId].status]:
                 merged[nodeId].status = contextStatus.status
                 merged[nodeId].toolName = contextStatus.toolName
+                merged[nodeId].lastTurnId = contextStatus.lastTurnId
             merged[nodeId].turnCount += contextStatus.turnCount
             merged[nodeId].errorCount += contextStatus.errorCount
-            IF contextStatus.lastTurnId IS NOT null:
-                merged[nodeId].lastTurnId = contextStatus.lastTurnId
     RETURN merged
 ```
 
@@ -643,7 +649,7 @@ The indicator updates on every poll cycle. When a CXDB instance is unreachable, 
 
 6. **Status is mutually exclusive.** Every node has exactly one status: `pending`, `running`, `complete`, or `error`.
 
-7. **Polling interval is constant at 3 seconds.** It does not back off, speed up, or adapt.
+7. **Polling delay is constant at 3 seconds.** After each poll cycle completes, the next poll is scheduled 3 seconds later via `setTimeout`. At most one poll cycle is in flight at any time. The delay does not back off, speed up, or adapt.
 
 8. **Unknown node IDs in CXDB are ignored.** If a turn references a `node_id` not in the loaded DOT file, the UI silently skips it.
 
