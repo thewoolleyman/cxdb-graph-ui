@@ -166,7 +166,14 @@ Returns a JSON object mapping node IDs to their parsed DOT attributes for the na
 }
 ```
 
-The server parses node attribute blocks matching `nodeId [key="value", ...]` syntax from the DOT source. Attribute values are unescaped (DOT escape sequences like `\"` and `\n` are resolved). The file is read fresh on each request. Returns 404 if the DOT file is not registered.
+The server parses node attribute blocks from the DOT source. Parsing rules:
+
+- **Attribute syntax:** Both quoted (`key="value"`) and unquoted (`key=value`) attribute values are supported.
+- **Named nodes only:** Global default blocks (`node [...]`, `edge [...]`, `graph [...]`) are excluded. Only named node definitions (e.g., `implement [shape=box, prompt="..."]`) are parsed.
+- **Subgraph scope:** Nodes defined inside `subgraph` blocks are included.
+- **Escape sequences:** Quoted attribute values support these DOT escapes: `\"` → `"`, `\n` → newline, `\\` → `\`. Other escape sequences are passed through verbatim.
+
+The file is read fresh on each request. Returns 404 if the DOT file is not registered.
 
 #### `GET /api/cxdb/{index}/*` — CXDB Reverse Proxy
 
@@ -259,7 +266,9 @@ The title contains `source->target` with HTML entity encoding for `->` (`&#45;&g
 
 ### 4.4 Pipeline Tabs
 
-When multiple DOT files are provided via `--dot`, the UI renders a tab bar. Each tab is labeled with the DOT file's graph ID (extracted from the `digraph <name> {` declaration) or the filename if parsing fails.
+When multiple DOT files are provided via `--dot`, the UI renders a tab bar. Each tab is labeled with the DOT file's graph ID or the filename as a fallback.
+
+**Graph ID extraction.** The browser extracts the graph ID from the DOT source when the file is first fetched, using a regex pattern that handles both quoted and unquoted names: `/digraph\s+("(?:[^"\\]|\\.)*"|\w+)/`. If the regex does not match (e.g., the DOT file uses `graph` instead of `digraph`, or has unusual formatting), the tab falls back to the base filename. Tabs initially display filenames (from the `/api/dots` response) and update to graph IDs as each DOT file is fetched and parsed.
 
 Switching tabs fetches the DOT file fresh and re-renders the SVG. If a cached status map exists for the newly selected pipeline (from a previous poll cycle), it is immediately reapplied to the new SVG. Otherwise, all nodes start as pending. The next poll cycle refreshes the status with live data. This avoids a gray flash when switching between tabs for pipelines that have already been polled.
 
@@ -287,13 +296,15 @@ The UI reads from CXDB HTTP APIs (default port 9010). All requests go through th
 |----------|--------|-------------|
 | `/api/cxdb/instances` | GET | Server-generated list of configured CXDB instances |
 | `/api/cxdb/{i}/v1/contexts` | GET | List all contexts on CXDB instance `i` |
-| `/api/cxdb/{i}/v1/contexts/{id}/turns?limit={n}&order={dir}` | GET | Fetch turns for a context on instance `i` |
+| `/api/cxdb/{i}/v1/contexts/{id}/turns?limit={n}&before_turn_id={id}` | GET | Fetch turns for a context on instance `i` |
 
 ### 5.2 Context List Response
 
 ```
 GET /v1/contexts
 ```
+
+The endpoint supports a `tag` query parameter for server-side filtering: `GET /v1/contexts?tag=kilroy/...` returns only contexts whose `client_tag` matches the given value exactly. The UI uses this to filter for Kilroy contexts (see Section 5.5).
 
 Returns:
 
@@ -303,7 +314,10 @@ Returns:
     {
       "client_tag": "kilroy/01KJ7JPB3C2AHNP9AYX7D19BWK",
       "session_id": "54",
-      "last_activity_at": 1771929214261
+      "connected_at": 1771929210000,
+      "last_activity_at": 1771929214261,
+      "context_count": 2,
+      "peer_addr": "127.0.0.1:54321"
     }
   ],
   "active_tags": ["kilroy/01KJ7JPB3C2AHNP9AYX7D19BWK"],
@@ -313,20 +327,23 @@ Returns:
       "created_at_unix_ms": 1771929214262,
       "head_depth": 100,
       "head_turn_id": "6064",
-      "is_live": false
+      "is_live": false,
+      "client_tag": "kilroy/01KJ7JPB3C2AHNP9AYX7D19BWK"
     }
   ],
   "count": 20
 }
 ```
 
+Each context object includes a `client_tag` field (optional string) identifying the application that created it. Kilroy sets this to `kilroy/{run_id}`. The `is_live` field is `true` when the context has an active session writing to it. Additional fields (`title`, `labels`, `session_id`, `last_activity_at`) may be present but are unused by the UI.
+
 ### 5.3 Turn Response
 
 ```
-GET /v1/contexts/{context_id}/turns?limit=20&order=desc
+GET /v1/contexts/{context_id}/turns?limit=100
 ```
 
-Returns:
+Returns (turns are always ordered newest-first; CXDB does not support ascending order):
 
 ```json
 {
@@ -350,12 +367,33 @@ Returns:
         "type_id": "com.kilroy.attractor.ToolResult",
         "type_version": 1
       },
+      "decoded_as": {
+        "type_id": "com.kilroy.attractor.ToolResult",
+        "type_version": 1
+      },
       "depth": 102,
-      "turn_id": "6066"
+      "turn_id": "6066",
+      "parent_turn_id": "6065"
     }
-  ]
+  ],
+  "next_before_turn_id": "6066"
 }
 ```
+
+**Query parameters:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `limit` | `64` | Maximum number of turns to return (1–65535) |
+| `before_turn_id` | `0` | Pagination cursor. When `0` (default), returns the most recent turns. When set to a turn ID, returns turns older than that ID. Use `next_before_turn_id` from the previous response to fetch the next page. |
+| `view` | `typed` | Response format: `typed` (decoded JSON), `raw` (msgpack), or `both` |
+
+**Response fields:**
+
+- `declared_type` — the type as written by the client when the turn was appended.
+- `decoded_as` — the type after registry resolution. May differ from `declared_type` when `type_hint_mode` is `latest` or `explicit`. The UI uses `declared_type.type_id` for type matching (sufficient because Attractor types do not use version migration).
+- `next_before_turn_id` — pagination cursor for fetching older turns. Pass this as the `before_turn_id` query parameter to get the next page. `null` when there are no more turns.
+- `parent_turn_id` — the turn this was appended after (present but unused by the UI).
 
 ### 5.4 Turn Type IDs
 
@@ -377,6 +415,10 @@ CXDB is a generic context store with no first-class pipeline concept. The UI dis
 
 **Discovery algorithm:**
 
+The algorithm has two phases: (1) identify Kilroy contexts using `client_tag`, and (2) fetch the `RunStarted` turn to extract `graph_name` and `run_id`.
+
+Kilroy contexts are identified by their `client_tag`, which follows the format `kilroy/{run_id}`. The contexts endpoint supports server-side filtering via the `tag` query parameter, but since the `run_id` portion varies, the UI fetches all contexts and filters client-side by prefix.
+
 ```
 FUNCTION discoverPipelines(cxdbInstances, knownMappings):
     FOR EACH (index, instance) IN cxdbInstances:
@@ -387,22 +429,60 @@ FUNCTION discoverPipelines(cxdbInstances, knownMappings):
             IF key IN knownMappings:
                 CONTINUE  -- already discovered (positive or negative)
 
-            firstTurn = fetchTurns(index, context.context_id, limit=1, order=asc)
-            IF firstTurn.declared_type.type_id == "com.kilroy.attractor.RunStarted":
+            -- Phase 1: Filter by client_tag prefix
+            IF context.client_tag IS null OR NOT context.client_tag.startsWith("kilroy/"):
+                knownMappings[key] = null  -- not a Kilroy context
+                CONTINUE
+
+            -- Phase 2: Fetch RunStarted turn (first turn of the context)
+            firstTurn = fetchFirstTurn(index, context.context_id, context.head_depth)
+            IF firstTurn IS NOT null AND firstTurn.declared_type.type_id == "com.kilroy.attractor.RunStarted":
                 graphName = firstTurn.data.graph_name
                 runId = firstTurn.data.run_id
                 knownMappings[key] = { graphName, runId }
             ELSE:
-                knownMappings[key] = null  -- not an Attractor context
+                knownMappings[key] = null  -- has kilroy tag but unexpected first turn
 
     RETURN knownMappings
 ```
+
+**Fetching the first turn.** CXDB returns turns newest-first and does not support ascending order. The `before_turn_id` parameter paginates backward from a given turn ID. To reach the first turn of a context, the algorithm requests up to `headDepth + 1` turns (capped at the CXDB maximum of 65,535) to fetch the entire context in as few requests as possible:
+
+```
+FUNCTION fetchFirstTurn(cxdbIndex, contextId, headDepth):
+    IF headDepth == 0:
+        -- Context has exactly one turn; limit=1 returns it
+        RETURN fetchTurns(cxdbIndex, contextId, limit=1).turns[0]
+
+    -- Fetch the entire context in one request when possible.
+    -- headDepth + 1 = total turn count. CXDB limit max is 65535.
+    fetchLimit = min(headDepth + 1, 65535)
+
+    -- Paginate backward to the oldest turn.
+    cursor = 0  -- 0 means "start from newest"
+    lastTurns = null
+    LOOP:
+        response = fetchTurns(cxdbIndex, contextId, limit=fetchLimit, before_turn_id=cursor)
+        IF response.turns IS EMPTY:
+            BREAK
+        lastTurns = response.turns
+        IF response.next_before_turn_id IS null:
+            BREAK  -- reached the oldest page
+        cursor = response.next_before_turn_id
+
+    -- The last element of the final page is the oldest (first) turn
+    IF lastTurns IS NOT null:
+        RETURN lastTurns[lastTurns.length - 1]
+    RETURN null
+```
+
+For contexts with ≤65,535 turns (virtually all Kilroy pipelines), the first turn is fetched in a single request. Contexts exceeding 65,535 turns require at most `ceil(headDepth / 65535)` requests. This runs once per context (results are cached). The `client_tag` prefix filter (Phase 1) ensures pagination only runs for Kilroy contexts, not for unrelated contexts that may share the CXDB instance.
 
 The `graph_name` from the `RunStarted` turn is matched against the graph ID in each loaded DOT file (the identifier after `digraph` in the DOT source). Contexts whose `graph_name` matches the currently displayed pipeline are used for the status overlay — regardless of which CXDB instance they reside on.
 
 The `RunStarted` turn also contains a `run_id` field that uniquely identifies the pipeline run. All contexts belonging to the same run (e.g., parallel branches) share the same `run_id`. The discovery algorithm records both `graph_name` and `run_id` for each context.
 
-**Caching.** The context-to-pipeline mapping is cached in memory, keyed by `(cxdb_index, context_id)`. Both positive results (RunStarted contexts mapped to a pipeline) and negative results (non-Attractor contexts stored as `null`) are cached. The first turn of a context is immutable — once a context is classified, it is never re-fetched. Only newly appeared context IDs trigger discovery requests. This prevents repeated fetches of non-Attractor contexts that share a CXDB instance.
+**Caching.** The context-to-pipeline mapping is cached in memory, keyed by `(cxdb_index, context_id)`. Both positive results (RunStarted contexts mapped to a pipeline) and negative results (non-Kilroy contexts and non-RunStarted contexts stored as `null`) are cached. The first turn of a context is immutable — once a context is classified, it is never re-fetched. Only newly appeared context IDs trigger discovery requests. The `client_tag` prefix filter prevents fetching turns for non-Kilroy contexts entirely.
 
 **Multiple runs of the same pipeline.** When CXDB contains contexts from multiple runs of the same pipeline (same `graph_name`, different `run_id`), the UI uses only the most recent run. The most recent run is determined by the highest `created_at_unix_ms` among the `RunStarted` contexts for that pipeline. Contexts from older runs are ignored for status overlay purposes. This prevents stale data from a completed run from conflicting with an in-progress run.
 
@@ -418,9 +498,11 @@ The UI polls all configured CXDB instances every 3 seconds. Each poll cycle:
 
 1. For each CXDB instance, fetch `GET /api/cxdb/{i}/v1/contexts` — get context lists. If an instance is unreachable (502), skip it and retain its per-context status maps from the last successful poll.
 2. Run pipeline discovery for any new `(index, context_id)` pairs (Section 5.5)
-3. For each context matching the active pipeline (across all instances), fetch recent turns: `GET /api/cxdb/{i}/v1/contexts/{id}/turns?limit=100&order=desc`
-4. Run `buildContextStatusMap` per context, then `mergeStatusMaps` across contexts (Section 6.2). Per-context status maps from unreachable instances are included in the merge using their cached values.
-5. Apply CSS classes to SVG nodes (Section 6.3)
+3. **Determine active run per pipeline.** For each loaded pipeline, group discovered contexts by `run_id`. The active run is the one whose contexts have the highest `created_at_unix_ms` value. Contexts from non-active runs are excluded from steps 4–7. When the active `run_id` changes for a pipeline (a new run has started), reset all per-context status maps and `lastSeenTurnId` cursors for that pipeline's old-run contexts, and clear the per-pipeline turn cache (step 5) for that pipeline. This implements the "most recent run" rule described in Section 5.5.
+4. For each context in the **active run** of **any loaded pipeline** (across all instances), fetch recent turns: `GET /api/cxdb/{i}/v1/contexts/{id}/turns?limit=100` (returns newest-first by default). Turns are fetched for all pipelines, not just the active tab — this ensures per-context status maps stay current for inactive pipelines, preventing stale data on tab switch.
+5. **Cache raw turns** — Store the raw turn arrays from step 4 in a per-pipeline turn cache, keyed by `(cxdb_index, context_id)`. This cache is replaced (not appended) on each successful fetch. When a CXDB instance is unreachable, its entries in the turn cache are retained from the previous successful fetch. The detail panel (Section 7.2) reads from this cache.
+6. Run `updateContextStatusMap` per context (updating persistent per-context maps and advancing each context's `lastSeenTurnId` cursor), then `mergeStatusMaps` across **active-run** contexts for the **active pipeline** (Section 6.2). Per-context maps for inactive pipelines are also updated but their merged maps are not computed until the user switches to that tab. Per-context status maps from unreachable instances are included in the merge using their cached values.
+7. Apply CSS classes to SVG nodes for the active pipeline (Section 6.3)
 
 **Poll scheduling.** The poller uses `setTimeout` (not `setInterval`). After a poll cycle completes, the next poll is scheduled 3 seconds later. This prevents overlapping poll cycles when CXDB instances respond slowly — at most one poll cycle is in flight at any time. The effective interval is 3 seconds plus poll execution time.
 
@@ -428,11 +510,13 @@ The polling interval is constant. It does not adapt to pipeline activity or CXDB
 
 **Status caching on failure.** The UI retains per-context status maps from the last successful poll. When a CXDB instance is unreachable, its contexts' status maps are not discarded — they participate in the merge using cached values. This ensures that status is preserved (not reverted to "pending") when a CXDB instance goes down temporarily. Cached status maps are only replaced when fresh data is successfully fetched for that context.
 
-**Turn fetch limit.** Each context poll fetches at most 100 recent turns (`limit=100, order=desc`). This is sufficient for status computation because `StageStarted`/`StageFinished`/`StageFailed` lifecycle turns appear at node boundaries, and a pipeline with fewer than ~50 nodes will have all lifecycle events within 100 turns. For very long-running nodes that generate many turns, older turns outside the window are irrelevant — the most recent lifecycle turn for each node determines its status.
+**Turn fetch limit.** Each context poll fetches at most 100 recent turns (`limit=100`; CXDB always returns turns newest-first). This window may not contain lifecycle turns for nodes that completed early in a long-running pipeline. The persistent status map (Section 6.2) ensures completed nodes retain their status even when their lifecycle turns fall outside this window.
+
+**Gap recovery.** After step 4, if any context's fetched turns do not reach back to `lastSeenTurnId` (i.e., the oldest fetched turn has `turn_id > lastSeenTurnId + 1`, using numeric comparison), the poller issues additional paginated requests using `before_turn_id` to fetch the missing turns until `lastSeenTurnId` is reached or `next_before_turn_id` is null. This ensures lifecycle events (e.g., `StageFinished`) that occurred during a CXDB outage are not permanently lost. Gap recovery runs at most once per context per poll cycle and is bounded by the number of turns missed (typically one additional request per 100 missed turns). The recovered turns are prepended (in oldest-first order) to the context's turn batch before step 5 caches them and step 6 processes them for status derivation.
 
 ### 6.2 Node Status Map
 
-The status map associates each DOT node ID with an execution status.
+The status map associates each DOT node ID with an execution status. The status map is **persistent** — it accumulates across poll cycles rather than being recomputed from scratch. This prevents completed nodes from reverting to "pending" when their lifecycle turns fall outside the 100-turn fetch window.
 
 ```
 TYPE NodeStatus:
@@ -443,60 +527,89 @@ TYPE NodeStatus:
     errorCount  : Integer
 ```
 
+**Status map lifecycle:**
+
+1. A new status map is initialized (all nodes "pending") when a pipeline is first displayed.
+2. On each poll cycle, fetched turns are processed and node statuses are **promoted** according to the precedence `pending < running < complete < error`. Statuses are never demoted.
+3. The status map is **reset** (all nodes back to "pending") only when the active `run_id` changes — i.e., a new run of the same pipeline is detected (Section 5.5).
+
+**Turn ID comparison.** CXDB turn IDs are numeric strings (e.g., `"6066"`). All turn ID comparisons in the UI — including the deduplication check, `lastSeenTurnId` tracking, and `lastTurnId` on `NodeStatus` — must use numeric ordering: `parseInt(turn.turn_id, 10)`. The `<=` operator on turn IDs in the pseudocode below denotes numeric comparison, not lexicographic string comparison. Lexicographic comparison breaks for IDs of different lengths (e.g., `"999" > "1000"` lexicographically).
+
 **Status derivation algorithm (per context):**
 
-The algorithm processes turns from a single CXDB context. When multiple contexts match the active pipeline (e.g., parallel branches), the algorithm runs independently per context and the results are merged (see below).
+The algorithm processes turns from a single CXDB context and promotes statuses in an existing per-context status map. When multiple contexts match the active pipeline (e.g., parallel branches), the algorithm runs independently per context and the results are merged (see below).
 
 ```
-FUNCTION buildContextStatusMap(dotNodeIds, turns):
-    map = {}
+FUNCTION updateContextStatusMap(existingMap, dotNodeIds, turns, lastSeenTurnId):
+    -- Initialize entries for any new node IDs not yet in the map
     FOR EACH nodeId IN dotNodeIds:
-        map[nodeId] = NodeStatus { status: "pending", turnCount: 0, errorCount: 0 }
+        IF nodeId NOT IN existingMap:
+            existingMap[nodeId] = NodeStatus { status: "pending", turnCount: 0, errorCount: 0 }
+
+    PRECEDENCE = { "error": 3, "running": 2, "complete": 1, "pending": 0 }
+
+    -- Track the newest turn ID in this batch for the next poll cycle
+    newLastSeenTurnId = lastSeenTurnId
 
     -- turns are ordered newest-first
     FOR EACH turn IN turns:
+        -- Skip turns already processed in a previous poll cycle
+        IF lastSeenTurnId IS NOT null AND turn.turn_id <= lastSeenTurnId:
+            BREAK  -- all remaining turns are older, stop processing
+
+        -- Record the newest turn ID (first iteration only, since turns are newest-first)
+        IF newLastSeenTurnId == lastSeenTurnId:
+            newLastSeenTurnId = turn.turn_id
+
         nodeId = turn.data.node_id
         typeId = turn.declared_type.type_id
-        IF nodeId IS null OR nodeId NOT IN map:
+        IF nodeId IS null OR nodeId NOT IN existingMap:
             CONTINUE
 
-        -- Lifecycle turns are authoritative status signals
+        -- Determine the status this turn implies
+        newStatus = null
         IF typeId == "com.kilroy.attractor.StageFinished":
-            IF map[nodeId].status != "error":
-                map[nodeId].status = "complete"
-
+            newStatus = "complete"
         ELSE IF typeId == "com.kilroy.attractor.StageFailed":
-            map[nodeId].status = "error"
-
+            newStatus = "error"
         ELSE IF typeId == "com.kilroy.attractor.StageStarted":
-            IF map[nodeId].status == "pending":
-                map[nodeId].status = "running"
-
+            newStatus = "running"
         ELSE:
-            -- Non-lifecycle turns: use heuristic fallback
-            IF map[nodeId].status == "pending":
-                map[nodeId].status = "running"
+            -- Non-lifecycle turns: infer running
+            newStatus = "running"
+
+        -- Only promote, never demote (except: error always wins)
+        IF newStatus == "error" OR PRECEDENCE[newStatus] > PRECEDENCE[existingMap[nodeId].status]:
+            existingMap[nodeId].status = newStatus
 
         IF turn.data.is_error == true:
-            map[nodeId].errorCount++
+            existingMap[nodeId].errorCount++
 
-        map[nodeId].turnCount++
-        map[nodeId].lastTurnId = turn.turn_id
-        IF map[nodeId].toolName IS null:
-            map[nodeId].toolName = turn.data.tool_name
+        existingMap[nodeId].turnCount++
+        IF existingMap[nodeId].toolName IS null:
+            existingMap[nodeId].toolName = turn.data.tool_name
+
+        -- Update lastTurnId to the most recent turn for this node (numeric comparison)
+        IF existingMap[nodeId].lastTurnId IS null
+           OR turn.turn_id > existingMap[nodeId].lastTurnId:
+            existingMap[nodeId].lastTurnId = turn.turn_id
 
     -- Heuristic fallback: promote to error if running node has 3+ errors
     -- (only applies when no StageFailed turn was present)
     FOR EACH nodeId IN dotNodeIds:
-        IF map[nodeId].status == "running" AND map[nodeId].errorCount >= 3:
-            map[nodeId].status = "error"
+        IF existingMap[nodeId].status == "running" AND existingMap[nodeId].errorCount >= 3:
+            existingMap[nodeId].status = "error"
 
-    RETURN map
+    RETURN (existingMap, newLastSeenTurnId)
 ```
 
-**Lifecycle turn precedence.** Because turns are processed newest-first, the most recent lifecycle event takes priority. A `StageFinished` turn definitively marks a node "complete" — even for the last node in a pipeline, which has no subsequent node to trigger the heuristic. A `StageFailed` turn definitively marks a node "error" regardless of the error count heuristic.
+**Turn deduplication.** Each per-context status map tracks a `lastSeenTurnId` — the newest `turn_id` processed in the previous poll cycle. On each poll, the algorithm skips turns with `turn_id <= lastSeenTurnId`, processing only newly appended turns. Since CXDB returns turns newest-first, the algorithm breaks out of the loop as soon as it hits a previously-seen turn. This prevents `turnCount` and `errorCount` from being inflated by re-processing overlapping turns across poll cycles. The cursor is initialized to `null` (process all turns) when a context is first discovered, and resets to `null` when the active `run_id` changes.
 
-**Multi-context merging.** When multiple CXDB contexts match the active pipeline (e.g., parallel branches), the algorithm runs independently per context, producing one status map per context. The per-context maps are then merged using the following precedence (highest wins):
+**lastTurnId assignment.** The `lastTurnId` field on `NodeStatus` records the most recent turn for that node. It is updated whenever a turn's `turn_id` exceeds the stored value (using numeric comparison). Within a single poll batch, the first encounter per node captures the newest turn ID (since turns arrive newest-first). Across poll cycles, new turns always have higher IDs than previously stored values (due to deduplication), so `lastTurnId` correctly advances to reflect the latest activity for each node.
+
+**Lifecycle turn precedence.** Because turns are processed newest-first, the most recent lifecycle event takes priority. A `StageFinished` turn definitively marks a node "complete" — even for the last node in a pipeline, which has no subsequent node to trigger the heuristic. A `StageFailed` turn definitively marks a node "error" regardless of the error count heuristic. The promotion-only rule ensures that once a node is marked "complete" or "error", it retains that status even when its lifecycle turns fall outside the 100-turn fetch window on subsequent polls.
+
+**Multi-context merging.** When multiple CXDB contexts match the active pipeline (e.g., parallel branches), the algorithm runs independently per context, producing one per-context status map. The per-context maps are then merged into a single display map using the following precedence (highest wins):
 
 ```
 error > running > complete > pending
@@ -519,7 +632,7 @@ FUNCTION mergeStatusMaps(dotNodeIds, perContextMaps):
     RETURN merged
 ```
 
-This ensures that parallel branches each contribute their own "running" node, and a node that is "running" in one context but "complete" in another shows as "running."
+This ensures that parallel branches each contribute their own "running" node, and a node that is "running" in one context but "complete" in another shows as "running." The per-context maps are persistent (accumulated across polls); the merged map is recomputed each poll cycle from the current per-context maps.
 
 ### 6.3 CSS Status Classes
 
@@ -568,7 +681,7 @@ The detail panel displays node attributes extracted from the DOT source. Attribu
 
 ### 7.2 CXDB Activity
 
-The detail panel shows recent CXDB turns for the selected node, filtered from the most recent poll data:
+The detail panel shows recent CXDB turns for the selected node. Turns are sourced from the per-pipeline turn cache (Section 6.1, step 4), filtered to those where `turn.data.node_id` matches the selected node's DOT ID. When the selected node has matching turns across multiple contexts (e.g., parallel branches), turns from all matching contexts are combined and sorted newest-first by `turn_id` (using numeric comparison — see Section 6.2).
 
 | Column | Source | Description |
 |--------|--------|-------------|
@@ -577,7 +690,7 @@ The detail panel shows recent CXDB turns for the selected node, filtered from th
 | Output | `data.output` | Truncated output (expandable) |
 | Error | `data.is_error` | Highlighted if true |
 
-Turns are ordered newest-first. The panel shows at most 20 turns per node.
+Turns are ordered newest-first. The panel shows at most 20 turns per node. If all of a node's turns have scrolled out of the 100-turn poll window (i.e., the node completed early and subsequent nodes have generated many turns), the detail panel shows the node's DOT attributes but displays "No recent CXDB activity" in place of the turn list. The node's status remains correct via the persistent status map (Section 6.2).
 
 ### 7.3 Shape-to-Type Label Mapping
 
@@ -694,6 +807,8 @@ The indicator updates on every poll cycle. When a CXDB instance is unreachable, 
 9. **No mobile support.** The UI targets desktop browsers at 1200px+ width.
 
 10. **No notifications.** The UI does not produce desktop notifications, sounds, or alerts.
+
+11. **No SSE event streaming.** CXDB exposes a `/v1/events` Server-Sent Events endpoint for real-time push notifications (e.g., `TurnAppended`, `ContextCreated`). The UI uses polling instead for simplicity — no persistent connection management, simpler error recovery, and 3-second latency is sufficient for the "mission control" use case.
 
 ---
 

@@ -2,6 +2,23 @@
 
 Automated loop that alternates `/spec:critique` and `/spec:revise` until the critique finds no remaining issues (or only minor ones).
 
+## Architecture
+
+The loop is driven by a **deterministic bash script** — not LLM loop control. This ensures the loop always completes the correct number of rounds regardless of LLM behavior after sub-skill invocations.
+
+```
+SKILL.md (thin wrapper — parses args, invokes loop.sh)
+  └── scripts/loop.sh (deterministic loop driver)
+        ├── claude -p "/spec:critique ..." (sub-skill)
+        ├── scripts/check_exit.sh (exit condition check)
+        ├── claude -p "/spec:revise ..." (sub-skill)
+        └── scripts/round_summary.sh (parse acknowledgement)
+```
+
+- **Bash owns the loop**: round counting, exit conditions, state tracking
+- **LLM owns the work**: critique analysis and spec revision (via `claude -p`)
+- **No LLM involvement in loop control**: exit conditions are checked with `grep`/`awk`
+
 ## Usage
 
 ```
@@ -25,55 +42,78 @@ Automated loop that alternates `/spec:critique` and `/spec:revise` until the cri
 - **`no_major_issues_found`** (default) — Stops when zero issues remain, or all issues are minor/cosmetic.
 - **`no_issues_found`** — Stops only when zero `## Issue #N:` headings exist. Stricter.
 
-## Flowchart
+## How It Works
+
+### Loop Flow
 
 ```
-    ┌──────────────────────────┐
-    │  Parse ARGUMENTS         │
-    │  Set round = 0           │
-    └────────────┬─────────────┘
-                 │
-    ┌────────────▼─────────────┐
-    │  [A] round++ ◄───────────┼──────────────────────────────┐
-    │      round > MAX?        │                              │
-    │      yes → EXIT: LIMIT   │                              │
-    └────────────┬─────────────┘                              │
-            no   │                                            │
-    ┌────────────▼─────────────┐                              │
-    │  [B] Run /spec:critique  │                              │
-    │      + CRITIQUE_PROMPT   │                              │
-    └────────────┬─────────────┘                              │
-                 │                                            │
-    ┌────────────▼─────────────┐                              │
-    │  [C] Read critique file  │                              │
-    │      Extract issue titles│                              │
-    └────────────┬─────────────┘                              │
-                 │                                            │
-    ┌────────────▼─────────────┐                              │
-    │  [D] Exit condition met? │                              │
-    │      yes → EXIT: CONV.   │                              │
-    │      same as last round? │                              │
-    │      yes → EXIT: STUCK   │                              │
-    └────────────┬─────────────┘                              │
-            no   │                                            │
-    ┌────────────▼─────────────┐                              │
-    │  [E] Run /spec:revise    │                              │
-    │      + REVISE_PROMPT     │                              │
-    └────────────┬─────────────┘                              │
-                 │                                            │
-    ┌────────────▼─────────────┐                              │
-    │  [F] Round summary       │                              │
-    │      ✓/~/✗ per issue     │                              │
-    └────────────┬─────────────┘                              │
-                 │                                            │
-    ┌────────────▼─────────────┐                              │
-    │  [G] ROUND COMPLETE      │                              │
-    │  [H] Return to A ────────┼──────────────────────────────┘
-    └──────────────────────────┘
+┌──────────────────────────┐
+│  Parse ARGUMENTS         │
+│  Run scripts/loop.sh     │
+└────────────┬─────────────┘
+             │
+┌────────────▼─────────────┐
+│  [A] round++             │◄──────────────────────────┐
+│      round > MAX?        │                           │
+│      yes → FINAL REPORT  │                           │
+└────────────┬─────────────┘                           │
+         no  │                                         │
+┌────────────▼─────────────┐                           │
+│  [B] claude -p           │                           │
+│      "/spec:critique"    │                           │
+└────────────┬─────────────┘                           │
+             │                                         │
+┌────────────▼─────────────┐                           │
+│  [C] Find critique file  │                           │
+│      (ls diff)           │                           │
+└────────────┬─────────────┘                           │
+             │                                         │
+┌────────────▼─────────────┐                           │
+│  [D] check_exit.sh       │                           │
+│      converged → REPORT  │                           │
+│      stuck → REPORT      │                           │
+└────────────┬─────────────┘                           │
+         no  │                                         │
+┌────────────▼─────────────┐                           │
+│  [E] claude -p           │                           │
+│      "/spec:revise"      │                           │
+└────────────┬─────────────┘                           │
+             │                                         │
+┌────────────▼─────────────┐                           │
+│  [F] round_summary.sh    │                           │
+│      Parse ack files     │───────────────────────────┘
+└──────────────────────────┘
 
-    EXIT: CONVERGED ──┐
-    EXIT: ROUND LIMIT ┼──► FINAL REPORT
-    EXIT: STUCK ──────┘
+FINAL REPORT (printed by loop.sh)
+```
+
+### Exit Conditions (all checked in bash, not LLM)
+
+| Exit | Trigger | Detection |
+|------|---------|-----------|
+| **Converged** | No issues, or all minor | `grep` + `awk` on critique file |
+| **Round limit** | `round > MAX_ROUNDS` | Bash integer comparison |
+| **Stuck** | Same issues as last round | `comm -23` on sorted title lists |
+
+### Sub-skill Invocation
+
+Each sub-skill runs as a non-interactive `claude -p` process:
+- `claude -p "/spec:critique ..." --allowed-tools "Read Write Glob ..."`
+- `claude -p "/spec:revise ..." --allowed-tools "Read Write Edit Glob ..."`
+
+Output streams to stdout in real time. The `--allowed-tools` flag pre-authorizes tool access without `--dangerously-skip-permissions`.
+
+## File Structure
+
+```
+spec-critique-revise-loop/
+├── SKILL.md              # Thin wrapper (parse args → run loop.sh)
+├── README.md             # This file
+├── specification.md      # Detailed design spec
+└── scripts/
+    ├── loop.sh           # Main loop driver
+    ├── check_exit.sh     # Exit condition checker (grep/awk)
+    └── round_summary.sh  # Parse acknowledgement files
 ```
 
 ## Round Summary Output
@@ -81,31 +121,13 @@ Automated loop that alternates `/spec:critique` and `/spec:revise` until the cri
 After each revise, the loop prints:
 
 ```
-[STEP F] Round 1 summary
-  ✓ Issue #1: Missing error codes — applied
-  ~ Issue #2: Incomplete auth flow — partial: deferred OAuth
-  ✗ Issue #3: Naming inconsistency — skipped: intentional
-  + REVISE_PROMPT: added backward-compat note
+[STEP F] (round 1 of 3) Round summary
+  ✓ Issue #1: Missing error codes — applied to specification
+  ~ Issue #2: Incomplete auth flow — partially addressed
+  ✗ Issue #3: Naming inconsistency — not addressed
   Issues: 3 | Applied: 1 | Partial: 1 | Skipped: 1
-=== ROUND 1 COMPLETE ===
-[STEP H] Returning to step A
+=== ROUND 1 of 3 COMPLETE ===
 ```
-
-## Exit Conditions
-
-| Exit | Trigger |
-|------|---------|
-| **Converged** | Critique found no issues (or only minor ones per `LOOP_EXIT_CRITERIA`) |
-| **Round limit** | `round > MAX_ROUNDS` |
-| **Stuck** | Two consecutive critiques raise identical issue titles |
-
-## Loop Reliability
-
-The loop uses three mechanisms to prevent premature stopping:
-
-1. **Step labels** — Every step prints `[STEP X]` before executing, keeping the agent aware of loop position.
-2. **Post-skill reminders** — After steps B and E (skill invocations), the loop explicitly states "you are still inside the loop, your next step is X."
-3. **Sub-skill exit warnings** — Both `/spec:critique` and `/spec:revise` print a warning at completion: "If you are in a loop, you are NOT done."
 
 ## Related Skills
 
