@@ -103,13 +103,33 @@ When the UI polls CXDB
 Then all nodes remain gray (pending)
 ```
 
+### Scenario: Pipeline completed — last node marked complete via StageFinished
+```
+Given a pipeline run has completed all nodes including the final exit node
+  And CXDB contains a StageFinished turn for the final node
+When the UI polls CXDB
+Then the final node is colored green (complete), not blue (running)
+  And all traversed nodes are colored green
+```
+
 ### Scenario: Multiple contexts for same pipeline (parallel branches)
 ```
 Given a pipeline run has spawned parallel branches
-  And multiple CXDB contexts have RunStarted turns with the same graph_name
+  And multiple CXDB contexts have RunStarted turns with the same graph_name and same run_id
 When the UI polls CXDB
 Then turns from all matching contexts contribute to the status map
+  And nodes running in different branches are both colored blue (running)
   And the detail panel shows activity from all branches
+```
+
+### Scenario: Second run of same pipeline while first run data exists
+```
+Given CXDB contains contexts from a completed run of alpha_pipeline (run_id A)
+  And a new run of alpha_pipeline starts (run_id B)
+  And run B has only completed the first two nodes
+When the UI polls CXDB
+Then only contexts with run_id B are used for the status overlay
+  And nodes completed in run A but not yet reached in run B show as pending
 ```
 
 ---

@@ -141,6 +141,33 @@ Serves DOT files registered via `--dot` flags. The `{name}` is the base filename
 - Only filenames registered via `--dot` are servable. Requests for unregistered names return 404.
 - Files are read fresh on each request. DOT file regeneration is picked up without server restart.
 
+#### `GET /dots/{name}/nodes` — DOT Node Attributes
+
+Returns a JSON object mapping node IDs to their parsed DOT attributes for the named DOT file.
+
+```json
+{
+  "implement": {
+    "shape": "box",
+    "class": "hard",
+    "prompt": "Implement the feature according to the spec...",
+    "tool_command": null,
+    "question": null,
+    "goal_gate": null
+  },
+  "check_fmt": {
+    "shape": "parallelogram",
+    "class": null,
+    "prompt": null,
+    "tool_command": "cargo fmt --check",
+    "question": null,
+    "goal_gate": null
+  }
+}
+```
+
+The server parses node attribute blocks matching `nodeId [key="value", ...]` syntax from the DOT source. Attribute values are unescaped (DOT escape sequences like `\"` and `\n` are resolved). The file is read fresh on each request. Returns 404 if the DOT file is not registered.
+
 #### `GET /api/cxdb/{index}/*` — CXDB Reverse Proxy
 
 Each `--cxdb` flag registers a CXDB instance at a zero-based index. The proxy route includes the index to disambiguate instances.
@@ -154,6 +181,16 @@ The server strips `/api/cxdb/{index}` and forwards the remainder to the correspo
 - No header injection, body rewriting, or caching.
 - If a CXDB instance is unreachable, returns 502 Bad Gateway for that index.
 - Index out of range returns 404.
+
+#### `GET /api/dots` — DOT File List
+
+Returns a JSON array of available DOT filenames (registered via `--dot` flags). This is a server-generated response used by the browser to build pipeline tabs.
+
+```json
+{ "dots": ["pipeline-alpha.dot", "pipeline-beta.dot"] }
+```
+
+#### `GET /api/cxdb/instances` — CXDB Instance List
 
 The browser fetches `/api/cxdb/instances` to get the list of configured CXDB URLs and their indices. This is a server-generated JSON response, not proxied:
 
@@ -173,9 +210,15 @@ The browser fetches `/api/cxdb/instances` to get the list of configured CXDB URL
 
 ### 4.1 Graphviz WASM
 
-The browser loads `@hpcc-js/wasm-graphviz` from a CDN (jsDelivr). This library compiles Graphviz to WebAssembly and exposes a `layout(dotString, "svg", "dot")` function that returns SVG markup.
+The browser loads `@hpcc-js/wasm-graphviz` from jsDelivr CDN at a pinned version:
 
-The UI calls this function with the raw DOT file content fetched from `/dots/{name}`. The resulting SVG is injected into the main content area.
+```
+https://cdn.jsdelivr.net/npm/@hpcc-js/wasm-graphviz@1.6.1/dist/index.min.js
+```
+
+This library compiles Graphviz to WebAssembly and exposes a `Graphviz.load()` async factory that returns an instance with a `layout(dotString, "svg", "dot")` method. The UI calls this with the raw DOT file content fetched from `/dots/{name}`. The resulting SVG is injected into the main content area.
+
+If the CDN is unreachable, the WASM module fails to load and the graph area displays an error message. The rest of the UI (tabs, connection indicator) still renders.
 
 ### 4.2 SVG Node Identification
 
@@ -219,6 +262,18 @@ The title contains `source->target` with HTML entity encoding for `->` (`&#45;&g
 When multiple DOT files are provided via `--dot`, the UI renders a tab bar. Each tab is labeled with the DOT file's graph ID (extracted from the `digraph <name> {` declaration) or the filename if parsing fails.
 
 Switching tabs fetches the DOT file fresh, re-renders the SVG, and clears the CXDB status overlay. The status overlay rebuilds on the next poll cycle.
+
+### 4.5 Initialization Sequence
+
+When the browser loads `index.html`, the following sequence executes:
+
+1. **Load Graphviz WASM** — Import `@hpcc-js/wasm-graphviz` from CDN. During loading, the graph area shows "Loading Graphviz...".
+2. **Fetch DOT file list** — `GET /api/dots` returns available DOT filenames. Build the tab bar.
+3. **Fetch CXDB instance list** — `GET /api/cxdb/instances` returns configured CXDB URLs.
+4. **Render first pipeline** — Fetch the first DOT file via `GET /dots/{name}`, render it as SVG.
+5. **Start polling** — Trigger the first CXDB poll immediately (t=0). Subsequent polls run every 3 seconds via `setInterval`. The first poll triggers pipeline discovery for all contexts.
+
+Steps 2 and 3 run in parallel. Step 4 requires steps 1 and 2 to complete. Step 5 requires step 3 to complete but does not block on step 4.
 
 ---
 
@@ -342,9 +397,13 @@ FUNCTION discoverPipelines(cxdbInstances, knownMappings):
 
 The `graph_name` from the `RunStarted` turn is matched against the graph ID in each loaded DOT file (the identifier after `digraph` in the DOT source). Contexts whose `graph_name` matches the currently displayed pipeline are used for the status overlay — regardless of which CXDB instance they reside on.
 
+The `RunStarted` turn also contains a `run_id` field that uniquely identifies the pipeline run. All contexts belonging to the same run (e.g., parallel branches) share the same `run_id`. The discovery algorithm records both `graph_name` and `run_id` for each context.
+
 **Caching.** The context-to-pipeline mapping is cached in memory, keyed by `(cxdb_index, context_id)`. The `RunStarted` turn is immutable — once a context is mapped, it is never re-fetched. Only newly appeared context IDs trigger discovery requests.
 
-**Cross-instance merging.** If contexts matching the same pipeline exist on multiple CXDB instances (e.g., parallel branches written to separate servers), their turns are merged into a single status map. The UI does not distinguish which CXDB instance a turn came from.
+**Multiple runs of the same pipeline.** When CXDB contains contexts from multiple runs of the same pipeline (same `graph_name`, different `run_id`), the UI uses only the most recent run. The most recent run is determined by the highest `created_at_unix_ms` among the `RunStarted` contexts for that pipeline. Contexts from older runs are ignored for status overlay purposes. This prevents stale data from a completed run from conflicting with an in-progress run.
+
+**Cross-instance merging.** If contexts from the same run (same `run_id`) exist on multiple CXDB instances (e.g., parallel branches written to separate servers), their turns are merged into a single status map. The UI does not distinguish which CXDB instance a turn came from.
 
 ---
 
@@ -356,11 +415,13 @@ The UI polls all configured CXDB instances every 3 seconds using `setInterval`. 
 
 1. For each CXDB instance, fetch `GET /api/cxdb/{i}/v1/contexts` — get context lists
 2. Run pipeline discovery for any new `(index, context_id)` pairs (Section 5.5)
-3. For each context matching the active pipeline (across all instances), fetch recent turns
-4. Merge turns from all matching contexts, build the node status map (Section 6.2)
+3. For each context matching the active pipeline (across all instances), fetch recent turns: `GET /api/cxdb/{i}/v1/contexts/{id}/turns?limit=100&order=desc`
+4. Run `buildContextStatusMap` per context, then `mergeStatusMaps` across contexts (Section 6.2)
 5. Apply CSS classes to SVG nodes (Section 6.3)
 
 The polling interval is constant. It does not adapt to pipeline activity or CXDB load. Requests to different CXDB instances within a single poll cycle are issued in parallel.
+
+**Turn fetch limit.** Each context poll fetches at most 100 recent turns (`limit=100, order=desc`). This is sufficient for status computation because `StageStarted`/`StageFinished`/`StageFailed` lifecycle turns appear at node boundaries, and a pipeline with fewer than ~50 nodes will have all lifecycle events within 100 turns. For very long-running nodes that generate many turns, older turns outside the window are irrelevant — the most recent lifecycle turn for each node determines its status.
 
 ### 6.2 Node Status Map
 
@@ -375,46 +436,84 @@ TYPE NodeStatus:
     errorCount  : Integer
 ```
 
-**Status derivation algorithm:**
+**Status derivation algorithm (per context):**
+
+The algorithm processes turns from a single CXDB context. When multiple contexts match the active pipeline (e.g., parallel branches), the algorithm runs independently per context and the results are merged (see below).
 
 ```
-FUNCTION buildNodeStatusMap(dotNodeIds, turns):
+FUNCTION buildContextStatusMap(dotNodeIds, turns):
     map = {}
     FOR EACH nodeId IN dotNodeIds:
         map[nodeId] = NodeStatus { status: "pending", turnCount: 0, errorCount: 0 }
 
     -- turns are ordered newest-first
-    currentNodeId = null
-
     FOR EACH turn IN turns:
         nodeId = turn.data.node_id
+        typeId = turn.declared_type.type_id
         IF nodeId IS null OR nodeId NOT IN map:
             CONTINUE
 
-        IF currentNodeId IS null:
-            currentNodeId = nodeId
-            map[nodeId].status = "running"
-            map[nodeId].toolName = turn.data.tool_name
-
-        ELSE IF nodeId != currentNodeId:
-            -- older turn on a different node: that node completed
-            IF map[nodeId].status == "pending":
+        -- Lifecycle turns are authoritative status signals
+        IF typeId == "com.kilroy.attractor.StageFinished":
+            IF map[nodeId].status != "error":
                 map[nodeId].status = "complete"
+
+        ELSE IF typeId == "com.kilroy.attractor.StageFailed":
+            map[nodeId].status = "error"
+
+        ELSE IF typeId == "com.kilroy.attractor.StageStarted":
+            IF map[nodeId].status == "pending":
+                map[nodeId].status = "running"
+
+        ELSE:
+            -- Non-lifecycle turns: use heuristic fallback
+            IF map[nodeId].status == "pending":
+                map[nodeId].status = "running"
 
         IF turn.data.is_error == true:
             map[nodeId].errorCount++
 
         map[nodeId].turnCount++
         map[nodeId].lastTurnId = turn.turn_id
+        IF map[nodeId].toolName IS null:
+            map[nodeId].toolName = turn.data.tool_name
 
-    -- promote to error if running node has consecutive errors
-    IF currentNodeId IS NOT null AND map[currentNodeId].errorCount >= 3:
-        map[currentNodeId].status = "error"
+    -- Heuristic fallback: promote to error if running node has 3+ errors
+    -- (only applies when no StageFailed turn was present)
+    FOR EACH nodeId IN dotNodeIds:
+        IF map[nodeId].status == "running" AND map[nodeId].errorCount >= 3:
+            map[nodeId].status = "error"
 
     RETURN map
 ```
 
-When multiple CXDB contexts match the active pipeline (e.g., parallel branches), turns from all contexts are merged and sorted by depth before applying the algorithm. Each context contributes its own "running" node if it is currently active.
+**Lifecycle turn precedence.** Because turns are processed newest-first, the most recent lifecycle event takes priority. A `StageFinished` turn definitively marks a node "complete" — even for the last node in a pipeline, which has no subsequent node to trigger the heuristic. A `StageFailed` turn definitively marks a node "error" regardless of the error count heuristic.
+
+**Multi-context merging.** When multiple CXDB contexts match the active pipeline (e.g., parallel branches), the algorithm runs independently per context, producing one status map per context. The per-context maps are then merged using the following precedence (highest wins):
+
+```
+error > running > complete > pending
+```
+
+```
+FUNCTION mergeStatusMaps(dotNodeIds, perContextMaps):
+    PRECEDENCE = { "error": 3, "running": 2, "complete": 1, "pending": 0 }
+    merged = {}
+    FOR EACH nodeId IN dotNodeIds:
+        merged[nodeId] = NodeStatus { status: "pending", turnCount: 0, errorCount: 0 }
+        FOR EACH contextMap IN perContextMaps:
+            contextStatus = contextMap[nodeId]
+            IF PRECEDENCE[contextStatus.status] > PRECEDENCE[merged[nodeId].status]:
+                merged[nodeId].status = contextStatus.status
+                merged[nodeId].toolName = contextStatus.toolName
+            merged[nodeId].turnCount += contextStatus.turnCount
+            merged[nodeId].errorCount += contextStatus.errorCount
+            IF contextStatus.lastTurnId IS NOT null:
+                merged[nodeId].lastTurnId = contextStatus.lastTurnId
+    RETURN merged
+```
+
+This ensures that parallel branches each contribute their own "running" node, and a node that is "running" in one context but "complete" in another shows as "running."
 
 ### 6.3 CSS Status Classes
 
@@ -449,7 +548,7 @@ Clicking an SVG node opens a detail panel. The panel displays information from b
 
 ### 7.1 DOT Attributes
 
-The detail panel parses the DOT source to extract node attributes. These are displayed as static metadata:
+The detail panel displays node attributes extracted from the DOT source. Attributes are parsed server-side and served via `GET /dots/{name}/nodes` (see Section 3.2). This avoids complex DOT parsing in browser JavaScript.
 
 | Field | Source | Description |
 |-------|--------|-------------|
@@ -459,7 +558,7 @@ The detail panel parses the DOT source to extract node attributes. These are dis
 | Prompt | DOT `prompt` attribute | Full prompt text, scrollable |
 | Tool Command | DOT `tool_command` attribute | Shell command for tool gate nodes |
 | Question | DOT `question` attribute | Human gate question text |
-| Goal Gate | DOT `goal_gate` attribute | Whether this is a goal gate |
+| Goal Gate | DOT `goal_gate` attribute | Boolean flag — if `"true"`, this conditional node acts as a goal gate (displayed as a badge on the detail panel header). Goal gates use the same `diamond` shape as regular conditionals. |
 
 ### 7.2 CXDB Activity
 
@@ -540,7 +639,7 @@ The indicator updates on every poll cycle. When a CXDB instance is unreachable, 
 
 ### Status Overlay
 
-5. **Status is derived from CXDB turns, never fabricated.** A node is "running" only if its `node_id` appears on the most recent CXDB turn. A node is "complete" only if a later node has activity. The UI does not infer status beyond what the turn data provides.
+5. **Status is derived from CXDB turns, never fabricated.** A node's status is determined primarily by lifecycle turns (`StageStarted` → running, `StageFinished` → complete, `StageFailed` → error). When lifecycle turns are absent, a heuristic fallback infers status from turn activity. The UI does not infer status beyond what the turn data provides.
 
 6. **Status is mutually exclusive.** Every node has exactly one status: `pending`, `running`, `complete`, or `error`.
 
@@ -600,6 +699,8 @@ The indicator updates on every poll cycle. When a CXDB instance is unreachable, 
 - [ ] Multiple `--dot` flags register multiple pipelines
 - [ ] `GET /` serves the dashboard HTML
 - [ ] `GET /dots/{name}` serves registered DOT files, returns 404 for others
+- [ ] `GET /dots/{name}/nodes` returns parsed DOT node attributes as JSON
+- [ ] `GET /api/dots` returns the list of available DOT filenames
 - [ ] `GET /api/cxdb/{i}/*` proxies to the corresponding CXDB instance
 - [ ] `GET /api/cxdb/instances` returns the configured CXDB URLs
 - [ ] Multiple `--cxdb` flags register multiple CXDB instances
@@ -612,6 +713,9 @@ The indicator updates on every poll cycle. When a CXDB instance is unreachable, 
 - [ ] UI polls CXDB every 3 seconds
 - [ ] Pipeline discovery via `RunStarted` turn's `graph_name` field
 - [ ] Context-to-pipeline mapping is cached (no redundant discovery requests)
+- [ ] Status derived from StageStarted/StageFinished/StageFailed lifecycle turns when present
+- [ ] Multiple runs of the same pipeline: only the most recent run_id is used
+- [ ] Parallel branch contexts merged with precedence: error > running > complete > pending
 - [ ] Nodes colored by status: gray (pending), blue/pulse (running), green (complete), red (error)
 - [ ] Status overlay updates without re-rendering the SVG
 - [ ] Connection indicator shows per-instance CXDB reachable/unreachable state
