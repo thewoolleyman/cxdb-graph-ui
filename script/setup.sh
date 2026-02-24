@@ -5,6 +5,15 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_DIR="$(dirname "$REPO_ROOT")"
 
+# Clone kilroy fork if it doesn't already exist
+KILROY_DIR="$WORKSPACE_DIR/kilroy"
+if [ -d "$KILROY_DIR" ]; then
+  echo "✓ kilroy repo already exists at $KILROY_DIR"
+else
+  echo "Cloning kilroy fork …"
+  git clone https://github.com/thewoolleyman/kilroy.git "$KILROY_DIR"
+fi
+
 # Install Go dependencies (if go.mod exists)
 if [ -f "$REPO_ROOT/go.mod" ]; then
   echo "Downloading Go modules …"

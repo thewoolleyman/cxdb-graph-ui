@@ -33,6 +33,19 @@ Slash-command skills that automate specification and Kilroy pipeline workflows.
 |---|---|
 | `spec:critique` | Critiques the spec against its goals, invariants, and holdout scenarios. Writes versioned critique files to `specification/critiques/`. |
 | `spec:revise` | Revises the spec based on unacknowledged critique feedback. Edits the spec in place and writes acknowledgement files. |
+| `kilroy:setup` | One-time setup: builds Kilroy binary from `../kilroy`, starts CXDB on ports 9009/9010, verifies prereqs (go, docker, ruby, claude CLI, API key). |
+| `kilroy:generate-pipeline` | Compiles pipeline DOT from YAML config + prompt markdown files. Deterministic — no LLM involved. Runs `compile_dot.rb` → `verify_dot.rb` → `kilroy attractor validate`. |
+| `kilroy:run` | Runs pre-flight checks, confirms with user, then executes `kilroy attractor run`. Creates an isolated worktree, runs all pipeline nodes with checkpoint commits. |
+| `kilroy:status` | Lists existing runs, checks status, offers to resume or stop interrupted pipelines. State in `~/.local/state/kilroy/attractor/runs/`. |
+| `kilroy:help` | Displays guide to the Kilroy software factory, available skills, and typical workflow. |
+| `kilroy:land` | Lands a completed run — squash-merges the run branch, runs `script/smoke-test-suite-full`, and pushes. |
+| `cxdb:status` | Queries CXDB API (`http://127.0.0.1:9020`) to show pipeline context status, detect stuck agents, error loops, stale contexts. |
+| `land-the-plane` | Runs smoke tests, then commits and pushes changes. Stops on first failure. |
+
+**Typical workflow:** `kilroy:setup` → `kilroy:generate-pipeline` → `kilroy:run` → `kilroy:status` / `cxdb:status` to monitor → `kilroy:land` to merge, test, and push.
+
+**IMPORTANT — Pipeline DOT file is a generated artifact:**
+The `pipeline.dot` file at the repo root is compiled output. **NEVER edit it directly.** Always update the YAML/prompt sources under `pipeline-config/` and then regenerate via `/kilroy:generate-pipeline`. Direct edits will be overwritten on the next generation and will diverge from the source-of-truth config.
 
 ---
 
@@ -100,3 +113,14 @@ Three NLSpecs (Natural Language Specifications) that define the architecture Kil
 | `unified-llm-spec.md` | Provider-agnostic LLM SDK. Single interface across all providers, streaming-first, middleware/interceptor pattern, structured outputs. Four layers: provider spec → utilities → core client → high-level API. |
 
 **Architecture stack:** Unified LLM Client (bottom) → Coding Agent Loop (middle) → Pipeline Orchestration (top). Changes to Kilroy should align with these specs.
+
+---
+
+## Documentation (`docs/`)
+
+Reference documentation for the project. **Keep these in sync when skills, workflows, or architecture change.**
+
+| File | What it covers |
+|---|---|
+| `docs/software-factory.md` | **Primary guide.** Architecture overview (Attractor, Kilroy, CXDB), what parts of Kilroy we use, skill reference, pipeline configuration, validation tiers, manual instructions. Update this when skills change or Kilroy usage evolves. |
+| `docs/cxdb-console-guide.md` | CXDB web console usage: dashboard layout, turn-by-turn inspection, keyboard shortcuts, interpreting agent activity. |
