@@ -5,30 +5,18 @@ user-invocable: true
 allowed-tools: Read, Write, Edit, Glob, Bash(ls:*), Bash(pwd:*), Bash(date:*), Skill
 ---
 
-You are running an automated critique-revise loop on the CXDB Graph UI specification.
-
 ## ARGUMENTS
 
-Parse the following raw arguments string for named parameters. **Ignore any text that is not a named parameter.**
+Parse `$ARGUMENTS` for named `KEY=VALUE` parameters. Ignore non-parameter text.
 
-Raw arguments: `$ARGUMENTS`
+| Parameter | Values | Default |
+|-----------|--------|---------|
+| `LOOP_EXIT_CRITERIA` | `no_issues_found` \| `no_major_issues_found` | `no_major_issues_found` |
+| `MAX_ROUNDS` | Positive integer | `3` |
+| `CRITIQUE_PROMPT` | Quoted string | _(empty)_ |
+| `REVISE_PROMPT` | Quoted string | _(empty)_ |
 
-Extract these named parameters (all optional):
-
-| Parameter | Values | Default | Description |
-|-----------|--------|---------|-------------|
-| `LOOP_EXIT_CRITERIA` | `no_issues_found` or `no_major_issues_found` | `no_major_issues_found` | When to stop the loop |
-| `MAX_ROUNDS` | Any positive integer | `3` | Maximum critique-revise cycles before forced exit |
-| `CRITIQUE_PROMPT` | Quoted string | _(empty)_ | Additional instructions passed to `/spec:critique` |
-| `REVISE_PROMPT` | Quoted string | _(empty)_ | Additional instructions passed to `/spec:revise` |
-
-**Parsing rules:**
-- Parameters use `KEY=VALUE` syntax (e.g., `MAX_ROUNDS=5`)
-- String values may be quoted with double quotes (e.g., `CRITIQUE_PROMPT="focus on API design"`)
-- Unrecognized keys are ignored
-- Missing parameters use their defaults
-
-After parsing, print exactly:
+Print:
 
 ```
 === PARSED ARGUMENTS ===
@@ -39,109 +27,108 @@ REVISE_PROMPT      = {value or "(none)"}
 ========================
 ```
 
-Store these as `exit_criteria`, `max_rounds`, `critique_prompt`, and `revise_prompt`.
+---
 
-## MANDATORY LOOP PROTOCOL
-
-You MUST follow this protocol exactly. There is only ONE way to exit: the EXIT CONDITION defined below. **Do not stop until the exit condition is met.**
-
-### Initialization
+## LOOP
 
 Set `round = 0`. Set `previous_issue_titles = []`.
 
-### Loop Start
+Execute steps A through H in order. After H, return to A. The ONLY exits are in step A (round limit) and step D (converged or stuck).
 
-**You are now entering the loop. Execute the following steps IN ORDER, then return to Loop Start. Do NOT exit the loop unless the EXIT CONDITION is met.**
+### A. Increment round
 
-#### A. Increment Round
+Print: **`[STEP A] round = {round + 1} of {max_rounds}`**
 
-Set `round = round + 1`.
+Set `round = round + 1`. If `round > max_rounds` → go to EXIT: ROUND LIMIT.
 
-Print exactly: **`=== CRITIQUE-REVISE LOOP: STARTING ROUND {round} OF {max_rounds} ===`**
+### B. Run critique
 
-If `round > max_rounds`, go to **FORCED EXIT (round limit)**.
+Print: **`[STEP B] Running /spec:critique...`**
 
-#### B. Run Critique
+Invoke `spec-critique` via the Skill tool. Pass `critique_prompt` as arguments if non-empty.
 
-Invoke the `spec-critique` skill using the Skill tool. If `critique_prompt` is non-empty, pass it as the skill's arguments. Otherwise invoke with no arguments.
+**After the skill returns, you are still inside the loop. Your next step is C.**
 
-#### C. Read the Critique File
+### C. Read critique file
 
-After the critique skill completes, read the **newly created** critique file in `specification/critiques/`. Extract all issue titles (headings matching `## Issue #N: {title}`). Store them as `current_issue_titles`. Also note which issues (if any) are explicitly described as "minor" in their body text.
+Print: **`[STEP C] Reading critique file...`**
 
-#### D. Check EXIT CONDITION
+Read the newly created file in `specification/critiques/`. Extract issue titles matching `## Issue #N: {title}`. Store as `current_issue_titles`. Note which issues are described as "minor" in their body.
 
-The exit condition depends on `exit_criteria`:
+### D. Check exit condition
 
-- **If `exit_criteria` = `no_issues_found`:** Exit when the critique file contains ZERO issues matching `## Issue #N:`.
-- **If `exit_criteria` = `no_major_issues_found`:** Exit when the critique file contains ZERO issues matching `## Issue #N:`, OR when ALL issues present are explicitly labeled as minor (the critique body uses words like "minor", "nitpick", "cosmetic", "trivial", or "optional" to describe every issue, with no issues described as significant, major, critical, or important).
+Print: **`[STEP D] Checking exit condition...`**
 
-Check now:
-- If the exit condition is satisfied → go to **NORMAL EXIT (converged)**.
-- Otherwise → continue to step E.
+**`no_issues_found`:** Exit if `current_issue_titles` is empty.
 
-#### E. Check Stuck Detection
+**`no_major_issues_found`:** Exit if `current_issue_titles` is empty OR every issue is explicitly minor/nitpick/cosmetic/trivial/optional.
 
-Compare `current_issue_titles` to `previous_issue_titles`. If EVERY title in `current_issue_titles` also appeared in `previous_issue_titles` (the critique is raising only issues it already raised last round), go to **FORCED EXIT (stuck)**.
+If exit condition met → go to EXIT: CONVERGED.
 
-Set `previous_issue_titles = current_issue_titles`.
+If `current_issue_titles` is a subset of `previous_issue_titles` (every current title appeared last round) → go to EXIT: STUCK.
 
-#### F. Run Revise
+Set `previous_issue_titles = current_issue_titles`. Continue to E.
 
-Invoke the `spec-revise` skill using the Skill tool. If `revise_prompt` is non-empty, pass it as the skill's arguments. Otherwise invoke with no arguments.
+### E. Run revise
 
-#### G. Round Summary
+Print: **`[STEP E] Running /spec:revise...`**
 
-After the revise skill completes, read the **newly created** acknowledgement file(s) in `specification/critiques/` for this round. Produce a round summary by printing:
+Invoke `spec-revise` via the Skill tool. Pass `revise_prompt` as arguments if non-empty.
 
-```
-=== ROUND {round} SUMMARY ===
-```
+**After the skill returns, you are still inside the loop. Your next step is F.**
 
-Then for each issue from the critique, print its disposition from the acknowledgement:
-- **Applied:** `  ✓ Issue #{n}: {title} — applied to spec`
-- **Partially addressed:** `  ~ Issue #{n}: {title} — partially addressed: {brief reason}`
-- **Not addressed:** `  ✗ Issue #{n}: {title} — not addressed: {brief reason}`
+### F. Round summary
 
-If `revise_prompt` is non-empty, also note any additional changes the revise skill made in response to the `REVISE_PROMPT` that went beyond the critique issues:
-- `  + Additional (REVISE_PROMPT): {brief description of extra change}`
+Print: **`[STEP F] Round {round} summary`**
 
-End the summary with:
-- `  Issues raised: {count}`
-- `  Applied: {count} | Partial: {count} | Skipped: {count}`
+Read the new acknowledgement file(s). For each critique issue, print:
+- `  ✓ Issue #{n}: {title} — applied`
+- `  ~ Issue #{n}: {title} — partial: {reason}`
+- `  ✗ Issue #{n}: {title} — skipped: {reason}`
 
-#### H. Continue Loop
+If `revise_prompt` produced extra changes: `  + REVISE_PROMPT: {description}`
 
-Print exactly: **`=== ROUND {round} COMPLETE. LOOPING BACK. ===`**
+Print totals: `  Issues: {n} | Applied: {n} | Partial: {n} | Skipped: {n}`
 
-**You are NOT done. Return to Loop Start NOW and execute the next round. Do NOT stop.**
+### G. Loop continuation check
+
+Print: **`=== ROUND {round} COMPLETE ===`**
+
+**You are NOT done. Proceed to step H now.**
+
+### H. Return to A
+
+Print: **`[STEP H] Returning to step A`**
+
+Go to step A.
 
 ---
 
-## NORMAL EXIT (converged)
+## EXIT: CONVERGED
 
-Print exactly: **`=== LOOP CONVERGED after {round} rounds ===`**
+Print: **`=== LOOP CONVERGED after {round} round(s) ===`**
 
-Then proceed to **Final Report**.
+Go to FINAL REPORT.
 
-## FORCED EXIT (round limit)
+## EXIT: ROUND LIMIT
 
-Print exactly: **`=== LOOP HIT ROUND LIMIT ({max_rounds} rounds) without converging ===`**
+Print: **`=== LOOP HIT ROUND LIMIT ({max_rounds}) ===`**
 
-Then proceed to **Final Report**.
+Go to FINAL REPORT.
 
-## FORCED EXIT (stuck)
+## EXIT: STUCK
 
-Print exactly: **`=== LOOP STUCK: consecutive critiques raised the same issues ===`**
+Print: **`=== LOOP STUCK — same issues as previous round ===`**
 
-Then proceed to **Final Report**.
+Go to FINAL REPORT.
 
-## Final Report
+## FINAL REPORT
 
-This is the ONLY place where you may stop. Tell the user:
+This is the ONLY place you may stop. Print:
 
-- **Rounds completed:** The value of `round`
+- **Rounds:** `{round}`
 - **Exit reason:** converged / round limit / stuck
-- **Exit criteria used:** The value of `exit_criteria`
-- **Cumulative summary:** Combine the per-round summaries into an overall view — total issues raised across all rounds, total applied/partial/skipped, and the most significant spec improvements
-- **Files created:** List all critique and acknowledgement files generated during the loop (read `specification/critiques/` and list them)
+- **Exit criteria:** `{exit_criteria}`
+- **Cumulative totals:** issues raised, applied, partial, skipped across all rounds
+- **Key improvements:** most significant spec changes
+- **Files created:** list all critique and acknowledgement files from `specification/critiques/`

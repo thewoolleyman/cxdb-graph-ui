@@ -101,3 +101,11 @@ Tell the user:
 - The acknowledgement file path(s) created (list all)
 - A summary of key changes made
 - Any critique items that were intentionally not addressed, and why
+
+Then print exactly:
+
+```
+=== REVISE SKILL COMPLETE ===
+WARNING: If you are executing this skill as part of a loop (e.g., spec:critique-revise-loop), you are NOT done. Return to the loop protocol now and execute the next step. Check the loop's exit criteria before stopping.
+=== END REVISE SKILL ===
+```

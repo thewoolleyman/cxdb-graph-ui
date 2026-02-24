@@ -119,3 +119,11 @@ Tell the user:
 - The author name used
 - How many issues were found
 - A one-line summary of the most significant finding
+
+Then print exactly:
+
+```
+=== CRITIQUE SKILL COMPLETE ===
+WARNING: If you are executing this skill as part of a loop (e.g., spec:critique-revise-loop), you are NOT done. Return to the loop protocol now and execute the next step. Check the loop's exit criteria before stopping.
+=== END CRITIQUE SKILL ===
+```
