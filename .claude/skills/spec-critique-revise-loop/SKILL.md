@@ -43,7 +43,7 @@ Set `round = round + 1`. If `round > max_rounds` → go to EXIT: ROUND LIMIT.
 
 ### B. Run critique
 
-Print: **`[STEP B] Running /spec:critique...`**
+Print: **`[STEP B] (round {round} of {max_rounds}) Running /spec:critique...`**
 
 Invoke `spec-critique` via the Skill tool. Pass `critique_prompt` as arguments if non-empty.
 
@@ -51,13 +51,13 @@ Invoke `spec-critique` via the Skill tool. Pass `critique_prompt` as arguments i
 
 ### C. Read critique file
 
-Print: **`[STEP C] Reading critique file...`**
+Print: **`[STEP C] (round {round} of {max_rounds}) Reading critique file...`**
 
 Read the newly created file in `specification/critiques/`. Extract issue titles matching `## Issue #N: {title}`. Store as `current_issue_titles`. Note which issues are described as "minor" in their body.
 
 ### D. Check exit condition
 
-Print: **`[STEP D] Checking exit condition...`**
+Print: **`[STEP D] (round {round} of {max_rounds}) Checking exit condition...`**
 
 **`no_issues_found`:** Exit if `current_issue_titles` is empty.
 
@@ -71,7 +71,7 @@ Set `previous_issue_titles = current_issue_titles`. Continue to E.
 
 ### E. Run revise
 
-Print: **`[STEP E] Running /spec:revise...`**
+Print: **`[STEP E] (round {round} of {max_rounds}) Running /spec:revise...`**
 
 Invoke `spec-revise` via the Skill tool. Pass `revise_prompt` as arguments if non-empty.
 
@@ -79,7 +79,7 @@ Invoke `spec-revise` via the Skill tool. Pass `revise_prompt` as arguments if no
 
 ### F. Round summary
 
-Print: **`[STEP F] Round {round} summary`**
+Print: **`[STEP F] (round {round} of {max_rounds}) Round summary`**
 
 Read the new acknowledgement file(s). For each critique issue, print:
 - `  ✓ Issue #{n}: {title} — applied`
@@ -92,13 +92,13 @@ Print totals: `  Issues: {n} | Applied: {n} | Partial: {n} | Skipped: {n}`
 
 ### G. Loop continuation check
 
-Print: **`=== ROUND {round} COMPLETE ===`**
+Print: **`=== ROUND {round} of {max_rounds} COMPLETE ===`**
 
 **You are NOT done. Proceed to step H now.**
 
 ### H. Return to A
 
-Print: **`[STEP H] Returning to step A`**
+Print: **`[STEP H] (round {round} of {max_rounds}) Returning to step A`**
 
 Go to step A.
 
