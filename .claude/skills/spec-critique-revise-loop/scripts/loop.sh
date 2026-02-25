@@ -61,6 +61,8 @@ unset CLAUDECODE 2>/dev/null || true
 CRASH_LOG="/tmp/critique-revise-loop.$$.status"
 trap 'rm -f "$prev_issues_file" "$CRASH_LOG" 2>/dev/null' EXIT
 _status() { echo "$*" > "$CRASH_LOG"; }
+_elapsed() { bash "$ELAPSED_TIME" "$loop_start"; }
+_step_header() { echo "*$1 (round $round of $max_rounds, elapsed $(_elapsed)): $2*"; }
 
 # --- Read critic config ---
 
@@ -85,6 +87,9 @@ fi
 
 round=0
 prev_issues_file=$(mktemp)
+loop_start=$(date +%s)
+
+ELAPSED_TIME="$SCRIPT_DIR/elapsed_time.sh"
 
 cumulative_issues=0
 cumulative_applied=0
@@ -116,7 +121,7 @@ while true; do
 
   echo ""
   echo "=========================================="
-  echo "[STEP A] round = $round of $max_rounds"
+  _step_header "Step A" "Start round"
   echo "=========================================="
 
   _status "round=$round step=A"
@@ -132,7 +137,7 @@ while true; do
 
   _status "round=$round step=B critique"
   echo ""
-  echo "[STEP B] (round $round of $max_rounds) Running ${#critic_commands[@]} critic(s)..."
+  _step_header "Step B" "Running ${#critic_commands[@]} critic(s)"
   echo "---"
 
   # Snapshot critiques directory before running
@@ -213,7 +218,7 @@ while true; do
   # --- Step C: Find new critique files ---
 
   echo ""
-  echo "[STEP C] (round $round of $max_rounds) Finding critique files..."
+  _step_header "Step C" "Finding critique files"
 
   after_critique=$(ls "$CRITIQUES_DIR" 2>/dev/null | sort)
   round_critique_files=()
@@ -240,7 +245,7 @@ while true; do
   # --- Step D: Check exit condition (all critics must converge) ---
 
   echo ""
-  echo "[STEP D] (round $round of $max_rounds) Checking exit condition..."
+  _step_header "Step D" "Checking exit condition"
 
   all_issues_tmp=$(mktemp)
   any_continue=0
@@ -301,7 +306,7 @@ while true; do
 
   _status "round=$round step=E revise"
   echo ""
-  echo "[STEP E] (round $round of $max_rounds) Running /spec:revise..."
+  _step_header "Step E" "Running /spec:revise"
   echo "---"
 
   # Snapshot before revise
@@ -332,7 +337,7 @@ while true; do
   # --- Step F: Round summary ---
 
   echo ""
-  echo "[STEP F] (round $round of $max_rounds) Round summary"
+  _step_header "Step F" "Round summary"
 
   after_revise=$(ls "$CRITIQUES_DIR" 2>/dev/null | sort)
   round_ack_files=()

@@ -25,6 +25,7 @@ cp "$SCRIPT_DIR/round.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/s
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/round_summary.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/report.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
+cp "$SCRIPT_DIR/elapsed_time.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 chmod +x "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"*.sh
 
 # --- Create mock claude ---
@@ -147,6 +148,17 @@ assert_contains() {
   fi
 }
 
+assert_matches() {
+  local test_name="$1" pattern="$2" actual="$3"
+  if echo "$actual" | grep -qE "$pattern"; then
+    echo "  PASS: $test_name"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL: $test_name (expected to match '$pattern')"
+    fail=$((fail + 1))
+  fi
+}
+
 assert_file_exists() {
   local test_name="$1" file="$2"
   if [ -f "$file" ]; then
@@ -163,6 +175,7 @@ echo ""
 
 STATE_DIR="$TMPDIR_TEST/state"
 mkdir -p "$STATE_DIR"
+date +%s > "$STATE_DIR/loop_start"
 
 # --- Test 1: Round 1 returns exit 0 (continue) ---
 
@@ -177,11 +190,11 @@ exit1=$?
 set -e
 
 assert_eq "round 1 exit code" "0" "$exit1"
-assert_contains "step A header" "[STEP A] round = 1 of 3" "$output1"
-assert_contains "step B critique" "[STEP B] (round 1 of 3)" "$output1"
+assert_matches "step A header" "Step A \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Start round" "$output1"
+assert_matches "step B critique" "Step B \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Running critics" "$output1"
 assert_contains "step D check" "CONTINUE" "$output1"
-assert_contains "step E revise" "[STEP E] (round 1 of 3)" "$output1"
-assert_contains "step F summary" "[STEP F] (round 1 of 3)" "$output1"
+assert_matches "step E revise" "Step E \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Running /spec:revise" "$output1"
+assert_matches "step F summary" "Step F \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Round summary" "$output1"
 assert_contains "round complete" "ROUND 1 of 3 COMPLETE" "$output1"
 
 # --- Test 2: State persisted ---
@@ -215,7 +228,7 @@ assert_eq "round 2 exit code" "1" "$exit2"
 assert_contains "converged message" "CONVERGED" "$output2"
 
 # Round 2 should NOT have revise step (converged at D)
-if echo "$output2" | grep -qF "[STEP E]"; then
+if echo "$output2" | grep -qE "Step E.*Running /spec:revise"; then
   echo "  FAIL: round 2 should not have revise step"
   fail=$((fail + 1))
 else

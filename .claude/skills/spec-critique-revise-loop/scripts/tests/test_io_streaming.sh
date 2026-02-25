@@ -34,6 +34,7 @@ mkdir -p "$MOCK_PROJ/specification/critiques"
 cp "$SCRIPT_DIR/loop.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/round_summary.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
+cp "$SCRIPT_DIR/elapsed_time.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 chmod +x "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"*.sh
 
 # --- Create mock claude that writes to BOTH stdout and stderr ---
@@ -226,9 +227,9 @@ assert_contains "revise stderr progress" "STDERR:revise:progress" "$COMBINED_FIL
 echo ""
 echo "Test 3: loop.sh framing output present"
 assert_contains "header" "CRITIQUE-REVISE LOOP" "$COMBINED_FILE"
-assert_contains "step A" "[STEP A]" "$COMBINED_FILE"
-assert_contains "step B" "[STEP B]" "$COMBINED_FILE"
-assert_contains "step D" "[STEP D]" "$COMBINED_FILE"
+assert_contains "step A" "Step A" "$COMBINED_FILE"
+assert_contains "step B" "Step B" "$COMBINED_FILE"
+assert_contains "step D" "Step D" "$COMBINED_FILE"
 assert_contains "final report" "FINAL REPORT" "$COMBINED_FILE"
 
 # --- Test 4: round ordering (round 1 output before round 2 output) ---

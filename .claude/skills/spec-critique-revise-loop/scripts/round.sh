@@ -68,6 +68,7 @@ CRITIC_CONFIG="$SKILL_DIR/config/critic-commands.conf"
 
 CHECK_EXIT="$SCRIPT_DIR/check_exit.sh"
 ROUND_SUMMARY="$SCRIPT_DIR/round_summary.sh"
+ELAPSED_TIME="$SCRIPT_DIR/elapsed_time.sh"
 
 # --- Allowed tools for each sub-skill ---
 
@@ -100,11 +101,20 @@ CRASH_LOG="/tmp/critique-revise-round.$$.status"
 trap 'rm -f "$CRASH_LOG" 2>/dev/null' EXIT
 _status() { echo "$*" > "$CRASH_LOG"; }
 
+# Elapsed time: use loop_start from state dir if available, otherwise use script start
+if [ -f "$state_dir/loop_start" ]; then
+  _loop_start=$(cat "$state_dir/loop_start")
+else
+  _loop_start=$(date +%s)
+fi
+_elapsed() { bash "$ELAPSED_TIME" "$_loop_start"; }
+_step_header() { echo "*$1 (round $round of $max_rounds, elapsed $(_elapsed)): $2*"; }
+
 # --- Round header ---
 
 echo ""
 echo "=========================================="
-echo "[STEP A] round = $round of $max_rounds"
+_step_header "Step A" "Start round"
 echo "=========================================="
 
 _status "round=$round step=A"
@@ -113,7 +123,7 @@ _status "round=$round step=A"
 
 _status "round=$round step=B critique"
 echo ""
-echo "[STEP B] (round $round of $max_rounds) Running critics..."
+_step_header "Step B" "Running critics"
 echo "---"
 
 # Snapshot critiques directory before running
@@ -222,7 +232,7 @@ echo "---"
 # --- Step C: Find new critique files ---
 
 echo ""
-echo "[STEP C] (round $round of $max_rounds) Finding critique files..."
+_step_header "Step C" "Finding critique files"
 
 after_critique=$(ls "$CRITIQUES_DIR" 2>/dev/null | sort)
 critique_files=()
@@ -249,7 +259,7 @@ done
 # --- Step D: Check exit condition (all critics must converge) ---
 
 echo ""
-echo "[STEP D] (round $round of $max_rounds) Checking exit condition..."
+_step_header "Step D" "Checking exit condition"
 
 # We need a temp file for aggregating issue titles across all critics.
 # check_exit.sh writes to prev_issues_file as a side effect, so we use
@@ -320,7 +330,7 @@ fi
 
 _status "round=$round step=E revise"
 echo ""
-echo "[STEP E] (round $round of $max_rounds) Running /spec:revise..."
+_step_header "Step E" "Running /spec:revise"
 echo "---"
 
 # Snapshot before revise
@@ -351,7 +361,7 @@ echo "---"
 # --- Step F: Round summary ---
 
 echo ""
-echo "[STEP F] (round $round of $max_rounds) Round summary"
+_step_header "Step F" "Round summary"
 
 after_revise=$(ls "$CRITIQUES_DIR" 2>/dev/null | sort)
 round_ack_files=()

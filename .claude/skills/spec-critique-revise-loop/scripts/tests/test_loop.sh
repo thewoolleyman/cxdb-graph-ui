@@ -25,6 +25,7 @@ mkdir -p "$MOCK_PROJ/specification/critiques"
 cp "$SCRIPT_DIR/loop.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/round_summary.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
+cp "$SCRIPT_DIR/elapsed_time.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 chmod +x "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"*.sh
 
 # --- Create mock claude binary ---
@@ -250,6 +251,17 @@ assert_contains() {
   fi
 }
 
+assert_matches() {
+  local test_name="$1" pattern="$2" actual="$3"
+  if echo "$actual" | grep -qE "$pattern"; then
+    echo "  PASS: $test_name"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL: $test_name (expected to match '$pattern')"
+    fail=$((fail + 1))
+  fi
+}
+
 # Test: 2-round loop with no_major_issues_found should converge after round 2
 echo "--- Running loop.sh with mock claude (max 3 rounds) ---"
 echo ""
@@ -271,22 +283,22 @@ echo ""
 
 # Verify the output
 assert_contains "header printed" "CRITIQUE-REVISE LOOP" "$output"
-assert_contains "round 1 started" "[STEP A] round = 1 of 3" "$output"
-assert_contains "round 1 critique" "[STEP B] (round 1 of 3)" "$output"
-assert_contains "round 1 exit check" "[STEP D] (round 1 of 3)" "$output"
+assert_matches "round 1 started" "Step A \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Start round" "$output"
+assert_matches "round 1 critique" "Step B \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Running" "$output"
+assert_matches "round 1 exit check" "Step D \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Checking exit" "$output"
 assert_contains "round 1 continue" "CONTINUE" "$output"
-assert_contains "round 1 revise" "[STEP E] (round 1 of 3)" "$output"
-assert_contains "round 1 summary" "[STEP F] (round 1 of 3)" "$output"
+assert_matches "round 1 revise" "Step E \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Running /spec:revise" "$output"
+assert_matches "round 1 summary" "Step F \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Round summary" "$output"
 assert_contains "round 1 complete" "ROUND 1 of 3 COMPLETE" "$output"
-assert_contains "round 2 started" "[STEP A] round = 2 of 3" "$output"
-assert_contains "round 2 critique" "[STEP B] (round 2 of 3)" "$output"
+assert_matches "round 2 started" "Step A \(round 2 of 3, elapsed [0-9]+:[0-9]{2}\): Start round" "$output"
+assert_matches "round 2 critique" "Step B \(round 2 of 3, elapsed [0-9]+:[0-9]{2}\): Running" "$output"
 assert_contains "converged" "CONVERGED" "$output"
 assert_contains "final report" "FINAL REPORT" "$output"
 assert_contains "exit reason converged" "Exit reason:       converged" "$output"
 assert_contains "rounds completed" "Rounds completed:  2" "$output"
 
 # Round 2 should NOT have revise/summary (converged at step D)
-if echo "$output" | grep -qF "[STEP E] (round 2 of 3)"; then
+if echo "$output" | grep -qE "Step E \(round 2 of 3.*Running /spec:revise"; then
   echo "  FAIL: round 2 should not have revise step (converged at D)"
   fail=$((fail + 1))
 else

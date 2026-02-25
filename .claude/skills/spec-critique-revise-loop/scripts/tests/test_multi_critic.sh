@@ -25,6 +25,7 @@ mkdir -p "$MOCK_PROJ/specification/critiques"
 cp "$SCRIPT_DIR/round.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/round_summary.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
+cp "$SCRIPT_DIR/elapsed_time.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/report.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 chmod +x "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"*.sh
 
@@ -353,6 +354,7 @@ mkdir -p "$MOCK_PROJ2/specification/critiques"
 cp "$SCRIPT_DIR/round.sh" "$MOCK_PROJ2/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ2/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/round_summary.sh" "$MOCK_PROJ2/.claude/skills/spec-critique-revise-loop/scripts/"
+cp "$SCRIPT_DIR/elapsed_time.sh" "$MOCK_PROJ2/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/report.sh" "$MOCK_PROJ2/.claude/skills/spec-critique-revise-loop/scripts/"
 chmod +x "$MOCK_PROJ2/.claude/skills/spec-critique-revise-loop/scripts/"*.sh
 
@@ -395,6 +397,7 @@ mkdir -p "$MOCK_PROJ3/specification/critiques"
 cp "$SCRIPT_DIR/round.sh" "$MOCK_PROJ3/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ3/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/round_summary.sh" "$MOCK_PROJ3/.claude/skills/spec-critique-revise-loop/scripts/"
+cp "$SCRIPT_DIR/elapsed_time.sh" "$MOCK_PROJ3/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/report.sh" "$MOCK_PROJ3/.claude/skills/spec-critique-revise-loop/scripts/"
 chmod +x "$MOCK_PROJ3/.claude/skills/spec-critique-revise-loop/scripts/"*.sh
 
@@ -430,6 +433,7 @@ mkdir -p "$MOCK_PROJ4/specification/critiques"
 cp "$SCRIPT_DIR/round.sh" "$MOCK_PROJ4/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ4/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/round_summary.sh" "$MOCK_PROJ4/.claude/skills/spec-critique-revise-loop/scripts/"
+cp "$SCRIPT_DIR/elapsed_time.sh" "$MOCK_PROJ4/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/report.sh" "$MOCK_PROJ4/.claude/skills/spec-critique-revise-loop/scripts/"
 chmod +x "$MOCK_PROJ4/.claude/skills/spec-critique-revise-loop/scripts/"*.sh
 
