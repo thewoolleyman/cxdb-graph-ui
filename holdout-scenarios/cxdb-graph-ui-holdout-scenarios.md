@@ -135,6 +135,7 @@ Then expand_spec is colored green (complete)
 ### Scenario: Agent stuck in error loop (per-context scoping)
 ```
 Given a pipeline run is active with a single context
+  And within the current 100-turn poll window for that context
   And the 3 most recent ToolResult turns on a node within that context each have is_error: true
   And non-ToolResult turns (Prompt, ToolCall) are interleaved between them
 When the UI polls CXDB
