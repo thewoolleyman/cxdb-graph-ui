@@ -32,8 +32,8 @@
       "which*": "allow"
     },
     "read": "allow",
-    "write": "ask",
-    "edit": "ask",
+    "write": "allow",
+    "edit": "allow",
     "glob": "allow",
     "grep": "allow",
     "todowrite": "allow"

@@ -84,7 +84,8 @@ Then expand_spec is colored green (complete)
 ### Scenario: Agent stuck in error loop
 ```
 Given a pipeline run is active
-  And the most recent 3+ turns on a node have is_error: true
+  And the 3 most recent ToolResult turns on a node each have is_error: true
+  And non-ToolResult turns (Prompt, ToolCall) are interleaved between them
 When the UI polls CXDB
 Then that node is colored red (error)
 ```
@@ -95,6 +96,15 @@ Given a pipeline run completed with all nodes successful
 When the UI polls CXDB
 Then all traversed nodes are colored green (complete)
   And no node is pulsing
+```
+
+### Scenario: Pipeline stalled after agent crash
+```
+Given a pipeline run is active with a node in running state
+  And all active-run contexts transition to is_live: false
+When the UI polls CXDB
+Then the running node is marked stale (orange)
+  And the top bar shows "Pipeline stalled — no active sessions"
 ```
 
 ### Scenario: No active pipeline run
@@ -271,6 +281,16 @@ When the instance becomes reachable again
 Then the status overlay resumes with fresh data
 ```
 
+### Scenario: Turn fetch fails for one context
+```
+Given a pipeline run is active across multiple contexts
+  And one context returns a non-200 response when fetching turns (e.g., type registry missing)
+When the UI polls CXDB
+Then the failing context is skipped for that poll cycle
+  And its last known node status remains visible
+  And other contexts continue to update normally
+```
+
 ### Scenario: All CXDB instances return empty context lists
 ```
 Given all configured CXDB instances are running but have no contexts
@@ -319,6 +339,13 @@ Then the server exits with a non-zero code
 Given the server was started with --dot pipeline-a.dot
 When a request is made to /dots/pipeline-b.dot
 Then the server returns 404
+```
+
+### Scenario: Duplicate DOT basenames rejected
+```
+When the user runs: go run ui/main.go --dot pipelines/alpha/pipeline.dot --dot pipelines/beta/pipeline.dot
+Then the server exits with a non-zero code
+  And prints an error identifying the conflicting basename "pipeline.dot"
 ```
 
 ### Scenario: Path traversal attempt
