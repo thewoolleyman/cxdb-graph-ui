@@ -305,8 +305,16 @@ while true; do
   # --- Step E: Run revise ---
 
   _status "round=$round step=E revise"
+
+  # Extract unique version identifiers from critique files for the status header
+  _revise_versions=""
+  for _cf in "${round_critique_files[@]}"; do
+    _v=$(basename "$_cf" | grep -oE '^v[0-9]+')
+    [ -n "$_v" ] && _revise_versions="${_revise_versions:+$_revise_versions, }$_v"
+  done
+
   echo ""
-  _step_header "Step E" "Running /spec:revise"
+  _step_header "Step E" "Running /spec:revise for ${_revise_versions:-unknown}"
   echo "---"
 
   # Snapshot before revise

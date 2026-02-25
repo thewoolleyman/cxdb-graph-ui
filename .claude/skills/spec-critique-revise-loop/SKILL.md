@@ -166,6 +166,8 @@ bash .claude/skills/spec-critique-revise-loop/scripts/check_timeout.sh "$LOOP_ST
 
 If exit code is 1 → set `EXIT_REASON=loop_timeout`. Skip to Step 5.
 
+Extract the version identifier(s) from the new critique files (e.g., `v45` from `v45-opus.md`) and include them in the Step 4e header: `*Step 4e (round N/MAX_ROUNDS, elapsed MM:SS): Run revise for v45*`. When multiple critics produce different versions, join them with commas (e.g., `v45, v46`).
+
 If continuing, launch a single Task subagent to revise:
 
 ```

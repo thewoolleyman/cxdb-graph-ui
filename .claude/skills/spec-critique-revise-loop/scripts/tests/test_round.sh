@@ -193,7 +193,7 @@ assert_eq "round 1 exit code" "0" "$exit1"
 assert_matches "step A header" "Step A \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Start round" "$output1"
 assert_matches "step B critique" "Step B \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Running critics" "$output1"
 assert_contains "step D check" "CONTINUE" "$output1"
-assert_matches "step E revise" "Step E \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Running /spec:revise" "$output1"
+assert_matches "step E revise with version" "Step E \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Running /spec:revise for v[0-9]+" "$output1"
 assert_matches "step F summary" "Step F \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Round summary" "$output1"
 assert_contains "round complete" "ROUND 1 of 3 COMPLETE" "$output1"
 

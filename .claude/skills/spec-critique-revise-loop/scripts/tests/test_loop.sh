@@ -287,7 +287,7 @@ assert_matches "round 1 started" "Step A \(round 1 of 3, elapsed [0-9]+:[0-9]{2}
 assert_matches "round 1 critique" "Step B \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Running" "$output"
 assert_matches "round 1 exit check" "Step D \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Checking exit" "$output"
 assert_contains "round 1 continue" "CONTINUE" "$output"
-assert_matches "round 1 revise" "Step E \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Running /spec:revise" "$output"
+assert_matches "round 1 revise with version" "Step E \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Running /spec:revise for v[0-9]+" "$output"
 assert_matches "round 1 summary" "Step F \(round 1 of 3, elapsed [0-9]+:[0-9]{2}\): Round summary" "$output"
 assert_contains "round 1 complete" "ROUND 1 of 3 COMPLETE" "$output"
 assert_matches "round 2 started" "Step A \(round 2 of 3, elapsed [0-9]+:[0-9]{2}\): Start round" "$output"
