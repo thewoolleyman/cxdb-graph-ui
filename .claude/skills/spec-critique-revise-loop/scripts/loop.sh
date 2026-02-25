@@ -48,20 +48,18 @@ REVISE_TOOLS="Read,Write,Edit,Glob,Bash(ls:*),Bash(pwd:*),Bash(date:*)"
 # Allow nested claude invocation (we're called from inside a claude session)
 unset CLAUDECODE 2>/dev/null || true
 
-# --- Log file ---
-# The Bash tool buffers all output until the command finishes (~10 min/round).
-# Tee everything to a log file so the user can `tail -f` it for progress.
+# --- Crash detection ---
+# Write a status file to /tmp so a crash can be diagnosed.
+# This is ONLY for crash detection — all real output goes to stdout/stderr.
 
-LOG_FILE="$PROJ_DIR/specification/critiques/.loop-progress.log"
-
-# Redirect all subsequent stdout+stderr through tee
-exec > >(tee "$LOG_FILE") 2>&1
+CRASH_LOG="/tmp/critique-revise-loop.$$.status"
+trap 'rm -f "$prev_issues_file" "$CRASH_LOG" 2>/dev/null' EXIT
+_status() { echo "$*" > "$CRASH_LOG"; }
 
 # --- State ---
 
 round=0
 prev_issues_file=$(mktemp)
-trap 'rm -f "$prev_issues_file" "$LOG_FILE" 2>/dev/null' EXIT
 
 cumulative_issues=0
 cumulative_applied=0
@@ -95,6 +93,8 @@ while true; do
   echo "[STEP A] round = $round of $max_rounds"
   echo "=========================================="
 
+  _status "round=$round step=A"
+
   # Check round limit BEFORE doing work
   if [ "$round" -gt "$max_rounds" ]; then
     round=$((round - 1))  # don't count the round that didn't execute
@@ -104,6 +104,7 @@ while true; do
 
   # --- Step B: Run critique ---
 
+  _status "round=$round step=B critique"
   echo ""
   echo "[STEP B] (round $round of $max_rounds) Running /spec:critique..."
   echo "---"
@@ -185,6 +186,7 @@ while true; do
 
   # --- Step E: Run revise ---
 
+  _status "round=$round step=E revise"
   echo ""
   echo "[STEP E] (round $round of $max_rounds) Running /spec:revise..."
   echo "---"
