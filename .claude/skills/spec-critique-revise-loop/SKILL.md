@@ -1,6 +1,6 @@
 ---
 name: spec:critique-revise-loop
-description: "Automated critique-revise loop for the CXDB Graph UI spec. Args: LOOP_EXIT_CRITERIA=no_issues_found|no_major_issues_found (default: no_major_issues_found), MAX_ROUNDS=N (default: 3), CRITIQUE_PROMPT=\"...\", REVISE_PROMPT=\"...\""
+description: "Automated critique-revise loop for the CXDB Graph UI spec. Args: LOOP_EXIT_CRITERIA=no_issues_found|no_major_issues_found (default: no_major_issues_found), MAX_ROUNDS=N (default: 3), ROUND_TIMEOUT_MINUTES=N (default: 45), CRITIQUE_PROMPT=\"...\", REVISE_PROMPT=\"...\""
 user-invocable: true
 allowed-tools: Bash(bash:*), Bash(ls:*), Bash(cat:*), Bash(comm:*), Bash(sort:*), Bash(mktemp:*), Bash(rm:*), Bash(mkdir:*), Bash(wc:*), Bash(echo:*), Task, Read, Glob
 ---
@@ -11,8 +11,11 @@ Parse `$ARGUMENTS` for named `KEY=VALUE` parameters. Ignore non-parameter text.
 |-----------|--------|---------|
 | `LOOP_EXIT_CRITERIA` | `no_issues_found` \| `no_major_issues_found` | `no_major_issues_found` |
 | `MAX_ROUNDS` | Positive integer | `3` |
+| `ROUND_TIMEOUT_MINUTES` | Positive integer | `45` |
 | `CRITIQUE_PROMPT` | Quoted string | _(empty)_ |
 | `REVISE_PROMPT` | Quoted string | _(empty)_ |
+
+The loop timeout is derived automatically: `LOOP_TIMEOUT_MINUTES = ROUND_TIMEOUT_MINUTES * MAX_ROUNDS`.
 
 Print the parsed arguments.
 
@@ -28,7 +31,11 @@ echo "State dir: $STATE_DIR"
 mkdir -p "$STATE_DIR"
 touch "$STATE_DIR/prev_issues"
 echo "0 0 0 0" > "$STATE_DIR/cumulative"
+date +%s > "$STATE_DIR/loop_start"
+echo "Loop started at $(date)"
 ```
+
+Compute `LOOP_TIMEOUT_MINUTES = ROUND_TIMEOUT_MINUTES * MAX_ROUNDS` and store both values for later use.
 
 ### Step 2: Print header
 
@@ -50,6 +57,21 @@ For each round from 1 to `{MAX_ROUNDS}`:
 
 When printing each substep header, always include the round info. Format: `Step 4x (round N/MAX_ROUNDS): ...`
 
+#### Step 4-pre: Check timeouts before starting round
+
+Before each round, check both the loop timeout and record the round start time:
+
+```bash
+LOOP_START=$(cat "$STATE_DIR/loop_start")
+bash .claude/skills/spec-critique-revise-loop/scripts/check_timeout.sh "$LOOP_START" {LOOP_TIMEOUT_MINUTES} "loop"
+```
+
+If exit code is 1 → set `EXIT_REASON=loop_timeout`. Skip to Step 5.
+
+```bash
+date +%s > "$STATE_DIR/round_start"
+```
+
 #### Step 4a: Snapshot critiques directory
 
 ```bash
@@ -69,17 +91,19 @@ Task tool:
   model: "<model>"  (e.g., "opus")
   prompt: "<the substituted prompt>"
   description: "Critic <N>: critique spec"
+  max_turns: 30
 ```
 
 For `bash` critics:
 ```
 Task tool:
-  subagent_type: "Bash"
+  subagent_type: "general-purpose"
   prompt: "Run this command from the project root and report the output: <command>"
   description: "Critic <N>: external critic"
+  max_turns: 15
 ```
 
-Each Task subagent will return when done. Wait for all to complete.
+Each Task subagent will return when done (or when `max_turns` is reached). Wait for all to complete.
 
 Print a brief summary of each critic's result.
 
@@ -113,7 +137,25 @@ bash .claude/skills/spec-critique-revise-loop/scripts/check_exit.sh \
 
 Note: `check_exit.sh` updates `$STATE_DIR/prev_issues` as a side effect. When checking multiple files, use a temporary copy per critic and merge after (sort -u) to avoid cross-contamination.
 
-#### Step 4e: Run revise
+#### Step 4e: Check round timeout, then run revise
+
+Before launching revise, check the round timeout:
+
+```bash
+ROUND_START=$(cat "$STATE_DIR/round_start")
+bash .claude/skills/spec-critique-revise-loop/scripts/check_timeout.sh "$ROUND_START" {ROUND_TIMEOUT_MINUTES} "round"
+```
+
+If exit code is 1 → set `EXIT_REASON=round_timeout`. Skip to Step 5.
+
+Also check the loop timeout:
+
+```bash
+LOOP_START=$(cat "$STATE_DIR/loop_start")
+bash .claude/skills/spec-critique-revise-loop/scripts/check_timeout.sh "$LOOP_START" {LOOP_TIMEOUT_MINUTES} "loop"
+```
+
+If exit code is 1 → set `EXIT_REASON=loop_timeout`. Skip to Step 5.
 
 If continuing, launch a single Task subagent to revise:
 
@@ -122,6 +164,7 @@ Task tool:
   subagent_type: "general-purpose"
   prompt: "/spec:revise {REVISE_PROMPT_ARG}"  (or just "/spec:revise" if no extra prompt)
   description: "Revise spec from critiques"
+  max_turns: 40
 ```
 
 Wait for the revise subagent to complete. Print a summary of the result.

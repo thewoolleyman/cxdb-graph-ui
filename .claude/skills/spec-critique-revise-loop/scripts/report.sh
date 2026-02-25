@@ -41,6 +41,27 @@ echo "============================================"
 echo "Rounds completed:  $rounds_completed"
 echo "Exit reason:       $exit_reason"
 echo "Exit criteria:     ${exit_criteria:-(unknown)}"
+
+# Print elapsed time if loop_start exists
+if [ -f "$state_dir/loop_start" ]; then
+  loop_start=$(cat "$state_dir/loop_start")
+  now=$(date +%s)
+  elapsed=$(( now - loop_start ))
+  elapsed_m=$(( elapsed / 60 ))
+  elapsed_s=$(( elapsed % 60 ))
+  echo "Elapsed time:      ${elapsed_m}m ${elapsed_s}s"
+fi
+
+case "$exit_reason" in
+  loop_timeout)
+    echo ""
+    echo "** Loop terminated: total wall-clock timeout exceeded **"
+    ;;
+  round_timeout)
+    echo ""
+    echo "** Loop terminated: round wall-clock timeout exceeded **"
+    ;;
+esac
 echo ""
 echo "Cumulative totals:"
 echo "  Issues raised: $cumulative_issues"
