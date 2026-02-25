@@ -45,12 +45,12 @@ Changes:
 
 ## Issue #4: No holdout scenario covers the `StageFailed` → `StageRetrying` → retry success flow
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-The proposed scenario has been written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md` covering both the intermediate status during the retry window and the final "complete" status after successful retry. The scenario explicitly tests that `will_retry: true` prevents the node from being stuck in error state.
+The proposed scenario has been written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` covering both the intermediate status during the retry window and the final "complete" status after successful retry. The scenario explicitly tests that `will_retry: true` prevents the node from being stuck in error state.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed holdout scenario for StageFailed retry flow
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed holdout scenario for StageFailed retry flow
 
 ## Not Addressed (Out of Scope)
 

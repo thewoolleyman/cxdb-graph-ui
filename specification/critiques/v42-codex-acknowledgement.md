@@ -4,12 +4,12 @@ Both issues from the v42 codex critique were evaluated. Issue #1 was deferred as
 
 ## Issue #1: Holdout scenarios do not cover the CQL-empty supplemental discovery path
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-A proposed holdout scenario "CQL-empty supplemental discovery populates status overlay and liveness" was written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`. The scenario tests the full end-to-end flow: CQL returns empty results, the supplemental context list discovers Kilroy contexts, status overlays update, and liveness checks work correctly (preventing false stale detection). This complements the existing proposed scenarios (v37-opus for discovery, v38-codex for liveness) by verifying the complete path from discovery through rendering.
+A proposed holdout scenario "CQL-empty supplemental discovery populates status overlay and liveness" was written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`. The scenario tests the full end-to-end flow: CQL returns empty results, the supplemental context list discovers Kilroy contexts, status overlays update, and liveness checks work correctly (preventing false stale detection). This complements the existing proposed scenarios (v37-opus for discovery, v38-codex for liveness) by verifying the complete path from discovery through rendering.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed scenario for CQL-empty supplemental discovery end-to-end
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed scenario for CQL-empty supplemental discovery end-to-end
 
 ## Issue #2: CXDB `node_id` normalization rules are underspecified for generic pipelines
 

@@ -4,9 +4,9 @@ All three issues from the v40 codex critique were evaluated. Issues #2 and #3 we
 
 ## Issue #1: Holdout scenarios still test only the original six shapes
 
-**Status: Deferred — proposed holdout scenarios already exist**
+**Status: Applied to holdout scenarios**
 
-The v39-opus acknowledgement already wrote proposed holdout scenarios covering all ten shapes (both "Nodes rendered with correct shapes — extended" and "Status coloring applies to all node shapes — extended") to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`. These proposed scenarios include `circle`, `doublecircle`, `component`, `tripleoctagon`, and `house`. The proposed scenarios are awaiting promotion to the main holdout scenarios file. No additional spec change is needed — the proposed scenarios already address the gap.
+The v39-opus acknowledgement already wrote proposed holdout scenarios covering all ten shapes (both "Nodes rendered with correct shapes — extended" and "Status coloring applies to all node shapes — extended") to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`. These proposed scenarios include `circle`, `doublecircle`, `component`, `tripleoctagon`, and `house`. The proposed scenarios are awaiting promotion to the main holdout scenarios file. No additional spec change is needed — the proposed scenarios already address the gap.
 
 ## Issue #2: Definition of Done still lists only six shapes
 
@@ -19,9 +19,9 @@ Changes:
 
 ## Issue #3: The RunFailed-with-node_id case is still absent from the official holdout scenarios
 
-**Status: Deferred — proposed holdout scenario already exists**
+**Status: Applied to holdout scenarios**
 
-The v39-opus acknowledgement already wrote a proposed holdout scenario "Pipeline run fails on a specific node (RunFailed with node_id)" to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`. This proposed scenario tests that a `RunFailed` turn with `node_id` marks the node as red (error) with `hasLifecycleResolution = true`, and that the detail panel shows the failure reason. Promotion of proposed scenarios to the main holdout scenarios file is a separate review step, not a spec revision action.
+The v39-opus acknowledgement already wrote a proposed holdout scenario "Pipeline run fails on a specific node (RunFailed with node_id)" to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`. This proposed scenario tests that a `RunFailed` turn with `node_id` marks the node as red (error) with `hasLifecycleResolution = true`, and that the detail panel shows the failure reason. Promotion of proposed scenarios to the main holdout scenarios file is a separate review step, not a spec revision action.
 
 ## Not Addressed (Out of Scope)
 

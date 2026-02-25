@@ -5,7 +5,7 @@
 
 ## Prior Context
 
-The v39 opus acknowledgement reports that the spec now includes the expanded 10-shape mapping (plus default), CSS coverage notes, and RunFailed handling in status derivation. A RunFailed holdout scenario was drafted in `holdout-scenarios/proposed-holdout-scenarios-to-review.md` but not added to the main holdout scenarios file.
+The v39 opus acknowledgement reports that the spec now includes the expanded 10-shape mapping (plus default), CSS coverage notes, and RunFailed handling in status derivation. A RunFailed holdout scenario was drafted in `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` but not added to the main holdout scenarios file.
 
 ---
 
@@ -33,7 +33,7 @@ Update the Definition of Done shape checklist to match the ten shapes (plus defa
 ## Issue #3: The RunFailed-with-node_id case is still absent from the official holdout scenarios
 
 ### The problem
-The spec now treats `RunFailed` with `node_id` as a lifecycle resolution that sets the node to error and surfaces the reason in the detail panel. The only test coverage is a proposed scenario in `holdout-scenarios/proposed-holdout-scenarios-to-review.md`, not the primary holdout scenarios file. This leaves a gap between the status derivation logic and the official behavioral tests.
+The spec now treats `RunFailed` with `node_id` as a lifecycle resolution that sets the node to error and surfaces the reason in the detail panel. The only test coverage is a proposed scenario in `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`, not the primary holdout scenarios file. This leaves a gap between the status derivation logic and the official behavioral tests.
 
 ### Suggestion
 Promote the proposed "RunFailed with node_id" scenario into `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`, including the detail-panel reason display, so implementations are forced to cover this lifecycle path.

@@ -31,12 +31,12 @@ Changes:
 
 ## Issue #4: No holdout scenario for forked context discovery via parent's RunStarted
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-The suggested holdout scenario exercises a critical correctness path (forked context's `fetchFirstTurn` crossing the context boundary to discover the parent's `RunStarted`). This is well-documented in the spec (Section 5.5, "Cross-context traversal for forked contexts") but not covered by existing holdout scenarios. The proposed scenario has been written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md` for review before incorporation.
+The suggested holdout scenario exercises a critical correctness path (forked context's `fetchFirstTurn` crossing the context boundary to discover the parent's `RunStarted`). This is well-documented in the spec (Section 5.5, "Cross-context traversal for forked contexts") but not covered by existing holdout scenarios. The proposed scenario has been written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` for review before incorporation.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added "Forked context discovered via parent's RunStarted turn" proposed scenario.
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added "Forked context discovered via parent's RunStarted turn" proposed scenario.
 
 ## Not Addressed (Out of Scope)
 

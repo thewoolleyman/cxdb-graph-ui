@@ -10,11 +10,11 @@ Changed `determineActiveRuns` to use `context_id` as the primary (and sole) sort
 
 The codex critique suggested using `min(created_at_unix_ms)` or the root context's `created_at_unix_ms`. The opus critique (v32-opus Issue #2) suggested using `context_id` as the primary sort key. We adopted the `context_id` approach because it is simpler (no need to identify root contexts) and immune to the `append_turn` update semantics entirely.
 
-Wrote a proposed holdout scenario to `holdout-scenarios/proposed-holdout-scenarios-to-review.md` covering the late-branch active-run flip edge case, as the codex critique suggested.
+Wrote a proposed holdout scenario to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` covering the late-branch active-run flip edge case, as the codex critique suggested.
 
 Changes:
 - `specification/cxdb-graph-ui-spec.md`: Updated `determineActiveRuns` in Sections 5.5 and 6.1 to use `context_id` instead of `created_at_unix_ms`
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added "Active run selection stable when older run spawns late branch context" proposed scenario
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added "Active run selection stable when older run spawns late branch context" proposed scenario
 
 ## Not Addressed (Out of Scope)
 

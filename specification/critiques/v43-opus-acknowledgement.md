@@ -22,12 +22,12 @@ Changes:
 
 ## Issue #3: No holdout scenario covers the interaction between `StageFailed` with `will_retry=true` and subsequent `StageRetrying` turn ordering in the status map
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-A proposed holdout scenario "Node retrying after StageFailed with will_retry=true shows as running" was written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`. The scenario isolates the intermediate retry state (`StageFailed(will_retry=true)` then `StageRetrying` then `StageStarted`) and verifies that `hasLifecycleResolution` remains `false` throughout, distinguishing it from the existing v35-opus proposed scenario which tests the full retry-to-completion flow.
+A proposed holdout scenario "Node retrying after StageFailed with will_retry=true shows as running" was written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`. The scenario isolates the intermediate retry state (`StageFailed(will_retry=true)` then `StageRetrying` then `StageStarted`) and verifies that `hasLifecycleResolution` remains `false` throughout, distinguishing it from the existing v35-opus proposed scenario which tests the full retry-to-completion flow.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed scenario for StageFailed retry sequence intermediate state
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed scenario for StageFailed retry sequence intermediate state
 
 ## Issue #4: The spec does not document what happens when the Go server receives a request to a non-existent route
 

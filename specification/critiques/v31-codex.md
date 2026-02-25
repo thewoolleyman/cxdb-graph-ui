@@ -35,7 +35,7 @@ If you want to keep a forward-looking note, clarify it as hypothetical: “If a 
 ## Issue #2: Holdout scenarios still lack coverage for the `cqlSupported` flag reset on reconnection
 
 ### The problem
-The spec (Section 5.5) explicitly states that `cqlSupported[index]` is reset when a CXDB instance becomes unreachable and reconnects, so that a previously non-CQL instance can be re-probed after upgrade. The proposed scenario for this behavior exists in `holdout-scenarios/proposed-holdout-scenarios-to-review.md`, but it is still not incorporated into the main holdout scenarios. The absence of this scenario means an implementation could silently ignore the reset behavior without failing any holdout test, despite contradicting the spec.
+The spec (Section 5.5) explicitly states that `cqlSupported[index]` is reset when a CXDB instance becomes unreachable and reconnects, so that a previously non-CQL instance can be re-probed after upgrade. The proposed scenario for this behavior exists in `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`, but it is still not incorporated into the main holdout scenarios. The absence of this scenario means an implementation could silently ignore the reset behavior without failing any holdout test, despite contradicting the spec.
 
 ### Suggestion
 Promote the “CQL support flag resets on CXDB instance reconnection” scenario into `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` under **Pipeline Discovery** or **CXDB Connection Handling**. This closes the gap between spec behavior and test coverage.

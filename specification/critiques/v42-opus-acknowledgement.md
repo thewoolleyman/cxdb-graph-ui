@@ -22,12 +22,12 @@ Changes:
 
 ## Issue #3: No holdout scenario tests gap recovery with turn deduplication across the recovery boundary
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-A proposed holdout scenario "Gap recovery does not double-count already-processed turns" was written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`. The scenario tests that gap recovery's prepended older turns are correctly deduplicated against previously processed turns, and that `turnCount` reflects only newly processed turns (501-650), not the full history.
+A proposed holdout scenario "Gap recovery does not double-count already-processed turns" was written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`. The scenario tests that gap recovery's prepended older turns are correctly deduplicated against previously processed turns, and that `turnCount` reflects only newly processed turns (501-650), not the full history.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed scenario for gap recovery deduplication
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed scenario for gap recovery deduplication
 
 ## Issue #4: Tool gate nodes produce ToolCall/ToolResult turns — clarification note
 

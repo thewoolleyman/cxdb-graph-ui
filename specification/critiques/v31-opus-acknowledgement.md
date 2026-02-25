@@ -31,12 +31,12 @@ Changes:
 
 ## Issue #4: The holdout scenarios do not cover the forked-from-depth-0 fast-path guard
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-The suggested holdout scenario exercises the specific `fetchFirstTurn` fast-path edge case where a context forked from a depth-0 base turn has `headDepth == 0` but its newest turn is at depth > 0. This tests the depth guard added in v30 that prevents the fast-path from returning the wrong turn. Written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md` for review before incorporation.
+The suggested holdout scenario exercises the specific `fetchFirstTurn` fast-path edge case where a context forked from a depth-0 base turn has `headDepth == 0` but its newest turn is at depth > 0. This tests the depth guard added in v30 that prevents the fast-path from returning the wrong turn. Written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` for review before incorporation.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added "Forked context with depth-0 base turn discovers RunStarted via pagination" proposed scenario
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added "Forked context with depth-0 base turn discovers RunStarted via pagination" proposed scenario
 
 ## Not Addressed (Out of Scope)
 

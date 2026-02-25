@@ -94,15 +94,15 @@ Changes:
 
 Each acknowledgement must cover **every issue** from its corresponding critique. For items not implemented, provide clear reasoning — the next critic will read this to understand your decisions.
 
-## Step 5b: Capture Proposed Holdout Scenarios
+## Step 5b: Apply Holdout Scenario Updates
 
-If any critique issue identifies a gap, correction, or addition to the holdout scenarios (e.g., a scenario that doesn't match the spec's behavior, a missing negative case, or a new scenario implied by a spec change), **do not silently defer it**. Instead:
+If any critique issue identifies a gap, correction, or addition to the holdout scenarios (e.g., a scenario that doesn't match the spec's behavior, a missing negative case, or a new scenario implied by a spec change), write the scenario **directly** to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`. Do not defer or stage scenarios for later review.
 
-1. Write the proposed scenario to `holdout-scenarios/proposed-holdout-scenarios-to-review.md` (append, do not overwrite existing content)
-2. Include enough context for a reviewer: the critique version/author/issue that raised it, what the scenario should test, and why the current holdout scenarios are insufficient
-3. In the acknowledgement file, mark the item as **"Deferred — proposed holdout scenario written"** and reference the file
+1. Add the scenario to the appropriate section in `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` using the same Given/When/Then format as existing scenarios
+2. Only refuse to apply a holdout scenario if it is factually incorrect or invalid (e.g., describes an impossible state, contradicts a verified spec invariant, or was explicitly superseded by a later proposed scenario in the same critique round)
+3. In the acknowledgement file, mark the item as **"Applied to holdout scenarios"** and note the scenario title added
 
-This ensures holdout scenario gaps identified during critique are never lost.
+This ensures holdout scenario gaps identified during critique are captured immediately in the canonical acceptance suite.
 
 ## Step 6: Report
 

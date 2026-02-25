@@ -25,12 +25,12 @@ Changes:
 
 ## Issue #3: No holdout scenario verifies that `StageFinished` with `status: "fail"` produces a red (error) node, not green (complete)
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-A proposed holdout scenario "StageFinished with status=fail shows as error, not complete" was written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`. The scenario verifies that a `StageFinished` turn with `status: "fail"` colors the node red (error), sets `hasLifecycleResolution = true`, and renders the failure reason in the detail panel. This supersedes the similar v38-opus proposed scenario by being more concise and focused on the status field check. The spec already documents this behavior in Section 6.2 (`updateContextStatusMap` pseudocode) and the Definition of Done; the gap is in holdout scenario coverage.
+A proposed holdout scenario "StageFinished with status=fail shows as error, not complete" was written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`. The scenario verifies that a `StageFinished` turn with `status: "fail"` colors the node red (error), sets `hasLifecycleResolution = true`, and renders the failure reason in the detail panel. This supersedes the similar v38-opus proposed scenario by being more concise and focused on the status field check. The spec already documents this behavior in Section 6.2 (`updateContextStatusMap` pseudocode) and the Definition of Done; the gap is in holdout scenario coverage.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed scenario for StageFinished status=fail
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed scenario for StageFinished status=fail
 
 ## Issue #4: `formatted_delay` conversion for `StageRetrying` is underspecified for sub-second and large values
 

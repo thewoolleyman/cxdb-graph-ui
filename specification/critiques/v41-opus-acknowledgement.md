@@ -28,12 +28,12 @@ The `view` and `bytes_render` query parameters are already documented in Section
 
 ## Issue #4: Holdout scenarios do not test custom routing outcomes in StageFinished
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-A proposed holdout scenario "Conditional node with custom routing outcome shows as complete" was written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`. The scenario tests that a `StageFinished` turn with a custom status value (e.g., `"process"`) correctly results in a "complete" (green) node rather than an error, and that the detail panel renders both `data.status` and `data.preferred_label` without deduplication.
+A proposed holdout scenario "Conditional node with custom routing outcome shows as complete" was written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`. The scenario tests that a `StageFinished` turn with a custom status value (e.g., `"process"`) correctly results in a "complete" (green) node rather than an error, and that the detail panel renders both `data.status` and `data.preferred_label` without deduplication.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed scenario for custom routing outcomes in StageFinished
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed scenario for custom routing outcomes in StageFinished
 
 ## Not Addressed (Out of Scope)
 

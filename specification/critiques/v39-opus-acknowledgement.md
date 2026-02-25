@@ -11,7 +11,7 @@ The Section 7.3 shape-to-type label mapping table was expanded from six to ten e
 Changes:
 - `specification/cxdb-graph-ui-spec.md`: Expanded Section 7.3 table from 6 to 10 shapes plus default row, with explanatory paragraph
 - `specification/cxdb-graph-ui-spec.md`: Added SVG element coverage note to Section 6.3
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed scenarios for extended shape coverage in rendering and status coloring
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed scenarios for extended shape coverage in rendering and status coloring
 
 ## Issue #2: `RunFailed` with `node_id` falls through to the non-lifecycle "infer running" branch in the status derivation pseudocode
 
@@ -35,12 +35,12 @@ Changes:
 
 ## Issue #4: No holdout scenario covers `RunFailed` with `node_id` marking a node as error
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-A proposed holdout scenario "Pipeline run fails on a specific node (RunFailed with node_id)" was written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`. The scenario tests that a `RunFailed` turn with `node_id` marks the node as red (error) with `hasLifecycleResolution = true`, and that the detail panel shows the failure reason.
+A proposed holdout scenario "Pipeline run fails on a specific node (RunFailed with node_id)" was written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`. The scenario tests that a `RunFailed` turn with `node_id` marks the node as red (error) with `hasLifecycleResolution = true`, and that the detail panel shows the failure reason.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed scenario for RunFailed with node_id
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed scenario for RunFailed with node_id
 
 ## Not Addressed (Out of Scope)
 

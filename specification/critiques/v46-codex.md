@@ -30,7 +30,7 @@ This locks the newly documented lifecycle rules into the regression suite and pr
 ### The problem
 Section 6.2 explicitly treats `RunFailed` turns as authoritative lifecycle events that must set the affected node to "error" and mark `hasLifecycleResolution = true`. Section 7.2 and the Definition of Done likewise expect the detail panel to surface the failure reason when `RunFailed` includes a `node_id`. Despite this, the published holdout scenarios never cover a pipeline that terminates via `RunFailed`.
 
-The only mention appears in `holdout-scenarios/proposed-holdout-scenarios-to-review.md` (v39-opus entry). Because the canonical holdout file omits this case, an implementation could accidentally ignore `RunFailed` (leaving the node blue or pending) without failing acceptance. That undermines the spec’s guarantee that catastrophic pipeline failures are surfaced correctly.
+The only mention appears in `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` (v39-opus entry). Because the canonical holdout file omits this case, an implementation could accidentally ignore `RunFailed` (leaving the node blue or pending) without failing acceptance. That undermines the spec’s guarantee that catastrophic pipeline failures are surfaced correctly.
 
 ### Suggestion
 Add a RunFailed-focused scenario to `cxdb-graph-ui-holdout-scenarios.md`, ensuring the acceptance suite asserts:

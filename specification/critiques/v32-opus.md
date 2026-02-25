@@ -13,7 +13,7 @@ The v31 cycle had two critics (opus and codex). Three of opus's four issues were
 
 ### The problem
 
-The v31-opus Issue #4 proposed a holdout scenario (deferred to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`) with this precondition:
+The v31-opus Issue #4 proposed a holdout scenario (deferred to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`) with this precondition:
 
 > And the forked context has accumulated 50+ turns of its own (depths 1-50+)
 > And the forked context's head_depth is 0 (inherited from the base turn)
@@ -43,7 +43,7 @@ The depth guard in the fast-path (`IF response.turns[0].depth == 0`) is defensiv
 
 ### Suggestion
 
-Remove the proposed holdout scenario from `holdout-scenarios/proposed-holdout-scenarios-to-review.md` since the precondition is impossible. Add a brief comment in the spec's `fetchFirstTurn` fast-path explaining why the depth guard is defensive-only:
+Remove the proposed holdout scenario from `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` since the precondition is impossible. Add a brief comment in the spec's `fetchFirstTurn` fast-path explaining why the depth guard is defensive-only:
 
 > **Note:** `head_depth` is updated on every `append_turn`. A context with `head_depth == 0` has either zero appended turns (just created/forked) or exactly one turn at depth 0. The `depth == 0` guard is a defensive check — in practice, `get_last(limit=1)` for a `head_depth == 0` context always returns either empty (no turns) or a depth-0 turn.
 

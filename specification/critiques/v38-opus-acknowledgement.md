@@ -34,12 +34,12 @@ Changes:
 
 ## Issue #4: No holdout scenario covers the `StageFinished` with `status: "fail"` case
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-A proposed holdout scenario "Node finishes with failure status (StageFinished status: 'fail')" was written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`. The scenario tests that a node with `StageFinished { status: "fail" }` displays as red (error), not green (complete), and that the detail panel renders the failure details.
+A proposed holdout scenario "Node finishes with failure status (StageFinished status: 'fail')" was written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`. The scenario tests that a node with `StageFinished { status: "fail" }` displays as red (error), not green (complete), and that the detail panel renders the failure details.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed scenario for StageFinished with status "fail"
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed scenario for StageFinished with status "fail"
 
 ## Not Addressed (Out of Scope)
 

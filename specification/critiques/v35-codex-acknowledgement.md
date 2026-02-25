@@ -10,12 +10,12 @@ Updated the initialization sequence (Section 4.5, Step 4) to prefetch both `/dot
 
 Also updated the Step 4 heading from "Prefetch node IDs for all pipelines" to "Prefetch node IDs and edges for all pipelines" and updated the dependency description to note that both `/nodes` and `/edges` for each pipeline can be fetched concurrently.
 
-A proposed holdout scenario verifying that human gate choices appear on the first pipeline without a tab switch has been written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`.
+A proposed holdout scenario verifying that human gate choices appear on the first pipeline without a tab switch has been written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`.
 
 Changes:
 - `specification/cxdb-graph-ui-spec.md`: Updated Section 4.5 Step 4 to prefetch `/edges` alongside `/nodes` for all pipelines
 - `specification/cxdb-graph-ui-spec.md`: Updated Step 4 heading and dependency description
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed holdout scenario for human gate choices on first pipeline
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed holdout scenario for human gate choices on first pipeline
 
 ## Not Addressed (Out of Scope)
 

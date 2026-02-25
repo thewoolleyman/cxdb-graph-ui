@@ -31,12 +31,12 @@ Changes:
 
 ## Issue #4: CQL-to-fallback transition holdout scenario
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-The critique correctly identifies that the CQL-to-fallback transition during continuous operation (instance remains reachable but loses CQL support after a fast restart) is not covered by existing holdout scenarios. The code path is already fully specified in the `discoverPipelines` pseudocode. A proposed holdout scenario has been written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md` for review before incorporation.
+The critique correctly identifies that the CQL-to-fallback transition during continuous operation (instance remains reachable but loses CQL support after a fast restart) is not covered by existing holdout scenarios. The code path is already fully specified in the `discoverPipelines` pseudocode. A proposed holdout scenario has been written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` for review before incorporation.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed scenario for CXDB CQL-to-fallback transition.
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed scenario for CXDB CQL-to-fallback transition.
 
 ## Not Addressed (Out of Scope)
 

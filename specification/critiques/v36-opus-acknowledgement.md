@@ -43,9 +43,9 @@ This is consistent with the turn response format in Section 5.3 where `declared_
 
 ## Issue #4: No holdout scenario covers CQL search returning zero Kilroy contexts when they exist
 
-**Status: Deferred — proposed holdout scenarios written**
+**Status: Applied to holdout scenarios**
 
-Two proposed holdout scenarios were added to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`:
+Two proposed holdout scenarios were added to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`:
 
 1. **CQL search returns zero Kilroy contexts, fallback discovers them** — Tests the current default behavior where CQL succeeds but returns empty results due to missing key 30 metadata. Verifies that the UI does not fall back (since CQL returned 200, not 404) and no contexts are discovered via the CQL path.
 
@@ -54,7 +54,7 @@ Two proposed holdout scenarios were added to `holdout-scenarios/proposed-holdout
 The `client_tag` disappearing after session disconnect is now documented in the main spec as part of Issue #1's "Consequences for discovery" section. Adding a separate holdout scenario for this specific failure mode is captured in the second proposed scenario.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added two proposed holdout scenarios
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added two proposed holdout scenarios
 
 ## Not Addressed (Out of Scope)
 

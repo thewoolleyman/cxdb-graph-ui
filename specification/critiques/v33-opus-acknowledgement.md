@@ -30,10 +30,10 @@ The critic explicitly noted this is "a minor documentation observation, not a re
 
 **Status: Partially addressed**
 
-Updated the misleading header text in `holdout-scenarios/proposed-holdout-scenarios-to-review.md` from "All previously proposed scenarios have been incorporated" to "The following proposed scenarios are awaiting review." The actual review and incorporation/rejection of the six scenarios is deferred to a dedicated holdout scenario review pass — it is outside the scope of a spec revision cycle.
+Updated the misleading header text in `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` from "All previously proposed scenarios have been incorporated" to "The following proposed scenarios are awaiting review." The actual review and incorporation/rejection of the six scenarios is deferred to a dedicated holdout scenario review pass — it is outside the scope of a spec revision cycle.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Fixed misleading header text
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Fixed misleading header text
 
 ## Not Addressed (Out of Scope)
 

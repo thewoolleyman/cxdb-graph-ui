@@ -10,7 +10,7 @@ Section 6.1 step 1 was rewritten to specify that `cachedContextLists[i]` is popu
 
 Changes:
 - `specification/cxdb-graph-ui-spec.md`: Rewrote Section 6.1 step 1 to specify discovery-effective context list population for `cachedContextLists[i]`
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed scenario for CQL-empty supplemental context list populating cachedContextLists
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed scenario for CQL-empty supplemental context list populating cachedContextLists
 
 ## Issue #2: Spec requires dropping removed DOT nodes, but the status-map algorithms never define the removal step
 

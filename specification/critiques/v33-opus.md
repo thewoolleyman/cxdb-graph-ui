@@ -110,11 +110,11 @@ This is a minor documentation observation, not a required change. The `fetchFirs
 
 ---
 
-## Issue #4: Six proposed holdout scenarios remain in `proposed-holdout-scenarios-to-review.md` without incorporation or rejection
+## Issue #4: Six proposed holdout scenarios remain in `cxdb-graph-ui-holdout-scenarios.md` without incorporation or rejection
 
 ### The problem
 
-The `holdout-scenarios/proposed-holdout-scenarios-to-review.md` file contains six active proposed scenarios (plus one explicitly REMOVED):
+The `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` file contains six active proposed scenarios (plus one explicitly REMOVED):
 
 1. "RunStarted with null or empty graph_name" (v26-opus)
 2. "CXDB downgrades and CQL becomes unavailable mid-session" (v27-opus)

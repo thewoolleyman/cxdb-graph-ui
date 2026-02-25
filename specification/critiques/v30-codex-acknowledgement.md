@@ -12,7 +12,7 @@ Changes:
 - `specification/cxdb-graph-ui-spec.md`: Added "HTML escaping" paragraph in Section 4.4 (Pipeline Tabs)
 - `specification/cxdb-graph-ui-spec.md`: Added "HTML escaping" paragraph in Section 8.2 (CXDB Connection Indicator)
 - `specification/cxdb-graph-ui-spec.md`: Added Definition of Done item for tab label and indicator text escaping
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added "Pipeline tab label with HTML-like graph ID" proposed scenario
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added "Pipeline tab label with HTML-like graph ID" proposed scenario
 
 ## Issue #2: `decodeFirstTurn` assumes msgpack maps decode to plain objects
 

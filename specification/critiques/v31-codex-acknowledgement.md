@@ -15,11 +15,11 @@ Changes:
 
 **Status: Applied to holdout scenarios**
 
-Promoted the "CQL support flag resets on CXDB instance reconnection" scenario from `holdout-scenarios/proposed-holdout-scenarios-to-review.md` to the main `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` under the CXDB Connection Handling section. Removed the scenario from the proposed file since it has been incorporated. This closes the gap between the spec behavior (Section 5.5's `cqlSupported` flag reset) and holdout scenario coverage.
+Promoted the "CQL support flag resets on CXDB instance reconnection" scenario from `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` to the main `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` under the CXDB Connection Handling section. Removed the scenario from the proposed file since it has been incorporated. This closes the gap between the spec behavior (Section 5.5's `cqlSupported` flag reset) and holdout scenario coverage.
 
 Changes:
 - `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added "CQL support flag resets on CXDB instance reconnection" scenario under CXDB Connection Handling
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Removed the promoted scenario
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Removed the promoted scenario
 
 ## Not Addressed (Out of Scope)
 

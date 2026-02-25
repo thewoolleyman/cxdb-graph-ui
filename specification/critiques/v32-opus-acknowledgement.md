@@ -6,11 +6,11 @@ All four issues from v32-opus have been evaluated against the CXDB source code (
 
 **Status: Applied to specification**
 
-The proposed holdout scenario has been marked as REMOVED in `holdout-scenarios/proposed-holdout-scenarios-to-review.md` with a detailed explanation of why the precondition is impossible: `head_depth` is updated on every `append_turn`, so a context with 50+ turns has `head_depth >= 50`, not `head_depth == 0`. Added a defensive note to the `fetchFirstTurn` fast-path in the spec explaining that `head_depth == 0` means either zero appended turns or exactly one turn at depth 0, and that the `depth == 0` guard is defensive but not exercisable for contexts with accumulated turns.
+The proposed holdout scenario has been marked as REMOVED in `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` with a detailed explanation of why the precondition is impossible: `head_depth` is updated on every `append_turn`, so a context with 50+ turns has `head_depth >= 50`, not `head_depth == 0`. Added a defensive note to the `fetchFirstTurn` fast-path in the spec explaining that `head_depth == 0` means either zero appended turns or exactly one turn at depth 0, and that the `depth == 0` guard is defensive but not exercisable for contexts with accumulated turns.
 
 Changes:
 - `specification/cxdb-graph-ui-spec.md`: Added defensive note to `fetchFirstTurn` fast-path explaining `head_depth` update semantics
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Marked the v31-opus Issue #4 proposed scenario as REMOVED with explanation
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Marked the v31-opus Issue #4 proposed scenario as REMOVED with explanation
 
 ## Issue #2: The spec does not document that `ContextHead.created_at_unix_ms` is updated on each `append_turn`, potentially affecting `determineActiveRuns` ordering
 
@@ -25,11 +25,11 @@ This is the most significant change in this revision. Adopted suggestion (b): ch
 5. **Section 5.2 context list fallback**: Added clarifying note that `created_at_unix_ms` in the fallback sort reflects most recent turn timestamp, not original creation time.
 6. **`lookupContext` helper description**: Updated to note it provides access to `is_live` rather than `created_at_unix_ms`.
 
-Also wrote a proposed holdout scenario to `holdout-scenarios/proposed-holdout-scenarios-to-review.md` covering the late-branch active-run flip edge case (based on the identical finding in v32-codex Issue #1).
+Also wrote a proposed holdout scenario to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` covering the late-branch active-run flip edge case (based on the identical finding in v32-codex Issue #1).
 
 Changes:
 - `specification/cxdb-graph-ui-spec.md`: Multiple sections updated (5.2, 5.5, 6.1) to use `context_id` for active run selection
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added "Active run selection stable when older run spawns late branch context" proposed scenario
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added "Active run selection stable when older run spawns late branch context" proposed scenario
 
 ## Issue #3: The CQL search response does not include `title` in the field list
 

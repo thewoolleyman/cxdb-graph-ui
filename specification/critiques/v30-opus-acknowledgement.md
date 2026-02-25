@@ -31,12 +31,12 @@ Changes:
 
 ## Issue #4: The holdout scenarios do not cover the `cqlSupported` flag reset on reconnection
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-The suggested holdout scenario exercises a specific flag lifecycle (unreachable -> reconnect -> CQL retry) that is documented in the spec (Section 5.5) but not covered by existing holdout scenarios. The proposed scenario has been written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md` for review before incorporation. This complements the existing v27-opus proposed scenario (CQL-supported to unsupported transition) by covering the opposite direction (non-CQL to CQL upgrade).
+The suggested holdout scenario exercises a specific flag lifecycle (unreachable -> reconnect -> CQL retry) that is documented in the spec (Section 5.5) but not covered by existing holdout scenarios. The proposed scenario has been written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` for review before incorporation. This complements the existing v27-opus proposed scenario (CQL-supported to unsupported transition) by covering the opposite direction (non-CQL to CQL upgrade).
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added "CQL support flag resets on CXDB instance reconnection" proposed scenario
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added "CQL support flag resets on CXDB instance reconnection" proposed scenario
 
 ## Not Addressed (Out of Scope)
 

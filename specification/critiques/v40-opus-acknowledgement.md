@@ -31,12 +31,12 @@ Changes:
 
 ## Issue #4: No holdout scenario covers a DOT file containing comments
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-A proposed holdout scenario "DOT file with comments parses correctly" was written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`. The scenario tests that line comments, block comments, and comment-like sequences inside quoted strings are handled correctly by the server's DOT parser. It specifically exercises the edge case where `//` appears inside a quoted attribute value (e.g., a URL like `http://example.com`).
+A proposed holdout scenario "DOT file with comments parses correctly" was written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`. The scenario tests that line comments, block comments, and comment-like sequences inside quoted strings are handled correctly by the server's DOT parser. It specifically exercises the edge case where `//` appears inside a quoted attribute value (e.g., a URL like `http://example.com`).
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed scenario for DOT comment handling
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed scenario for DOT comment handling
 
 ## Not Addressed (Out of Scope)
 

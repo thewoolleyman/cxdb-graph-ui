@@ -30,16 +30,16 @@ The language in Sections 6.2 and 7.2 was softened. Verified against `engine.go` 
 Changes:
 - `specification/cxdb-graph-ui-spec.md`: Updated Section 6.2 `RunFailed` `node_id` language in the Lifecycle turn precedence paragraph
 - `specification/cxdb-graph-ui-spec.md`: Updated Section 7.2 pipeline-level turns paragraph for `RunFailed`
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Updated v39-opus expected behavior to match corrected language
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Updated v39-opus expected behavior to match corrected language
 
 ## Issue #4: No holdout scenario tests gap recovery with lifecycle turns that arrive during the gap
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-A proposed holdout scenario "Gap recovery bounded by MAX_GAP_PAGES advances cursor to oldest recovered turn" was written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`. The scenario verifies that when gap recovery exhausts `MAX_GAP_PAGES`, `lastSeenTurnId` is set to the oldest recovered turn's `turn_id` (not the newest), and that nodes outside the recovery window retain their previous status. The spec already documents this correctly in Section 6.1; the gap is in holdout scenario coverage.
+A proposed holdout scenario "Gap recovery bounded by MAX_GAP_PAGES advances cursor to oldest recovered turn" was written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`. The scenario verifies that when gap recovery exhausts `MAX_GAP_PAGES`, `lastSeenTurnId` is set to the oldest recovered turn's `turn_id` (not the newest), and that nodes outside the recovery window retain their previous status. The spec already documents this correctly in Section 6.1; the gap is in holdout scenario coverage.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed scenario for MAX_GAP_PAGES cursor advancement
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed scenario for MAX_GAP_PAGES cursor advancement
 
 ## Not Addressed (Out of Scope)
 

@@ -16,12 +16,12 @@ Changes:
 
 ## Issue #2: Holdout scenarios do not cover DOT comment stripping and quoted-comment safety
 
-**Status: Deferred — proposed holdout scenario written**
+**Status: Applied to holdout scenarios**
 
-A proposed holdout scenario "DOT comment stripping preserves quoted-string content and rejects unterminated constructs" was written to `holdout-scenarios/proposed-holdout-scenarios-to-review.md`. The scenario includes three sub-scenarios: (1) a node prompt containing `//` inside a quoted string is preserved while standalone comments are stripped, (2) an unterminated block comment returns 400, and (3) an unterminated quoted string returns 400. This complements the existing v40-opus proposed scenario (basic comment stripping) by explicitly testing the error paths for unterminated constructs, which are the most failure-prone parsing paths.
+A proposed holdout scenario "DOT comment stripping preserves quoted-string content and rejects unterminated constructs" was written to `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`. The scenario includes three sub-scenarios: (1) a node prompt containing `//` inside a quoted string is preserved while standalone comments are stripped, (2) an unterminated block comment returns 400, and (3) an unterminated quoted string returns 400. This complements the existing v40-opus proposed scenario (basic comment stripping) by explicitly testing the error paths for unterminated constructs, which are the most failure-prone parsing paths.
 
 Changes:
-- `holdout-scenarios/proposed-holdout-scenarios-to-review.md`: Added proposed scenarios for DOT comment stripping safety and unterminated construct errors
+- `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md`: Added proposed scenarios for DOT comment stripping safety and unterminated construct errors
 
 ## Not Addressed (Out of Scope)
 
