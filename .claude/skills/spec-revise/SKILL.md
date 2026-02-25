@@ -94,6 +94,16 @@ Changes:
 
 Each acknowledgement must cover **every issue** from its corresponding critique. For items not implemented, provide clear reasoning — the next critic will read this to understand your decisions.
 
+## Step 5b: Capture Proposed Holdout Scenarios
+
+If any critique issue identifies a gap, correction, or addition to the holdout scenarios (e.g., a scenario that doesn't match the spec's behavior, a missing negative case, or a new scenario implied by a spec change), **do not silently defer it**. Instead:
+
+1. Write the proposed scenario to `holdout-scenarios/proposed-holdout-scenarios-to-review.md` (append, do not overwrite existing content)
+2. Include enough context for a reviewer: the critique version/author/issue that raised it, what the scenario should test, and why the current holdout scenarios are insufficient
+3. In the acknowledgement file, mark the item as **"Deferred — proposed holdout scenario written"** and reference the file
+
+This ensures holdout scenario gaps identified during critique are never lost.
+
 ## Step 6: Report
 
 Tell the user:
