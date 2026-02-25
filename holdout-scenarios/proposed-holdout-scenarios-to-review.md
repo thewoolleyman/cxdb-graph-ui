@@ -83,29 +83,6 @@ Then the detail panel shows the literal text "<script>alert('xss')</script> and 
 
 ---
 
-## Proposed: CQL support flag resets on CXDB instance reconnection
-
-**Source:** v30-opus, Issue #4
-
-**Scenario:**
-```
-Given a CXDB instance initially runs an older version without CQL support
-  And the UI's CQL search to that instance returned 404
-  And the UI is using the context list fallback for that instance
-When the CXDB instance becomes unreachable
-  And then reconnects after being upgraded to a CQL-supporting version
-Then the UI resets the cqlSupported flag for that instance
-  And retries CQL search on the next poll cycle
-  And discovers CQL is now supported
-  And subsequent polls use CQL search instead of the fallback
-```
-
-**Expected behavior:** The `cqlSupported` flag is reset from `false` to unset when the instance becomes unreachable. On reconnection, the UI retries CQL search. If the upgraded instance supports CQL (returns 200 instead of 404), the flag is set to `true` and subsequent polls use CQL search.
-
-**Why current holdout scenarios are insufficient:** The existing "One of multiple CXDB instances unreachable" scenario tests partial connectivity and status preservation, but not the `cqlSupported` flag lifecycle. The "CXDB downgrades and CQL becomes unavailable" proposed scenario (v27-opus) covers the opposite direction (CQL-supported to unsupported). This scenario covers the upgrade path where a non-CQL instance gains CQL support during a UI session. If an implementer forgets to reset the flag on reconnection, the UI permanently uses the slower fallback path for that instance — a silent performance regression.
-
----
-
 ## Proposed: Pipeline tab label with HTML-like graph ID renders as literal text
 
 **Source:** v30-codex, Issue #1
@@ -122,3 +99,25 @@ Then the tab label shows the literal text "<b>Pipeline</b>"
 **Expected behavior:** Tab labels are rendered via `textContent` or explicit HTML escaping. No HTML injection is possible from DOT graph IDs.
 
 **Why current holdout scenarios are insufficient:** The existing "Tab shows graph ID from DOT declaration" scenario tests correct extraction but does not verify safe rendering of HTML-like content. The "DOT prompt containing HTML markup" proposed scenario (v29-codex) covers the detail panel but not the tab bar.
+
+---
+
+## Proposed: Forked context with depth-0 base turn discovers RunStarted via pagination
+
+**Source:** v31-opus, Issue #4
+
+**Scenario:**
+```
+Given a context was forked from the parent's RunStarted turn (base depth = 0)
+  And the forked context has accumulated 50+ turns of its own (depths 1-50+)
+  And the forked context's head_depth is 0 (inherited from the base turn)
+When the UI runs fetchFirstTurn for this context
+Then the fast-path fetches 1 turn (limit=1) and gets the newest turn (depth 50+)
+  And the depth != 0 guard triggers a fall-through to the pagination loop
+  And the pagination loop walks backward to find the depth-0 RunStarted turn
+  And the context is correctly mapped to the parent's pipeline
+```
+
+**Expected behavior:** The `fetchFirstTurn` fast-path checks `headDepth == 0`, fetches 1 turn, and finds a turn at depth > 0 (because the context was forked from depth 0 and has accumulated its own turns). The depth guard prevents returning this non-RunStarted turn and falls through to the general pagination loop, which walks backward to the actual depth-0 RunStarted turn.
+
+**Why current holdout scenarios are insufficient:** The existing "Context matched to pipeline via RunStarted turn" scenario tests basic discovery but does not test the `headDepth == 0` fast-path guard. The "Forked context discovered via parent's RunStarted turn" proposed scenario (v29-opus) tests cross-context pagination but from a context with `head_depth > 0`. This scenario specifically exercises the depth-0 fork edge case where `headDepth == 0` does NOT mean the context has a RunStarted turn at its tip — an implementer who omits the `depth == 0` guard would incorrectly return the newest turn instead of paginating.

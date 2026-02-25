@@ -418,6 +418,19 @@ When the UI polls
 Then all nodes remain pending (gray)
 ```
 
+### Scenario: CQL support flag resets on CXDB instance reconnection
+```
+Given a CXDB instance initially runs an older version without CQL support
+  And the UI's CQL search to that instance returned 404
+  And the UI is using the context list fallback for that instance
+When the CXDB instance becomes unreachable
+  And then reconnects after being upgraded to a CQL-supporting version
+Then the UI resets the cqlSupported flag for that instance
+  And retries CQL search on the next poll cycle
+  And discovers CQL is now supported
+  And subsequent polls use CQL search instead of the fallback
+```
+
 ---
 
 ## Server
