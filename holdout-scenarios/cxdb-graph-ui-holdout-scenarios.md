@@ -62,6 +62,57 @@ When the UI attempts to render it
 Then @hpcc-js/wasm-graphviz throws an error
   And the UI displays the error message in the graph area
   And the page does not crash or become unresponsive
+  And other pipelines (if any) remain functional
+```
+
+### Scenario: DOT parse error on /nodes does not block polling
+```
+Given a DOT file with invalid syntax is loaded
+When the browser fetches /dots/{name}/nodes during initialization
+Then the server returns 400 with a JSON error body
+  And the browser proceeds with an empty dotNodeIds set for that pipeline
+  And polling starts normally for all pipelines
+  And the graph area shows the Graphviz error message
+```
+
+### Scenario: DOT parse error on /edges does not block detail panel
+```
+Given a DOT file with invalid syntax is loaded
+When the browser fetches /dots/{name}/edges
+Then the server returns 400 with a JSON error body
+  And the browser proceeds with an empty edge list for that pipeline
+  And human gate choices are unavailable in the detail panel
+  And other detail panel functionality (node attributes, CXDB turns) is unaffected
+```
+
+### Scenario: Edge chain expansion in /edges response
+```
+Given a DOT file contains the edge chain: a -> b -> c [label="x"]
+When the browser fetches /dots/{name}/edges
+Then the response contains two edges: (a, b, "x") and (b, c, "x")
+  And not a single edge from a to c
+```
+
+### Scenario: Port suffixes stripped from edge node IDs
+```
+Given a DOT file contains: a:out -> b:in
+When the browser fetches /dots/{name}/edges
+Then the response contains an edge (a, b, null) with port suffixes removed
+```
+
+### Scenario: Tab shows graph ID from DOT declaration
+```
+Given a DOT file containing "digraph alpha_pipeline {"
+When the UI renders the tab bar
+Then the tab label is "alpha_pipeline", not the filename
+```
+
+### Scenario: Pipeline tab ordering matches --dot flag order
+```
+Given the server was started with: --dot b.dot --dot a.dot
+When the UI renders the tab bar
+Then the "b" tab appears before the "a" tab (not alphabetically sorted)
+  And the first pipeline rendered is from b.dot
 ```
 
 ---
@@ -81,13 +132,24 @@ Then expand_spec is colored green (complete)
   And subsequent nodes are colored gray (pending)
 ```
 
-### Scenario: Agent stuck in error loop
+### Scenario: Agent stuck in error loop (per-context scoping)
 ```
-Given a pipeline run is active
-  And the 3 most recent ToolResult turns on a node each have is_error: true
+Given a pipeline run is active with a single context
+  And the 3 most recent ToolResult turns on a node within that context each have is_error: true
   And non-ToolResult turns (Prompt, ToolCall) are interleaved between them
 When the UI polls CXDB
 Then that node is colored red (error)
+```
+
+### Scenario: Error loop detection does not span contexts
+```
+Given a pipeline run has two parallel branch contexts for the same node
+  And context A has 2 recent ToolResult turns with is_error: true
+  And context B has 1 recent ToolResult turn with is_error: true
+  And neither context independently has 3 consecutive error ToolResults
+When the UI polls CXDB
+Then the node is NOT colored red (error)
+  And the node retains its running status (blue)
 ```
 
 ### Scenario: Pipeline completed successfully
@@ -132,6 +194,55 @@ When the UI polls CXDB
 Then turns from all matching contexts contribute to the status map
   And nodes running in different branches are both colored blue (running)
   And the detail panel shows activity from all branches
+```
+
+### Scenario: Completed node retains status across polls
+```
+Given a pipeline run is active
+  And node A completed early (StageFinished processed)
+  And node B is currently running with 150+ tool call turns
+  And node A's lifecycle turns have fallen outside the 100-turn poll window
+When the UI polls CXDB
+Then node A remains green (complete), not gray (pending)
+  And node B is blue (running)
+```
+
+### Scenario: Lifecycle turn missed during poll gap is recovered
+```
+Given a pipeline run is active with node implement in running state
+  And the UI has polled successfully, recording lastSeenTurnId for the context
+  And the agent completes implement (StageFinished) and starts the next node
+  And more than 100 turns are appended after StageFinished
+When the UI polls CXDB on the next cycle
+Then the initial fetch (limit=100) does not contain the StageFinished turn
+  And gap recovery issues paginated requests to fetch turns back to lastSeenTurnId
+  And the StageFinished turn is recovered and processed
+  And implement is colored green (complete), not blue (running)
+```
+
+### Scenario: Parallel branch error loop with lifecycle resolution in another branch
+```
+Given a pipeline run has two parallel branch contexts for the same node
+  And context A has completed the node (StageFinished turn present, hasLifecycleResolution = true)
+  And context B is stuck in an error loop on the same node (3 consecutive error ToolResults)
+When the UI polls CXDB
+Then the error heuristic fires because context B lacks lifecycle resolution
+  And the node is colored red (error), not green (complete)
+```
+
+### Scenario: Status coloring applies to all node shapes
+```
+Given a pipeline graph contains all six node shapes:
+  - start (shape=Mdiamond)
+  - exit (shape=Msquare)
+  - llm_task (shape=box)
+  - conditional (shape=diamond)
+  - tool_gate (shape=parallelogram)
+  - human_gate (shape=hexagon)
+  And CXDB has status data marking each node as complete
+When the UI applies the status overlay
+Then all six nodes display with green fill (complete status)
+  And the CSS fill rules match regardless of whether the shape renders as polygon, ellipse, or path
 ```
 
 ### Scenario: Second run of same pipeline while first run data exists
@@ -232,6 +343,15 @@ Then the detail panel shows:
   - Type: "Human Gate"
   - Question text from DOT question attribute
   - Available choices from outgoing edge labels
+```
+
+### Scenario: Detail panel for early-completed node outside poll window
+```
+Given node A completed 200+ turns ago
+  And node A's turns have fallen outside the 100-turn poll window
+When the user clicks node A
+Then the detail panel shows node A's DOT attributes (ID, type, prompt)
+  And indicates no recent CXDB activity is available in the poll window
 ```
 
 ### Scenario: Close detail panel
@@ -346,6 +466,14 @@ Then the server returns 404
 When the user runs: go run ui/main.go --dot pipelines/alpha/pipeline.dot --dot pipelines/beta/pipeline.dot
 Then the server exits with a non-zero code
   And prints an error identifying the conflicting basename "pipeline.dot"
+```
+
+### Scenario: Duplicate graph IDs rejected
+```
+Given two DOT files with different basenames but both containing "digraph alpha_pipeline {"
+When the user runs: go run ui/main.go --dot a.dot --dot b.dot
+Then the server exits with a non-zero code
+  And prints an error identifying the duplicate graph ID "alpha_pipeline"
 ```
 
 ### Scenario: Path traversal attempt

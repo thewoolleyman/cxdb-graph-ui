@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CXDB Graph UI — State Variations Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #111; color: #e0e0e0; padding: 30px; }
+
+  h1 { font-size: 20px; color: #ffc832; margin-bottom: 24px; text-align: center; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 1400px; margin: 0 auto; }
+  .card {
+    background: #1a1a2e; border-radius: 8px; overflow: hidden;
+    border: 1px solid #333; position: relative;
+  }
+  .card-title {
+    background: #16213e; padding: 10px 16px; font-size: 14px; font-weight: 600;
+    border-bottom: 1px solid #333; color: #ffc832;
+  }
+  .card-body { padding: 0; }
+
+  .annotation {
+    position: absolute;
+    background: rgba(255, 200, 50, 0.95);
+    color: #1a1a2e;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.3;
+    max-width: 180px;
+    z-index: 100;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+
+  /* Mini topbar */
+  .mini-topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #16213e; padding: 6px 12px; border-bottom: 1px solid #333;
+    height: 36px;
+  }
+  .mini-tabs { display: flex; gap: 0; }
+  .mini-tab {
+    padding: 4px 14px; font-size: 12px;
+    border: 1px solid #333; border-bottom: none;
+    background: #1a1a2e; color: #888; border-radius: 4px 4px 0 0;
+    margin-right: -1px;
+  }
+  .mini-tab.active { background: #0f3460; color: #fff; border-color: #0f3460; }
+  .mini-status { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot.green { background: #4caf50; box-shadow: 0 0 4px #4caf50; }
+  .dot.red { background: #f44336; box-shadow: 0 0 4px #f44336; }
+  .dot.yellow { background: #ff9800; box-shadow: 0 0 4px #ff9800; }
+
+  /* Mini graph */
+  .mini-graph { padding: 16px; display: flex; justify-content: center; }
+  .mini-graph svg { max-width: 100%; }
+
+  /* Node shapes in SVG */
+  .n-pending { fill: #e0e0e0; }
+  .n-running { fill: #90caf9; }
+  .n-complete { fill: #a5d6a7; }
+  .n-error { fill: #ef9a9a; }
+  .n-stale { fill: #ffcc80; }
+  .n-stroke { stroke: #555; stroke-width: 1.5; }
+  .n-label { font-family: -apple-system, sans-serif; font-size: 10px; fill: #222; text-anchor: middle; dominant-baseline: middle; }
+  .e-line { stroke: #555; stroke-width: 1; fill: none; marker-end: url(#arrow); }
+  .e-label { font-family: -apple-system, sans-serif; font-size: 8px; fill: #888; text-anchor: middle; }
+
+  /* Warning banner */
+  .warning-banner {
+    background: #3e2723; border: 1px solid #ff9800; border-radius: 4px;
+    padding: 8px 12px; margin: 8px 12px; font-size: 11px; color: #ffcc80;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* Detail panel mini */
+  .mini-detail {
+    width: 200px; background: #16213e; border-left: 1px solid #333;
+    padding: 10px; font-size: 11px; flex-shrink: 0;
+  }
+  .mini-detail h4 { font-size: 12px; color: #fff; margin-bottom: 6px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+  .mini-detail .field { color: #888; margin-bottom: 3px; }
+  .mini-detail .field span { color: #ccc; }
+
+  .mini-turn {
+    display: flex; gap: 4px; padding: 3px 4px; background: #0d1b3e; border-radius: 2px;
+    margin-bottom: 2px; font-size: 10px;
+  }
+  .mt-type { font-weight: 600; min-width: 50px; }
+  .mt-type.tc { color: #64b5f6; }
+  .mt-type.tr { color: #81c784; }
+  .mt-type.te { color: #ef5350; }
+
+  .main-row { display: flex; }
+  .main-row .mini-graph { flex: 1; }
+</style>
+</head>
+<body>
+<h1>CXDB Graph UI — State Variations</h1>
+<div class="grid">
+
+  <!-- CARD 1: All nodes complete -->
+  <div class="card">
+    <div class="card-title">1. Pipeline Complete — All Nodes Green</div>
+    <div class="card-body">
+      <div class="mini-topbar">
+        <div class="mini-tabs">
+          <div class="mini-tab active">kilroy-build</div>
+        </div>
+        <div class="mini-status"><span class="dot green"></span> CXDB OK</div>
+      </div>
+      <div class="mini-graph">
+        <svg width="580" height="300" viewBox="0 0 580 300">
+          <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#555"/></marker></defs>
+          <!-- Start -->
+          <rect x="265" y="10" width="40" height="40" transform="rotate(45 285 30)" class="n-complete n-stroke"/>
+          <text x="285" y="30" class="n-label" font-size="9">Start</text>
+          <!-- expand -->
+          <rect x="230" y="70" width="110" height="34" rx="3" class="n-complete n-stroke"/>
+          <text x="285" y="90" class="n-label">expand_spec</text>
+          <line x1="285" y1="50" x2="285" y2="70" class="e-line"/>
+          <!-- check -->
+          <rect x="260" y="130" width="50" height="50" transform="rotate(45 285 155)" class="n-complete n-stroke"/>
+          <text x="285" y="157" class="n-label" font-size="9">check</text>
+          <line x1="285" y1="104" x2="285" y2="132" class="e-line"/>
+          <!-- implement -->
+          <rect x="100" y="200" width="110" height="34" rx="3" class="n-complete n-stroke"/>
+          <text x="155" y="220" class="n-label">implement</text>
+          <line x1="265" y1="165" x2="175" y2="200" class="e-line"/>
+          <text x="200" y="178" class="e-label">fail</text>
+          <!-- verify -->
+          <rect x="360" y="200" width="110" height="34" rx="3" class="n-complete n-stroke"/>
+          <text x="415" y="220" class="n-label">verify_result</text>
+          <line x1="305" y1="165" x2="395" y2="200" class="e-line"/>
+          <text x="370" y="178" class="e-label">pass</text>
+          <!-- done -->
+          <rect x="360" y="260" width="50" height="30" class="n-complete n-stroke"/>
+          <text x="385" y="278" class="n-label" font-size="9">Done</text>
+          <line x1="415" y1="234" x2="395" y2="260" class="e-line"/>
+        </svg>
+      </div>
+      <div class="annotation" style="bottom: 12px; right: 12px;">All nodes green — pipeline finished successfully</div>
+    </div>
+  </div>
+
+  <!-- CARD 2: Mid-execution with running + error -->
+  <div class="card">
+    <div class="card-title">2. Mid-Execution — Running + Error Nodes</div>
+    <div class="card-body">
+      <div class="mini-topbar">
+        <div class="mini-tabs">
+          <div class="mini-tab active">kilroy-build</div>
+          <div class="mini-tab">kilroy-test</div>
+        </div>
+        <div class="mini-status"><span class="dot green"></span> CXDB OK</div>
+      </div>
+      <div class="mini-graph">
+        <svg width="580" height="300" viewBox="0 0 580 300">
+          <defs><marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#555"/></marker></defs>
+          <!-- Start -->
+          <rect x="265" y="10" width="40" height="40" transform="rotate(45 285 30)" class="n-complete n-stroke"/>
+          <text x="285" y="30" class="n-label" font-size="9">Start</text>
+          <!-- expand -->
+          <rect x="230" y="70" width="110" height="34" rx="3" class="n-complete n-stroke"/>
+          <text x="285" y="90" class="n-label">expand_spec</text>
+          <line x1="285" y1="50" x2="285" y2="70" class="e-line"/>
+          <!-- check -->
+          <rect x="260" y="130" width="50" height="50" transform="rotate(45 285 155)" class="n-complete n-stroke"/>
+          <text x="285" y="157" class="n-label" font-size="9">check</text>
+          <line x1="285" y1="104" x2="285" y2="132" class="e-line"/>
+          <!-- implement (RUNNING) -->
+          <rect x="100" y="200" width="110" height="34" rx="3" class="n-running n-stroke" style="animation: pulse 1.5s infinite;"/>
+          <text x="155" y="220" class="n-label">implement</text>
+          <line x1="265" y1="165" x2="175" y2="200" class="e-line"/>
+          <text x="200" y="178" class="e-label">fail</text>
+          <!-- verify (ERROR) -->
+          <rect x="360" y="200" width="110" height="34" rx="3" class="n-error n-stroke"/>
+          <text x="415" y="220" class="n-label">verify_result</text>
+          <line x1="305" y1="165" x2="395" y2="200" class="e-line"/>
+          <text x="370" y="178" class="e-label">pass</text>
+          <!-- done (PENDING) -->
+          <rect x="360" y="260" width="50" height="30" class="n-pending n-stroke"/>
+          <text x="385" y="278" class="n-label" font-size="9">Done</text>
+          <line x1="415" y1="234" x2="395" y2="260" class="e-line"/>
+        </svg>
+      </div>
+      <style>
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+      </style>
+      <div class="annotation" style="bottom: 42px; left: 60px;">Blue + pulse = running</div>
+      <div class="annotation" style="bottom: 42px; right: 50px;">Red = error (3+ consecutive tool errors)</div>
+    </div>
+  </div>
+
+  <!-- CARD 3: CXDB partially unreachable -->
+  <div class="card">
+    <div class="card-title">3. Degraded — CXDB Instance Partially Unreachable</div>
+    <div class="card-body">
+      <div class="mini-topbar">
+        <div class="mini-tabs">
+          <div class="mini-tab active">kilroy-build</div>
+          <div class="mini-tab">kilroy-deploy</div>
+        </div>
+        <div class="mini-status"><span class="dot yellow"></span> 1/2 CXDB</div>
+      </div>
+      <div class="mini-graph">
+        <svg width="580" height="280" viewBox="0 0 580 280">
+          <!-- Start -->
+          <rect x="265" y="10" width="40" height="40" transform="rotate(45 285 30)" class="n-complete n-stroke"/>
+          <text x="285" y="30" class="n-label" font-size="9">Start</text>
+          <!-- expand -->
+          <rect x="230" y="70" width="110" height="34" rx="3" class="n-complete n-stroke"/>
+          <text x="285" y="90" class="n-label">expand_spec</text>
+          <line x1="285" y1="50" x2="285" y2="70" class="e-line"/>
+          <!-- implement -->
+          <rect x="100" y="140" width="110" height="34" rx="3" class="n-running n-stroke"/>
+          <text x="155" y="160" class="n-label">implement</text>
+          <line x1="260" y1="100" x2="175" y2="140" class="e-line"/>
+          <!-- check_fmt (still shows cached status from last good poll) -->
+          <rect x="100" y="200" width="110" height="34" rx="3" class="n-pending n-stroke" style="transform: skewX(-8deg); transform-origin: center;"/>
+          <text x="155" y="220" class="n-label">check_fmt</text>
+          <line x1="155" y1="174" x2="155" y2="200" class="e-line"/>
+          <!-- verify -->
+          <rect x="360" y="140" width="110" height="34" rx="3" class="n-complete n-stroke"/>
+          <text x="415" y="160" class="n-label">verify_result</text>
+          <line x1="310" y1="100" x2="395" y2="140" class="e-line"/>
+          <!-- done -->
+          <rect x="360" y="220" width="50" height="30" class="n-pending n-stroke"/>
+          <text x="385" y="238" class="n-label" font-size="9">Done</text>
+          <line x1="415" y1="174" x2="395" y2="220" class="e-line"/>
+        </svg>
+      </div>
+      <div class="annotation" style="top: 40px; right: 12px; max-width: 160px;">
+        Yellow indicator: 1 of 2 CXDB instances reachable. Graph retains cached status.
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 4: Stale pipeline -->
+  <div class="card">
+    <div class="card-title">4. Stalled Pipeline — No Active Sessions</div>
+    <div class="card-body">
+      <div class="mini-topbar">
+        <div class="mini-tabs">
+          <div class="mini-tab active">kilroy-build</div>
+        </div>
+        <div class="mini-status"><span class="dot yellow"></span> CXDB OK</div>
+      </div>
+      <div class="warning-banner">
+        ⚠ Pipeline stalled — no active sessions.
+      </div>
+      <div class="mini-graph" style="padding-top: 4px;">
+        <svg width="580" height="260" viewBox="0 0 580 260">
+          <!-- Start -->
+          <rect x="265" y="5" width="40" height="40" transform="rotate(45 285 25)" class="n-complete n-stroke"/>
+          <text x="285" y="25" class="n-label" font-size="9">Start</text>
+          <!-- expand -->
+          <rect x="230" y="60" width="110" height="34" rx="3" class="n-complete n-stroke"/>
+          <text x="285" y="80" class="n-label">expand_spec</text>
+          <line x1="285" y1="45" x2="285" y2="60" class="e-line"/>
+          <!-- implement (STALE — orange) -->
+          <rect x="100" y="120" width="110" height="34" rx="3" class="n-stale n-stroke"/>
+          <text x="155" y="140" class="n-label">implement</text>
+          <line x1="260" y1="90" x2="175" y2="120" class="e-line"/>
+          <!-- check_fmt -->
+          <rect x="100" y="180" width="110" height="34" rx="3" class="n-pending n-stroke" style="transform: skewX(-8deg); transform-origin: center;"/>
+          <text x="155" y="200" class="n-label">check_fmt</text>
+          <line x1="155" y1="154" x2="155" y2="180" class="e-line"/>
+          <!-- verify -->
+          <rect x="360" y="120" width="110" height="34" rx="3" class="n-complete n-stroke"/>
+          <text x="415" y="140" class="n-label">verify_result</text>
+          <line x1="310" y1="90" x2="395" y2="120" class="e-line"/>
+          <!-- done -->
+          <rect x="360" y="200" width="50" height="30" class="n-pending n-stroke"/>
+          <text x="385" y="218" class="n-label" font-size="9">Done</text>
+          <line x1="415" y1="154" x2="395" y2="200" class="e-line"/>
+        </svg>
+      </div>
+      <div class="annotation" style="bottom: 50px; left: 30px; max-width: 200px;">
+        Orange/stale = was running but all sessions disconnected (agent crashed?)
+      </div>
+      <div class="annotation" style="top: 56px; left: 100px; max-width: 200px;">
+        Warning banner when pipeline has stale nodes + no active sessions
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 5: CXDB fully unreachable -->
+  <div class="card">
+    <div class="card-title">5. Graceful Degradation — CXDB Fully Unreachable</div>
+    <div class="card-body">
+      <div class="mini-topbar">
+        <div class="mini-tabs">
+          <div class="mini-tab active">kilroy-build</div>
+        </div>
+        <div class="mini-status">
+          <span class="dot red"></span>
+          <span style="color: #ef5350;">CXDB unreachable</span>
+          <span style="color: #888; font-size: 10px; margin-left: 4px;">(127.0.0.1:9010)</span>
+        </div>
+      </div>
+      <div class="mini-graph">
+        <svg width="580" height="280" viewBox="0 0 580 280">
+          <!-- All pending/gray -->
+          <rect x="265" y="10" width="40" height="40" transform="rotate(45 285 30)" class="n-pending n-stroke"/>
+          <text x="285" y="30" class="n-label" font-size="9">Start</text>
+          <rect x="230" y="70" width="110" height="34" rx="3" class="n-pending n-stroke"/>
+          <text x="285" y="90" class="n-label">expand_spec</text>
+          <line x1="285" y1="50" x2="285" y2="70" class="e-line"/>
+          <rect x="260" y="130" width="50" height="50" transform="rotate(45 285 155)" class="n-pending n-stroke"/>
+          <text x="285" y="157" class="n-label" font-size="9">check</text>
+          <line x1="285" y1="104" x2="285" y2="132" class="e-line"/>
+          <rect x="100" y="200" width="110" height="34" rx="3" class="n-pending n-stroke"/>
+          <text x="155" y="220" class="n-label">implement</text>
+          <line x1="265" y1="165" x2="175" y2="200" class="e-line"/>
+          <rect x="360" y="200" width="110" height="34" rx="3" class="n-pending n-stroke"/>
+          <text x="415" y="220" class="n-label">verify_result</text>
+          <line x1="305" y1="165" x2="395" y2="200" class="e-line"/>
+          <rect x="360" y="260" width="50" height="30" class="n-pending n-stroke"/>
+          <text x="385" y="278" class="n-label" font-size="9">Done</text>
+          <line x1="415" y1="234" x2="395" y2="260" class="e-line"/>
+        </svg>
+      </div>
+      <div class="annotation" style="bottom: 12px; left: 100px; max-width: 250px;">
+        Graph still renders from DOT file alone. All nodes gray (pending) — no CXDB data. Red indicator shows unreachable URL.
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 6: Detail panel with human gate -->
+  <div class="card">
+    <div class="card-title">6. Detail Panel — Human Gate Node</div>
+    <div class="card-body">
+      <div class="mini-topbar">
+        <div class="mini-tabs">
+          <div class="mini-tab active">kilroy-build</div>
+        </div>
+        <div class="mini-status"><span class="dot green"></span> CXDB OK</div>
+      </div>
+      <div class="main-row">
+        <div class="mini-graph" style="flex: 1; padding: 12px;">
+          <svg width="260" height="220" viewBox="0 0 260 220">
+            <rect x="100" y="10" width="80" height="30" rx="3" class="n-complete n-stroke"/>
+            <text x="140" y="28" class="n-label">implement</text>
+            <line x1="140" y1="40" x2="140" y2="70" class="e-line"/>
+            <!-- review hexagon (running, selected) -->
+            <polygon points="140,70 190,90 190,120 140,140 90,120 90,90" class="n-running n-stroke" style="stroke: #ffc832; stroke-width: 2.5;"/>
+            <text x="140" y="108" class="n-label">review</text>
+            <line x1="140" y1="140" x2="100" y2="170" class="e-line"/>
+            <text x="90" y="165" class="e-label">approve</text>
+            <line x1="140" y1="140" x2="180" y2="170" class="e-line"/>
+            <text x="195" y="165" class="e-label">reject</text>
+            <rect x="70" y="175" width="60" height="25" rx="3" class="n-pending n-stroke"/>
+            <text x="100" y="190" class="n-label" font-size="9">Done</text>
+            <rect x="155" y="175" width="70" height="25" rx="3" class="n-pending n-stroke"/>
+            <text x="190" y="190" class="n-label" font-size="9">implement</text>
+          </svg>
+        </div>
+        <div class="mini-detail">
+          <h4 style="display: flex; justify-content: space-between;">
+            review
+            <span style="font-size: 10px; color: #90caf9;">Running</span>
+          </h4>
+          <div class="field">Type: <span>Human Gate (hexagon)</span></div>
+          <div class="field" style="margin-top: 6px;">Question:</div>
+          <div style="background: #0d1b3e; padding: 4px 6px; border-radius: 3px; font-size: 10px; color: #ccc; margin-bottom: 6px; border: 1px solid #333;">
+            Does the implementation meet all acceptance criteria from the spec?
+          </div>
+          <div class="field">Choices:</div>
+          <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+            <span style="background: #0d4a2e; color: #a5d6a7; padding: 2px 8px; border-radius: 3px; font-size: 10px;">approve</span>
+            <span style="background: #4a1111; color: #ef9a9a; padding: 2px 8px; border-radius: 3px; font-size: 10px;">reject</span>
+          </div>
+          <div class="field" style="font-size: 10px; color: #666;">CXDB-0 / Ctx 33</div>
+          <div class="mini-turn"><span class="mt-type tc">ToolCall</span><span style="color:#888;">prompt</span></div>
+          <div class="mini-turn"><span class="mt-type tr">Result</span><span style="color:#888;">awaiting...</span></div>
+        </div>
+      </div>
+      <div class="annotation" style="bottom: 8px; right: 8px; max-width: 180px;">
+        Hexagon = Human Gate. Shows question + edge-label choices from DOT.
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

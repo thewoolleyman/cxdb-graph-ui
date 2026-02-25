@@ -131,14 +131,14 @@ The server prints the URL on startup: `Kilroy Pipeline UI: http://127.0.0.1:9030
 
 #### `GET /` — Dashboard
 
-Serves `index.html` from the same directory as `main.go`. Returns 404 if the file is missing.
+Serves `index.html` embedded in the binary via Go's `//go:embed` directive. The `main.go` file embeds `index.html` at compile time using `//go:embed index.html`, serving it from the embedded filesystem. This ensures the asset is always available regardless of the working directory — `go run ui/main.go` compiles the binary in a temp directory, so runtime file resolution relative to the source would fail. Returns 500 if the embed fails to load (should not happen in a correctly compiled binary).
 
 #### `GET /dots/{name}` — DOT Files
 
 Serves DOT files registered via `--dot` flags. The `{name}` is the base filename (e.g., `pipeline-alpha.dot`).
 
 - The server builds a map from base filename to absolute path at startup. If two `--dot` flags resolve to the same base filename (e.g., `pipelines/alpha/pipeline.dot` and `pipelines/beta/pipeline.dot` both have basename `pipeline.dot`), the server exits with a non-zero code and prints an error identifying the conflicting paths. This prevents silent collisions where one pipeline becomes unreachable.
-- **Graph ID uniqueness.** At startup, the server parses each DOT file to extract its graph ID (the identifier after `digraph`). If two DOT files share the same graph ID, the server exits with a non-zero code and prints an error identifying the conflicting files and graph ID. Duplicate graph IDs would cause ambiguous pipeline discovery — both pipelines would match the same CXDB contexts, producing identical and misleading status overlays. This check mirrors the basename collision check and runs at startup alongside it.
+- **Graph ID uniqueness.** At startup, the server parses each DOT file to extract its graph ID (the identifier after `digraph`). The server uses the same graph ID parsing and normalization logic as the browser (Section 4.4): the regex `/(di)?graph\s+("(?:[^"\\]|\\.)*"|\w+)/` extracts the identifier, quoted IDs are unquoted (outer `"` stripped) and unescaped (internal `\"` sequences resolved), and the result is the normalized graph ID. This ensures that the server's uniqueness check and the browser's pipeline discovery match `RunStarted.data.graph_name` against the same normalized value. If two DOT files share the same normalized graph ID, the server exits with a non-zero code and prints an error identifying the conflicting files and graph ID. Duplicate graph IDs would cause ambiguous pipeline discovery — both pipelines would match the same CXDB contexts, producing identical and misleading status overlays. This check mirrors the basename collision check and runs at startup alongside it.
 - Only filenames registered via `--dot` are servable. Requests for unregistered names return 404.
 - Files are read fresh on each request. DOT file regeneration is picked up without server restart.
 
@@ -167,6 +167,8 @@ Returns a JSON object mapping node IDs to their parsed DOT attributes for the na
 }
 ```
 
+**Node ID normalization.** Node IDs returned by `/nodes` (as JSON keys) and `/edges` (as `source`/`target` values) are normalized to match the SVG `<title>` text that Graphviz produces and the `node_id` values in CXDB turns. The normalization rules are: quoted DOT identifiers have their outer `"` characters stripped and internal escape sequences resolved (`\"` → `"`, `\\` → `\`), and leading/trailing whitespace is trimmed. This is the same approach used for graph ID normalization (Section 4.4). The normalized node ID is the canonical key used for: `dotNodeIds` sets, status map keys, detail panel lookup, and edge `source`/`target` values. **Scope limitation:** Kilroy-generated DOT files use only unquoted, alphanumeric node IDs (e.g., `implement`, `check_fmt`). The normalization handles quoted IDs for correctness, but the UI does not need to support arbitrary Unicode or whitespace-containing node IDs.
+
 The server parses node attribute blocks from the DOT source. Parsing rules:
 
 - **Attribute syntax:** Both quoted (`key="value"`) and unquoted (`key=value`) attribute values are supported.
@@ -176,7 +178,7 @@ The server parses node attribute blocks from the DOT source. Parsing rules:
 - **Subgraph scope:** Nodes defined inside `subgraph` blocks are included.
 - **Escape sequences:** Quoted attribute values support these DOT escapes: `\"` → `"`, `\n` → newline, `\\` → `\`. Other escape sequences are passed through verbatim.
 
-The file is read fresh on each request. Returns 404 if the DOT file is not registered.
+The file is read fresh on each request. Returns 404 if the DOT file is not registered. Returns 400 with a JSON error body (`{"error": "DOT parse error: ..."}`) if the DOT file has invalid syntax that prevents node attribute parsing. The browser handles a 400 from `/nodes` by continuing with an empty `dotNodeIds` set for that pipeline — the SVG error message from Graphviz WASM (Section 4.1) is still displayed, polling proceeds, and status maps for that pipeline remain empty until the DOT file is fixed and the tab is re-selected.
 
 #### `GET /dots/{name}/edges` — DOT Edge List
 
@@ -190,9 +192,17 @@ Returns a JSON array of edges parsed from the named DOT file. Each edge includes
 ]
 ```
 
-The server parses edge statements from the DOT source (`source -> target` syntax). Edge labels come from the `label` attribute in the edge's attribute block (e.g., `check_goal -> done [label="pass"]`). Edges without a `label` attribute have `label: null`. Edges inside `subgraph` blocks are included.
+The server parses edge statements from the DOT source (`source -> target` syntax). Edge labels come from the `label` attribute in the edge's attribute block (e.g., `check_goal -> done [label="pass"]`). Edges without a `label` attribute have `label: null`. Edges inside `subgraph` blocks are included. **Edge attribute parsing reuses the same rules as node attribute parsing** (Section 3.2, `/dots/{name}/nodes`): quoted and unquoted values, `+` concatenation of quoted fragments, multi-line quoted strings, and the same escape decoding (`\"` → `"`, `\n` → newline, `\\` → `\`). This ensures human-gate choices and edge labels are decoded correctly even when labels contain whitespace, escaped characters, or multi-line content.
 
-The file is read fresh on each request. Returns 404 if the DOT file is not registered.
+**DOT edge subset.** The parser supports only the edge constructs used in Kilroy-generated DOT files:
+
+- **Simple edges:** `node_id -> node_id` with an optional attribute block. This is the primary form.
+- **Edge chains:** `a -> b -> c` is expanded into two edges: `(a, b)` and `(b, c)`. Each segment inherits the attribute block from the chain statement (e.g., `a -> b -> c [label="x"]` produces two edges both with `label: "x"`).
+- **Node IDs** in edge statements are normalized using the same rules as `/nodes` (see above): quoted IDs are unquoted and unescaped, whitespace is trimmed.
+- **Ports are stripped:** If an endpoint uses port syntax (`node_id:port` or `node_id:port:compass`), the port suffix is stripped and only the base `node_id` is used as `source` or `target`. This ensures edge endpoints match the node IDs in `/nodes` and the SVG `<title>` elements.
+- **Subgraph endpoints** (e.g., `subgraph cluster_x { ... } -> node_id`) are not supported. Edges must reference named nodes directly. Kilroy-generated DOT files do not use subgraph endpoints.
+
+The file is read fresh on each request. Returns 404 if the DOT file is not registered. Returns 400 with a JSON error body (`{"error": "DOT parse error: ..."}`) if the DOT file has invalid syntax that prevents edge parsing. The browser handles a 400 from `/edges` by continuing with an empty edge list for that pipeline — human gate choices will be unavailable in the detail panel until the DOT file is fixed.
 
 #### `GET /api/cxdb/{index}/*` — CXDB Reverse Proxy
 
@@ -210,7 +220,7 @@ The server strips `/api/cxdb/{index}` and forwards the remainder to the correspo
 
 #### `GET /api/dots` — DOT File List
 
-Returns a JSON object with a `dots` array containing the available DOT filenames (registered via `--dot` flags). This is a server-generated response used by the browser to build pipeline tabs.
+Returns a JSON object with a `dots` array containing the available DOT filenames (registered via `--dot` flags), **in the same order as the `--dot` flags were provided on the command line**. This ordering is deterministic and must be preserved — the server must use an ordered data structure (e.g., a slice, not a map) for DOT file registration. The browser uses this order for tab rendering and selects the first entry as the initial pipeline. This is a server-generated response used by the browser to build pipeline tabs.
 
 ```json
 { "dots": ["pipeline-alpha.dot", "pipeline-beta.dot"] }
@@ -245,6 +255,35 @@ https://cdn.jsdelivr.net/npm/@hpcc-js/wasm-graphviz@1.6.1/dist/index.min.js
 This library compiles Graphviz to WebAssembly and exposes a `Graphviz.load()` async factory that returns an instance with a `layout(dotString, "svg", "dot")` method. The UI calls this with the raw DOT file content fetched from `/dots/{name}`. The resulting SVG is injected into the main content area.
 
 If the CDN is unreachable, the WASM module fails to load and the graph area displays an error message. The rest of the UI (tabs, connection indicator) still renders.
+
+### 4.1.1 Browser Dependencies
+
+The browser loads two CDN dependencies. Both are ES modules imported via `<script type="module">` in `index.html`:
+
+1. **Graphviz WASM** — `@hpcc-js/wasm-graphviz` at pinned version (documented above in Section 4.1). Used for DOT-to-SVG rendering.
+
+2. **Msgpack decoder** — `@msgpack/msgpack` at a pinned CDN URL:
+
+```
+https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-beta2/dist.es5+esm/mod.min.mjs
+```
+
+This library provides a `decode(Uint8Array)` function that decodes msgpack bytes into JavaScript objects. It is used exclusively by `decodeFirstTurn` (Section 5.5) to extract `graph_name` and `run_id` from the raw msgpack payload of `RunStarted` turns fetched with `view=raw`. It is not used during regular turn polling (`view=typed`), which returns pre-decoded JSON.
+
+**Base64 decoding** uses the browser's built-in `atob()` function combined with a `Uint8Array` conversion — no additional library is needed:
+
+```javascript
+function base64ToBytes(b64) {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+}
+```
+
+No other CDN dependencies are required. All other functionality (DOM manipulation, fetch, SVG interaction) uses browser built-in APIs.
 
 ### 4.2 SVG Node Identification
 
@@ -292,7 +331,7 @@ When multiple DOT files are provided via `--dot`, the UI renders a tab bar. Each
 
 **Graph ID extraction.** The browser extracts the graph ID from the DOT source when the file is first fetched, using a regex pattern that handles both `digraph` and `graph` keywords, and both quoted and unquoted names: `/(di)?graph\s+("(?:[^"\\]|\\.)*"|\w+)/`. If the name is quoted, the UI unquotes it (strips the outer `"` characters) and unescapes internal `\"` sequences before using it as the graph ID. If the regex does not match (e.g., unusual formatting or anonymous graphs), the tab falls back to the base filename. Tabs initially display filenames (from the `/api/dots` response) and update to graph IDs as each DOT file is fetched and parsed. Pipeline discovery in Section 5.5 matches `RunStarted.data.graph_name` against the normalized (unquoted, unescaped) graph ID.
 
-Switching tabs fetches the DOT file fresh and re-renders the SVG. If a cached status map exists for the newly selected pipeline (from a previous poll cycle), it is immediately reapplied to the new SVG. Otherwise, all nodes start as pending. The next poll cycle refreshes the status with live data. This avoids a gray flash when switching between tabs for pipelines that have already been polled.
+Switching tabs fetches the DOT file fresh and re-renders the SVG. On every tab switch (or any event that refetches a DOT file), the UI also refetches `GET /dots/{name}/nodes` and `GET /dots/{name}/edges` to refresh cached node/edge metadata and updates `dotNodeIds` for that pipeline. This ensures that DOT file regeneration (new nodes, removed nodes, changed prompts, updated edge labels) is reflected in the status overlay, detail panel, and human-gate choices — not just the SVG rendering. When the node list changes, new nodes are initialized as "pending" in the per-context status maps, and removed nodes are dropped from the maps. If a cached status map exists for the newly selected pipeline (from a previous poll cycle), it is immediately reapplied to the new SVG (after reconciling with the refreshed `dotNodeIds`). Otherwise, all nodes start as pending. The next poll cycle refreshes the status with live data. This avoids a gray flash when switching between tabs for pipelines that have already been polled.
 
 ### 4.5 Initialization Sequence
 
@@ -318,16 +357,63 @@ The UI reads from CXDB HTTP APIs (default port 9010). All requests go through th
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/cxdb/instances` | GET | Server-generated list of configured CXDB instances |
-| `/api/cxdb/{i}/v1/contexts` | GET | List all contexts on CXDB instance `i` |
+| `/api/cxdb/{i}/v1/contexts/search?q={cql}` | GET | CQL search for contexts on CXDB instance `i` (primary discovery) |
+| `/api/cxdb/{i}/v1/contexts` | GET | List all contexts on CXDB instance `i` (fallback discovery) |
 | `/api/cxdb/{i}/v1/contexts/{id}/turns?limit={n}&before_turn_id={id}` | GET | Fetch turns for a context on instance `i` |
 
-### 5.2 Context List Response
+### 5.2 Context Discovery Endpoints
+
+**Primary: CQL search.** CXDB provides a CQL (Context Query Language) search endpoint at `GET /v1/contexts/search?q={cql}` that supports server-side prefix filtering via the `^=` (starts with) operator:
+
+```
+GET /v1/contexts/search?q=tag ^= "kilroy/"
+```
+
+This returns only contexts whose `client_tag` starts with `"kilroy/"`, using CXDB's secondary indexes (`tag_sorted` B-tree in `server/src/cql/indexes.rs`) for efficient server-side filtering. The CQL search response has a different shape from the context list response:
+
+```json
+{
+  "contexts": [ ... ],
+  "total_count": 5,
+  "elapsed_ms": 2,
+  "query": "tag ^= \"kilroy/\""
+}
+```
+
+Each context object in the `contexts` array contains: `context_id`, `head_turn_id`, `head_depth`, `created_at_unix_ms`, `is_live`, `client_tag` (from cached metadata), and `title` (from cached metadata). The CQL search response does **not** include `labels`, `session_id`, `last_activity_at`, `lineage`, `provenance`, `active_sessions`, or `active_tags` — the CQL endpoint builds lightweight context objects directly rather than calling the full `context_to_json` used by the context list endpoint. The absence of `labels` is significant for the metadata labels optimization (Section 5.5): since CQL search is the primary discovery path, the optimization cannot read `graph_name`/`run_id` from labels without per-context requests or a CXDB enhancement to include `labels` in CQL results. If the context lineage optimization (Section 5.5) is implemented in the future, the UI would need a separate context list request or individual context fetches for lineage data.
+
+CQL results are sorted by `context_id` descending (most recent first), as implemented in CXDB's `store.rs`. Since CXDB allocates context IDs monotonically from a global counter, this is effectively equivalent to creation-time ordering. The context list fallback sorts by `created_at_unix_ms` descending. The `determineActiveRuns` algorithm (Section 6.1) does not depend on response ordering — it scans all candidates to find the maximum `created_at_unix_ms` — so this difference has no functional impact.
+
+The CQL search endpoint also accepts an optional `limit` query parameter. When present, matching contexts are sorted by `context_id` descending and truncated to the specified count. The UI omits `limit` to retrieve all Kilroy contexts, since the discovery algorithm needs to see all contexts to determine the active run. Environments with hundreds of historical Kilroy runs will produce proportionally larger CQL search responses, but this is acceptable for the initial implementation — paginating CQL results would complicate discovery logic for a scenario that is not performance-critical at expected scale.
+
+**CQL error response.** When a CQL query is malformed, the endpoint returns 400 with a JSON error body:
+
+```json
+{
+  "error": "Parse error: unexpected token at position 5",
+  "error_type": "ParseError",
+  "position": 5,
+  "field": null
+}
+```
+
+This is distinct from 404 (CQL not supported) and network errors (instance unreachable). A 400 means CQL is supported but the query was rejected. Since the UI's query (`tag ^= "kilroy/"`) is hardcoded and correct, a 400 is unlikely in practice but could occur against a misconfigured proxy or incompatible CQL version. The `discoverPipelines` pseudocode (Section 5.5) handles this case explicitly.
+
+**CQL search bootstrap lag.** CQL secondary indexes are built from cached metadata, which is extracted from the first turn's msgpack payload. A newly created context may not appear in CQL search results until its first turn is appended and metadata is extracted. The context list fallback resolves `client_tag` from the active session as well (via `context_to_json`'s session-tag fallback), so it can discover contexts earlier. This race window is typically sub-second (the time between context creation and first turn append) and does not affect the UI's behavior — the context would be discovered on the next poll cycle after metadata extraction. No code change is needed; this is a documentation note for completeness.
+
+CQL search eliminates two problems that the context list fallback has: (1) the `limit=10000` heuristic and its truncation risk — CQL returns all matching contexts regardless of total context count, and (2) client-side prefix filtering — the server handles it, reducing payload size and client complexity.
+
+**Fallback: context list.** If the CQL search endpoint returns 404 (indicating an older CXDB version that lacks CQL support), the UI falls back to the full context list:
 
 ```
 GET /v1/contexts?limit=10000
 ```
 
-The endpoint supports a `limit` query parameter (default: 20) controlling the maximum number of contexts returned. The UI passes `limit=10000` to ensure all contexts are returned — the default of 20 is insufficient when non-Kilroy contexts (e.g., Claude Code sessions) accumulate on the instance. The endpoint also supports a `tag` query parameter for server-side filtering: `GET /v1/contexts?tag=kilroy/...` returns only contexts whose `client_tag` matches the given value exactly. The UI does not use server-side tag filtering because the `run_id` portion of the Kilroy tag varies; instead it fetches all contexts and filters client-side by prefix (see Section 5.5).
+The fallback endpoint supports a `limit` query parameter (default: 20) controlling the maximum number of contexts returned. Contexts are returned in **descending order by creation time** (newest first), matching CXDB's `list_recent_contexts` implementation which sorts by `created_at_unix_ms` descending. The UI passes `limit=10000` to ensure all contexts are returned — the default of 20 is insufficient when non-Kilroy contexts (e.g., Claude Code sessions) accumulate on the instance.
+
+**Fallback truncation risk.** The `limit=10000` value is a heuristic. If a CXDB instance accumulates more than 10,000 contexts over its lifetime (plausible on a shared development server running for weeks), the oldest contexts will be truncated from the response. Because contexts are ordered newest-first, this truncation affects the oldest contexts. Active Kilroy pipeline contexts are typically recent and unlikely to be truncated, but long-running pipelines on busy instances could be affected. The failure mode is silent: pipelines whose contexts are truncated will not be discovered, and no error is surfaced. This truncation risk is the primary reason to prefer CQL search.
+
+The fallback endpoint also supports a `tag` query parameter for server-side filtering: `GET /v1/contexts?tag=kilroy/...` returns only contexts whose `client_tag` matches the given value exactly. The UI does not use server-side tag filtering because the `run_id` portion of the Kilroy tag varies; the CQL `^=` operator handles prefix matching instead.
 
 Returns:
 
@@ -407,7 +493,7 @@ Returns (turns are always ordered oldest-first — ascending by depth within the
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `limit` | `64` | Maximum number of turns to return (parsed as u32; no server-enforced maximum). The UI uses at most 100 for polling and `headDepth + 1` for discovery. |
+| `limit` | `64` | Maximum number of turns to return (parsed as u32; no server-enforced maximum). The UI uses 100 for polling and discovery pagination. |
 | `before_turn_id` | `0` | Pagination cursor. When `0` (default), returns the most recent turns. When set to a turn ID, returns turns older than that ID. Use `next_before_turn_id` from the previous response to fetch the next page. |
 | `view` | `typed` | Response format: `typed` (decoded JSON), `raw` (msgpack), or `both` |
 
@@ -424,7 +510,7 @@ Returns (turns are always ordered oldest-first — ascending by depth within the
 
 | Type ID | Description | Key Data Fields |
 |---------|-------------|-----------------|
-| `com.kilroy.attractor.RunStarted` | First turn in a context (pipeline-level) | `graph_name`, `graph_dot`, `run_id` |
+| `com.kilroy.attractor.RunStarted` | First turn in a context (pipeline-level) | `graph_name`, `run_id` |
 | `com.kilroy.attractor.Prompt` | LLM prompt sent to agent | `node_id`, `text` |
 | `com.kilroy.attractor.ToolCall` | Agent invoked a tool | `node_id`, `tool_name`, `arguments_json` |
 | `com.kilroy.attractor.ToolResult` | Tool result | `node_id`, `tool_name`, `output`, `is_error` |
@@ -444,26 +530,46 @@ CXDB is a generic context store with no first-class pipeline concept. The UI dis
 
 The algorithm has two phases: (1) identify Kilroy contexts using `client_tag`, and (2) fetch the `RunStarted` turn to extract `graph_name` and `run_id`.
 
-Kilroy contexts are identified by their `client_tag`, which follows the format `kilroy/{run_id}`. The contexts endpoint supports server-side filtering via the `tag` query parameter, but since the `run_id` portion varies, the UI fetches all contexts and filters client-side by prefix. The context list request must include `limit=10000` to override the CXDB default of 20 — without this, instances with many non-Kilroy contexts (e.g., Claude Code sessions) may push Kilroy contexts outside the default 20-context window, causing pipeline discovery to silently miss them.
+Kilroy contexts are identified by their `client_tag`, which follows the format `kilroy/{run_id}`. The UI uses the CQL search endpoint (Section 5.2) as the primary discovery mechanism, with a fallback to the full context list for older CXDB versions. On each discovery call, the UI first attempts `GET /v1/contexts/search?q=tag ^= "kilroy/"`. If the endpoint returns 404, the UI sets a per-instance `cqlSupported` flag to `false` and falls back to `GET /v1/contexts?limit=10000` with client-side prefix filtering. The `cqlSupported` flag is checked on subsequent polls to skip the CQL attempt — it is reset when the CXDB instance becomes unreachable and then reconnects (since the instance may have been upgraded). When using CQL search, the server returns only `kilroy/`-prefixed contexts, eliminating the need for client-side prefix filtering and the 10,000-context limit heuristic. When using the fallback, the context list request must include `limit=10000` to override the CXDB default of 20 — without this, instances with many non-Kilroy contexts (e.g., Claude Code sessions) may push Kilroy contexts outside the default 20-context window.
 
 ```
-FUNCTION discoverPipelines(cxdbInstances, knownMappings):
+FUNCTION discoverPipelines(cxdbInstances, knownMappings, cqlSupported):
     FOR EACH (index, instance) IN cxdbInstances:
-        contexts = fetchContexts(index, limit=10000)
+        -- Phase 1: Fetch Kilroy contexts (CQL search or fallback)
+        IF cqlSupported[index] != false:
+            TRY:
+                searchResponse = fetchCqlSearch(index, 'tag ^= "kilroy/"')
+                contexts = searchResponse.contexts
+                cqlSupported[index] = true
+            CATCH httpError:
+                IF httpError.status == 404:
+                    cqlSupported[index] = false
+                    contexts = fetchContexts(index, limit=10000)  -- fallback
+                ELSE IF httpError.status == 400:
+                    -- CQL is supported but the query was rejected. Log the error
+                    -- for debugging. Do NOT set cqlSupported[index] = false (CQL works,
+                    -- the query just failed). Skip this instance for this poll cycle.
+                    logWarning("CQL query error on instance " + index + ": " + httpError.body.error)
+                    CONTINUE
+                ELSE:
+                    CONTINUE  -- instance unreachable, skip
+        ELSE:
+            contexts = fetchContexts(index, limit=10000)
 
         FOR EACH context IN contexts:
             key = (index, context.context_id)
             IF key IN knownMappings:
                 CONTINUE  -- already discovered (positive or negative)
 
-            -- Phase 1: Filter by client_tag prefix
-            IF context.client_tag IS null OR NOT context.client_tag.startsWith("kilroy/"):
-                knownMappings[key] = null  -- not a Kilroy context
-                CONTINUE
+            -- When using fallback (no CQL), apply client-side prefix filter
+            IF cqlSupported[index] == false:
+                IF context.client_tag IS null OR NOT context.client_tag.startsWith("kilroy/"):
+                    knownMappings[key] = null  -- not a Kilroy context
+                    CONTINUE
 
             -- Phase 2: Fetch RunStarted turn (first turn of the context)
             -- fetchFirstTurn may fail due to transient errors (non-200 response,
-            -- type registry missing, instance temporarily unreachable). Distinguish
+            -- instance temporarily unreachable, msgpack decode failure). Distinguish
             -- between "confirmed non-RunStarted" and "unknown due to error."
             TRY:
                 firstTurn = fetchFirstTurn(index, context.context_id, context.head_depth)
@@ -475,6 +581,14 @@ FUNCTION discoverPipelines(cxdbInstances, knownMappings):
             IF firstTurn IS NOT null AND firstTurn.declared_type.type_id == "com.kilroy.attractor.RunStarted":
                 graphName = firstTurn.data.graph_name
                 runId = firstTurn.data.run_id
+                -- Guard against null or empty graph_name. The registry bundle
+                -- marks graph_name as optional, so a valid RunStarted can have
+                -- graph_name absent or empty. Such a context can never match
+                -- any pipeline. Cache it as null (same as non-Kilroy) since
+                -- the first turn is immutable — retrying would not help.
+                IF graphName IS null OR graphName == "":
+                    knownMappings[key] = null
+                    CONTINUE
                 knownMappings[key] = { graphName, runId }
             ELSE IF firstTurn IS null:
                 -- Empty context (no turns yet). This can happen during early pipeline
@@ -487,7 +601,9 @@ FUNCTION discoverPipelines(cxdbInstances, knownMappings):
     RETURN knownMappings
 ```
 
-**Fetching the first turn.** CXDB returns turns oldest-first (ascending by position in the parent chain). The `before_turn_id` parameter paginates backward from a given turn ID. To reach the first turn of a context, the algorithm requests `headDepth + 1` turns to fetch the entire context in a single request:
+**Fetching the first turn.** CXDB returns turns oldest-first (ascending by position in the parent chain). The `before_turn_id` parameter paginates backward from a given turn ID. To reach the first turn of a context, the algorithm paginates backward from the head in bounded pages rather than fetching the entire context in a single request. This avoids O(headDepth) memory and latency costs — CXDB's `get_last` walks the parent chain sequentially, serializes every turn including decoded payloads, and transfers the entire response over HTTP. For deep contexts (headDepth in the tens of thousands), a single unbounded request could produce hundreds of megabytes of JSON, all of which would be discarded except the first turn.
+
+**Using `view=raw` for discovery.** The `fetchFirstTurn` algorithm uses `view=raw` instead of the default `view=typed`. This eliminates the type registry dependency for pipeline discovery. The `declared_type` field (containing `type_id` and `type_version`) is present in both `view=raw` and `view=typed` responses — it comes from the turn metadata, not the type registry. For the `RunStarted` data fields (`graph_name`, `run_id`), `view=raw` returns the raw msgpack payload as base64-encoded bytes in the `bytes_b64` field. The UI decodes this client-side: base64-decode to bytes, then msgpack-decode to extract the known `RunStarted` fields. This avoids the bootstrap ordering problem where the type registry bundle has not yet been published when the UI first discovers a pipeline (the registry is typically published by the Kilroy runner at the start of the run). Without `view=raw`, `fetchFirstTurn` would fail for all contexts during the window between context creation and registry publication, delaying pipeline discovery by 1-3 poll cycles (3-9 seconds). The regular turn polling (Section 6.1 step 4) continues using the default `view=typed` for the status overlay, since those fields are more complex and benefit from server-side projection.
 
 ```
 FUNCTION fetchFirstTurn(cxdbIndex, contextId, headDepth):
@@ -495,26 +611,97 @@ FUNCTION fetchFirstTurn(cxdbIndex, contextId, headDepth):
         -- Context has at most one turn; limit=1 returns it if present.
         -- An empty context (just created, no turns yet) also has headDepth 0,
         -- so guard against an empty response.
-        response = fetchTurns(cxdbIndex, contextId, limit=1)
+        -- Use view=raw to avoid type registry dependency.
+        response = fetchTurns(cxdbIndex, contextId, limit=1, view="raw")
         IF response.turns IS EMPTY:
             RETURN null
-        RETURN response.turns[0]
+        RETURN decodeFirstTurn(response.turns[0])
 
-    -- Fetch the entire context in one request.
-    -- headDepth + 1 = total turn count. CXDB parses limit as u32 with no enforced maximum.
-    response = fetchTurns(cxdbIndex, contextId, limit=headDepth + 1)
-    IF response.turns IS EMPTY:
-        RETURN null
-    RETURN response.turns[0]  -- oldest turn (oldest-first ordering) = first turn
+    -- Paginate backward from the head in bounded pages.
+    -- Each page fetches up to PAGE_SIZE turns (100). Check whether the page
+    -- contains a turn with depth == 0 (the first turn). If not, continue
+    -- paginating using before_turn_id. Cap at MAX_PAGES (50) to prevent
+    -- runaway pagination for extremely deep contexts.
+    -- Use view=raw to avoid type registry dependency.
+    PAGE_SIZE = 100
+    MAX_PAGES = 50
+    cursor = 0  -- 0 means "start from head" (no before_turn_id)
+
+    FOR page = 1 TO MAX_PAGES:
+        IF cursor == 0:
+            response = fetchTurns(cxdbIndex, contextId, limit=PAGE_SIZE, view="raw")
+        ELSE:
+            response = fetchTurns(cxdbIndex, contextId, limit=PAGE_SIZE, before_turn_id=cursor, view="raw")
+
+        IF response.turns IS EMPTY:
+            RETURN null
+
+        -- Turns are oldest-first. Check if depth=0 is in this page.
+        IF response.turns[0].depth == 0:
+            RETURN decodeFirstTurn(response.turns[0])
+
+        -- The oldest turn in this page is not depth=0. Continue paginating.
+        cursor = response.turns[0].turn_id  -- oldest turn's ID becomes the next before_turn_id
+        -- CXDB's get_before walks backward from before_turn_id's parent,
+        -- so the next page will contain turns older than this one.
+
+    -- Exceeded MAX_PAGES without finding depth=0.
+    -- This context is too deep for first-turn discovery. Return null so it
+    -- is retried on subsequent polls (not cached as a negative result).
+    RETURN null
+
+FUNCTION decodeFirstTurn(rawTurn):
+    -- Extract declared_type (available in both raw and typed views)
+    typeId = rawTurn.declared_type.type_id
+    IF typeId != "com.kilroy.attractor.RunStarted":
+        RETURN { declared_type: rawTurn.declared_type, data: null }
+
+    -- Decode the raw msgpack payload to extract graph_name and run_id.
+    -- The raw payload uses integer tags as map keys (not field names).
+    -- Go's msgpack encoder produces string-encoded integer keys (e.g., the
+    -- string "1" instead of the integer 1). CXDB's key_to_tag function
+    -- (store.rs, projection/mod.rs) handles both forms. The browser-side
+    -- decoder must do the same: for each map key, try parseInt if it is a
+    -- string, or use the integer directly.
+    --
+    -- RunStarted field tags (from kilroy-attractor-v1 bundle, version 1):
+    --   Tag 1: run_id (string)
+    --   Tag 8: graph_name (string, optional)
+    -- These tags are stable within bundle version 1. CXDB's type registry
+    -- versioning model ensures existing tags are never reassigned — new
+    -- bundle versions add fields with new tags. The full RunStarted v1
+    -- field inventory is: run_id (1), timestamp_ms (2), repo_path (3),
+    -- base_sha (4), run_branch (5), logs_root (6), worktree_dir (7),
+    -- graph_name (8), goal (9), modeldb_catalog_sha256 (10),
+    -- modeldb_catalog_source (11). Only tags 1 and 8 are used by the UI.
+    bytes = base64Decode(rawTurn.bytes_b64)
+    payload = msgpackDecode(bytes)
+    -- Access fields by their integer tag (or string-encoded integer key).
+    -- The || fallback handles both string-encoded integer keys (Go's
+    -- msgpack encoder) and integer keys (other encoders).
+    RETURN {
+        declared_type: rawTurn.declared_type,
+        data: { graph_name: payload["8"] || payload[8], run_id: payload["1"] || payload[1] }
+    }
 ```
 
-Since `fetchLimit = headDepth + 1` and CXDB imposes no limit maximum, the first turn is always fetched in a single request regardless of context depth. This runs once per context (results are cached). The `client_tag` prefix filter (Phase 1) ensures pagination only runs for Kilroy contexts, not for unrelated contexts that may share the CXDB instance.
+**Cross-context traversal for forked contexts.** The `fetchFirstTurn` pagination follows CXDB's parent chain via `parent_turn_id` links. For forked contexts (created for parallel branches), the parent chain extends across context boundaries — the child context's turns link back to the parent context's turns via the fork point's `parent_turn_id`. Walking to depth 0 therefore discovers the parent context's `RunStarted` turn, not a turn within the child context. This is correct because Kilroy's parallel branch contexts share the parent's `RunStarted` (same `graph_name`, same `run_id`) via the linked parent chain. CXDB's `get_before` implementation (`turn_store/mod.rs`) walks `parent_turn_id` without any context boundary check, confirming this cross-context traversal. If a future Kilroy version emits a new `RunStarted` in each forked child context, the pagination would still work (it would find the child's `RunStarted` at the child's depth-0 position), but the current behavior discovers the parent's `RunStarted` instead.
+
+**Pagination cost.** In the worst case (headDepth = 5000), fetching the first turn requires 50 paginated requests of 100 turns each. For typical Kilroy contexts (headDepth < 1000), this completes in under 10 pages. The `client_tag` prefix filter (Phase 1) ensures pagination only runs for Kilroy contexts, not for unrelated contexts that may share the CXDB instance. Each page request transfers at most 100 turns worth of JSON (roughly 50–200 KB depending on payload size), avoiding the memory spike of a single unbounded request. The `MAX_PAGES` cap of 50 means contexts deeper than ~5000 turns are skipped for discovery; these are retried on subsequent polls in case the depth was a transient artifact.
+
+**Note on CXDB internals.** The CXDB turn store has a `get_first_turn` method that walks back from the head to find depth=0 directly, but this is not exposed via the HTTP API. If a future CXDB release adds an HTTP endpoint for fetching the first turn (or exposes the binary protocol's `GetRangeByDepth` over HTTP), the pagination approach here should be replaced with a single targeted request. This runs once per context (results are cached).
 
 The `graph_name` from the `RunStarted` turn is matched against the graph ID in each loaded DOT file (the identifier after `digraph` in the DOT source). Contexts whose `graph_name` matches the currently displayed pipeline are used for the status overlay — regardless of which CXDB instance they reside on.
 
 The `RunStarted` turn also contains a `run_id` field (see Section 5.4 for the full field inventory) that uniquely identifies the pipeline run. All contexts belonging to the same run (e.g., parallel branches) share the same `run_id`. The discovery algorithm records both `graph_name` and `run_id` for each context.
 
-**Caching.** The context-to-pipeline mapping is cached in memory, keyed by `(cxdb_index, context_id)`. Both positive results (RunStarted contexts mapped to a pipeline) and negative results (non-Kilroy contexts and confirmed non-RunStarted contexts stored as `null`) are cached. The first turn of a context is immutable — once a context is successfully classified, it is never re-fetched. Only newly appeared context IDs (and previously failed or empty fetches that were not cached) trigger discovery requests. The `client_tag` prefix filter prevents fetching turns for non-Kilroy contexts entirely. Two cases are left unmapped (not cached as `null`) and retried on subsequent polls: (a) when a `fetchFirstTurn` call fails due to a transient error (non-200 response, type registry miss, timeout), and (b) when `fetchFirstTurn` returns `null` (empty context with no turns yet — common during early pipeline startup or transient CXDB lag). This prevents both transient failures and premature classification of empty contexts from permanently classifying a valid Kilroy context as non-Kilroy.
+**Caching.** The context-to-pipeline mapping is cached in memory, keyed by `(cxdb_index, context_id)`. Both positive results (RunStarted contexts mapped to a pipeline) and negative results (non-Kilroy contexts and confirmed non-RunStarted contexts stored as `null`) are cached. The first turn of a context is immutable — once a context is successfully classified, it is never re-fetched. Only newly appeared context IDs (and previously failed or empty fetches that were not cached) trigger discovery requests. The `client_tag` prefix filter (whether server-side via CQL or client-side in the fallback path) prevents fetching turns for non-Kilroy contexts entirely. Two cases are left unmapped (not cached as `null`) and retried on subsequent polls: (a) when a `fetchFirstTurn` call fails due to a transient error (non-200 response, timeout), and (b) when `fetchFirstTurn` returns `null` (empty context with no turns yet — common during early pipeline startup or transient CXDB lag). This prevents both transient failures and premature classification of empty contexts from permanently classifying a valid Kilroy context as non-Kilroy.
+
+**`client_tag` stability requirement.** The `client_tag` prefix filter assumes `client_tag` is stable across polls. CXDB resolves `client_tag` with a fallback chain: first from stored metadata (extracted from the first turn's msgpack payload key 30), then from the active session's tag. If the first turn's payload does not include context metadata (key 30 is absent), the `client_tag` in the context list is only present while the session is active (`is_live == true`). Once the session disconnects, `client_tag` becomes `null`, and the UI's prefix filter would fail to match — permanently excluding the context from discovery if it has already been cached as non-Kilroy. **Kilroy must embed `client_tag` in the first turn's context metadata** (key 30) for reliable classification. This is the expected integration pattern and is likely already the case, but the spec states this requirement explicitly rather than treating `client_tag` as an opaque stable field.
+
+**Metadata labels optimization (not required for initial implementation).** The CXDB server extracts and caches metadata from the first turn of every context (key 30 of the msgpack payload), including `client_tag`, `title`, and `labels`. If Kilroy embeds `graph_name` and `run_id` in the context metadata labels (e.g., `["kilroy:graph=alpha_pipeline", "kilroy:run=01KJ7..."]`), the UI could read them from the context list response's `labels` field, eliminating all `fetchFirstTurn` pagination. However, the CQL search response (the primary discovery path) does not include `labels` — only the full context list endpoint does (Section 5.2). This means the optimization is incompatible with the CQL-first discovery path without one of: (a) falling back to the context list endpoint (losing CQL's scalability benefits), (b) making separate per-context requests to `GET /v1/contexts/{id}` which does return `labels`, (c) a CXDB enhancement to include `labels` in CQL search results, or (d) using server-side SSE subscription (non-goal #11) — the `ContextMetadataUpdated` SSE event carries `labels` (confirmed in CXDB's `events.rs` and `http/mod.rs`), so the Go proxy server could collect labels from these events and serve them without per-context HTTP requests, elegantly bypassing both the CQL limitation and per-context HTTP overhead. Option (d) is the most efficient workaround because it avoids polling entirely for metadata discovery, but it requires the server-side SSE infrastructure described in non-goal #11. This is a Kilroy-side change (not a CXDB change) that would simplify discovery significantly but requires solving the CQL `labels` gap. The pagination approach works correctly today and is used for the initial implementation.
+
+**Context lineage optimization (not required for initial implementation).** CXDB tracks cross-context lineage via `ContextLinked` events. When a context is forked from another (e.g., for parallel branches), CXDB records `parent_context_id`, `root_context_id`, and `spawn_reason` in the context's provenance. The context list endpoint returns this data when `include_lineage=1` is passed. A future optimization could use lineage to skip `fetchFirstTurn` for child contexts: if a child's `parent_context_id` is already in `knownMappings`, the child inherits the parent's `graph_name`/`run_id` mapping. This would reduce discovery latency proportionally to the number of parallel branches. The current approach (fetching the first turn independently for each context) is correct but performs redundant work for forked contexts that share the same `RunStarted` data.
 
 **Multiple runs of the same pipeline.** When CXDB contains contexts from multiple runs of the same pipeline (same `graph_name`, different `run_id`), the UI uses only the most recent run. The most recent run is determined by the highest `created_at_unix_ms` among the `RunStarted` contexts for that pipeline. Contexts from older runs are ignored for status overlay purposes. This prevents stale data from a completed run from conflicting with an in-progress run.
 
@@ -528,7 +715,7 @@ The `RunStarted` turn also contains a `run_id` field (see Section 5.4 for the fu
 
 The UI polls all configured CXDB instances every 3 seconds. Each poll cycle:
 
-1. For each CXDB instance, fetch `GET /api/cxdb/{i}/v1/contexts?limit=10000` — get context lists. On success, store the response in `cachedContextLists[i]` (replacing any previous cached value). If an instance is unreachable (502), skip it, retain its per-context status maps from the last successful poll, and use `cachedContextLists[i]` as the context list for that instance in subsequent steps. This ensures that `lookupContext`, `determineActiveRuns`, and `checkPipelineLiveness` continue to function using the last known context data during transient outages — preserving active-run determination and liveness signals rather than losing them.
+1. For each CXDB instance, fetch Kilroy contexts using the CQL search endpoint or fallback (see Section 5.2 and 5.5's `discoverPipelines` for the CQL/fallback selection logic). On success, store the response contexts in `cachedContextLists[i]` (replacing any previous cached value). If an instance is unreachable (502), skip it, retain its per-context status maps from the last successful poll, and use `cachedContextLists[i]` as the context list for that instance in subsequent steps. This ensures that `lookupContext`, `determineActiveRuns`, and `checkPipelineLiveness` continue to function using the last known context data during transient outages — preserving active-run determination and liveness signals rather than losing them.
 2. Run pipeline discovery for any new `(index, context_id)` pairs (Section 5.5)
 3. **Determine active run per pipeline.** For each loaded pipeline, group discovered contexts by `run_id`. The active run is the one whose contexts have the highest `created_at_unix_ms` value. Contexts from non-active runs are excluded from steps 4–7. When the active `run_id` changes for a pipeline (a new run has started), reset all per-context status maps and `lastSeenTurnId` cursors for that pipeline's old-run contexts, and clear the per-pipeline turn cache (step 5) for that pipeline. This implements the "most recent run" rule described in Section 5.5. The context list data from step 1 must be retained (e.g., in a local variable) for use here, since the discovery mapping does not store `created_at_unix_ms`. The algorithm also maintains a `previousActiveRunIds` map (keyed by pipeline graph ID) across poll cycles to detect run changes.
 
@@ -574,7 +761,7 @@ FUNCTION determineActiveRuns(pipelines, knownMappings, contextLists, previousAct
     RETURN activeContextsByPipeline
 ```
 
-The `lookupContext` helper finds the context object (from step 1's context list responses) by `(cxdb_index, context_id)` to access `created_at_unix_ms`. The `resetPipelineState` helper clears the per-context status maps, `lastSeenTurnId` cursors, and per-pipeline turn cache for all contexts that belonged to the old run. It also removes `knownMappings` entries whose `runId` matches the old run's `run_id`. These entries are no longer useful — they will never match the active run, and if the same context IDs appear in a future run with different `RunStarted` data, they will be re-discovered. Entries for the new run and entries with `null` mappings (negative caches) are retained.
+The `lookupContext` helper finds the context object (from step 1's context list responses) by `(cxdb_index, context_id)` to access `created_at_unix_ms`. The `resetPipelineState` helper clears the per-context status maps, `lastSeenTurnId` cursors, and per-pipeline turn cache for all contexts that belonged to the old run. It also removes `knownMappings` entries whose `runId` matches the old run's `run_id`. These entries are removed for memory hygiene: old-run entries will never match the active run and would accumulate indefinitely across successive runs. (CXDB context IDs are monotonically increasing integers allocated from a global counter and are never reused, so there is no risk of a future context reusing an old ID.) Entries for the new run and entries with `null` mappings (negative caches) are retained.
 
 **Pipeline liveness check.** After determining active runs, check whether each pipeline's active-run contexts have any live sessions. A pipeline is "live" if at least one of its active-run contexts has `is_live == true` in the context list response. This signal is used in step 6 for stale node detection.
 
@@ -812,6 +999,8 @@ FUNCTION applyErrorHeuristic(mergedMap, dotNodeIds, perContextCaches):
 
 The `getMostRecentToolResultsForNodeInContext` helper scans a single context's cached turns for `ToolResult` turns (i.e., turns whose `declared_type.type_id` is `com.kilroy.attractor.ToolResult`) matching the given `node_id`, collecting them sorted by `turn_id` descending (newest-first, which is safe for intra-context ordering since turn IDs are monotonically increasing within a single context), and returns the first `count` matches. Only `ToolResult` turns carry the `is_error` field (see Section 5.4); other turn types (Prompt, ToolCall, etc.) do not have this field, so including them would dilute the error detection window and prevent the heuristic from firing during typical error loops where turn types interleave as Prompt → ToolCall → ToolResult. This avoids the cross-instance `turn_id` ordering problem: turn IDs are only compared within the same CXDB instance and context, where they have a meaningful temporal relationship.
 
+**Error heuristic window limitation.** The turn cache is replaced (not appended) on each successful fetch (Section 6.1, step 5). The error heuristic therefore only detects errors visible in the current 100-turn fetch window. If 3 error ToolResults span across two poll cycles — for example, 2 errors in the previous poll's window and 1 in the current window — only the current window's turns are available, and the heuristic would not fire. This means slow error loops (where errors are spaced more than ~100 turns apart across all turn types in the context) will not trigger the heuristic. This is acceptable for the initial implementation: the heuristic targets rapid error loops where the agent retries the same failing command in quick succession, producing many ToolResult turns per poll window. Slow error loops (one error every few minutes with hundreds of intervening turns) are an atypical pattern that is better addressed by lifecycle turns (`StageFailed`) or operator observation.
+
 **Stale pipeline detection (post-merge).** After the error heuristic, the stale detection step runs if the pipeline has no live sessions. When all contexts for a pipeline's active run have `is_live == false` (no agent is writing to any of them), any node still showing as "running" without lifecycle resolution is reclassified as "stale." This detects the case where an agent process crashes mid-node — no `StageFinished` or `StageFailed` is written, and the node would otherwise display as "running" indefinitely.
 
 ```
@@ -883,12 +1072,26 @@ The detail panel shows recent CXDB turns for the selected node. Turns are source
 
 | Column | Source | Description |
 |--------|--------|-------------|
-| Type | `declared_type.type_id` | Turn type (ToolCall, ToolResult, Prompt) |
-| Tool | `data.tool_name` | Tool invoked (e.g., `shell`, `write_file`) |
-| Output | `data.output` | Truncated output (expandable) |
-| Error | `data.is_error` | Highlighted if true |
+| Type | `declared_type.type_id` | Turn type (ToolCall, ToolResult, Prompt, etc.) |
+| Tool | `data.tool_name` | Tool invoked (e.g., `shell`, `write_file`) — blank for non-tool turns |
+| Output | varies by type (see mapping below) | Truncated content (expandable) |
+| Error | `data.is_error` | Highlighted if true — only applicable to ToolResult |
 
-Within each context section, turns are displayed newest-first (reversed from the API's oldest-first order for better UX — most recent activity at the top). The panel shows at most 20 turns per context section. If all of a node's turns have scrolled out of the 100-turn poll window (i.e., the node completed early and subsequent nodes have generated many turns), the detail panel shows the node's DOT attributes but displays "No recent CXDB activity" in place of the turn list. The node's status remains correct via the persistent status map (Section 6.2).
+**Per-type rendering.** The Output column content varies by turn type:
+
+| Turn Type | Output Column | Tool Column | Error Column |
+|-----------|--------------|-------------|--------------|
+| `Prompt` | `data.text` | blank | blank |
+| `ToolCall` | `data.arguments_json` | `data.tool_name` | blank |
+| `ToolResult` | `data.output` | `data.tool_name` | `data.is_error` (highlighted if true) |
+| `StageStarted` | "Stage started" (fixed label) | blank | blank |
+| `StageFinished` | "Stage finished" (fixed label) | blank | blank |
+| `StageFailed` | "Stage failed" (fixed label) | blank | blank |
+| Other/unknown | "[unsupported turn type]" (placeholder) | blank | blank |
+
+This mapping ensures all turn types that may appear in the turn cache render meaningfully. Lifecycle turns (StageStarted, StageFinished, StageFailed) use fixed labels since their data fields (node_id, timestamp_ms, status) are already reflected in the node status overlay and do not need detailed rendering.
+
+Within each context section, turns are displayed newest-first (reversed from the API's oldest-first order for better UX — most recent activity at the top). All `turn_id` comparisons used for ordering within the detail panel — both within-context sorting and cross-context section ordering — must be numeric (`parseInt(turn_id, 10)`), consistent with Section 6.2. Lexicographic comparison breaks for IDs of different digit lengths (e.g., `"999" > "1000"` lexicographically). The panel shows at most 20 turns per context section. If all of a node's turns have scrolled out of the 100-turn poll window (i.e., the node completed early and subsequent nodes have generated many turns), the detail panel shows the node's DOT attributes but displays "No recent CXDB activity" in place of the turn list. The node's status remains correct via the persistent status map (Section 6.2).
 
 ### 7.3 Shape-to-Type Label Mapping
 
@@ -1008,7 +1211,7 @@ When all contexts for the active pipeline's active run have `is_live == false` a
 
 10. **No notifications.** The UI does not produce desktop notifications, sounds, or alerts.
 
-11. **No SSE event streaming.** CXDB exposes a `/v1/events` Server-Sent Events endpoint for real-time push notifications (e.g., `TurnAppended`, `ContextCreated`). The UI uses polling instead for simplicity — no persistent connection management, simpler error recovery, and 3-second latency is sufficient for the "mission control" use case.
+11. **No browser-side SSE event streaming.** CXDB exposes a `/v1/events` Server-Sent Events endpoint for real-time push notifications (e.g., `TurnAppended`, `ContextCreated`). The browser uses polling instead for simplicity — no persistent connection management, simpler error recovery, and 3-second latency is sufficient for the "mission control" use case. Note: the Go proxy server could optionally subscribe to CXDB's SSE endpoint server-side (using the Go client's `SubscribeEvents` function with automatic reconnection) to reduce discovery latency — e.g., immediately triggering discovery when a `ContextCreated` event with a `kilroy/`-prefixed `client_tag` arrives, without waiting for the next poll cycle. This is not required for the initial implementation but is a lower-complexity design point than browser-side SSE, since the browser's polling architecture remains unchanged.
 
 ---
 

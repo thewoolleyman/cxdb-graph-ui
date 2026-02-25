@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CXDB Graph UI — Main View Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #e0e0e0; }
+
+  /* Annotation styles */
+  .annotation {
+    position: absolute;
+    background: rgba(255, 200, 50, 0.95);
+    color: #1a1a2e;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    max-width: 200px;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .annotation::after {
+    content: '';
+    position: absolute;
+    border: 6px solid transparent;
+  }
+  .annotation.arrow-down::after {
+    top: 100%; left: 50%; transform: translateX(-50%);
+    border-top-color: rgba(255, 200, 50, 0.95);
+  }
+  .annotation.arrow-up::after {
+    bottom: 100%; left: 50%; transform: translateX(-50%);
+    border-bottom-color: rgba(255, 200, 50, 0.95);
+  }
+  .annotation.arrow-left::after {
+    top: 50%; right: 100%; transform: translateY(-50%);
+    border-right-color: rgba(255, 200, 50, 0.95);
+  }
+  .annotation.arrow-right::after {
+    top: 50%; left: 100%; transform: translateY(-50%);
+    border-left-color: rgba(255, 200, 50, 0.95);
+  }
+
+  .container { width: 1400px; height: 900px; position: relative; display: flex; flex-direction: column; }
+
+  /* Top bar */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #16213e; padding: 8px 16px; border-bottom: 1px solid #333;
+    height: 48px;
+  }
+  .tabs { display: flex; gap: 0; }
+  .tab {
+    padding: 8px 20px; cursor: pointer; font-size: 14px;
+    border: 1px solid #333; border-bottom: none;
+    background: #1a1a2e; color: #888; border-radius: 6px 6px 0 0;
+    margin-right: -1px;
+  }
+  .tab.active { background: #0f3460; color: #fff; border-color: #0f3460; }
+  .cxdb-status { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .status-dot.green { background: #4caf50; box-shadow: 0 0 6px #4caf50; }
+  .status-dot.red { background: #f44336; box-shadow: 0 0 6px #f44336; }
+  .status-dot.yellow { background: #ff9800; box-shadow: 0 0 6px #ff9800; }
+
+  /* Main content area */
+  .main { display: flex; flex: 1; overflow: hidden; }
+
+  /* Graph area */
+  .graph-area {
+    flex: 1; padding: 30px; display: flex; justify-content: center; align-items: flex-start;
+    overflow: auto; background: #1a1a2e;
+  }
+
+  /* Simulated pipeline graph */
+  .pipeline-graph { position: relative; width: 700px; }
+
+  .node {
+    position: absolute; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 500; color: #222; border: 2px solid #555;
+    text-align: center; line-height: 1.2;
+  }
+  .node-box { width: 140px; height: 44px; border-radius: 4px; }
+  .node-diamond { width: 120px; height: 60px; transform: rotate(45deg); }
+  .node-diamond span { display: block; transform: rotate(-45deg); font-size: 10px; }
+  .node-parallelogram { width: 140px; height: 44px; transform: skewX(-15deg); border-radius: 2px; }
+  .node-parallelogram span { transform: skewX(15deg); display: block; }
+  .node-hexagon { width: 130px; height: 50px; clip-path: polygon(10% 0%, 90% 0%, 100% 50%, 90% 100%, 10% 100%, 0% 50%); }
+  .node-mdiamond { width: 60px; height: 60px; transform: rotate(45deg); border-radius: 0; }
+  .node-mdiamond span { display: block; transform: rotate(-45deg); font-size: 11px; }
+  .node-msquare { width: 60px; height: 60px; border-radius: 0; }
+
+  /* Status colors */
+  .status-pending { background: #e0e0e0; border-color: #999; }
+  .status-running { background: #90caf9; border-color: #42a5f5; animation: pulse 1.5s infinite; }
+  .status-complete { background: #a5d6a7; border-color: #66bb6a; }
+  .status-error { background: #ef9a9a; border-color: #ef5350; }
+  .status-stale { background: #ffcc80; border-color: #ffa726; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  /* Edges (simplified as lines) */
+  .edge-svg {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+  }
+  .edge-svg line, .edge-svg path {
+    stroke: #666; stroke-width: 1.5; fill: none;
+  }
+  .edge-svg text { fill: #aaa; font-size: 10px; }
+  .edge-svg polygon { fill: #666; stroke: none; }
+
+  /* Detail panel */
+  .detail-panel {
+    width: 360px; background: #16213e; border-left: 1px solid #333;
+    padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;
+  }
+  .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 12px; }
+  .panel-header h2 { font-size: 18px; color: #fff; }
+  .close-btn { background: none; border: none; color: #888; font-size: 20px; cursor: pointer; }
+  .panel-section { margin-bottom: 8px; }
+  .panel-section h3 { font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .panel-field { display: flex; gap: 8px; margin-bottom: 4px; font-size: 13px; }
+  .panel-field .label { color: #888; min-width: 80px; }
+  .panel-field .value { color: #e0e0e0; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .badge-running { background: #1565c0; color: #fff; }
+  .badge-error { background: #c62828; color: #fff; }
+  .badge-complete { background: #2e7d32; color: #fff; }
+  .badge-llm { background: #4a148c; color: #fff; }
+
+  .prompt-text {
+    background: #0d1b3e; border: 1px solid #333; border-radius: 4px;
+    padding: 8px; font-size: 12px; color: #ccc; max-height: 100px;
+    overflow-y: auto; font-family: monospace; white-space: pre-wrap;
+  }
+
+  .turn-list { display: flex; flex-direction: column; gap: 4px; }
+  .turn-item {
+    display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px;
+    background: #0d1b3e; border-radius: 4px; font-size: 12px;
+  }
+  .turn-type { font-weight: 600; min-width: 70px; }
+  .turn-type.tool-call { color: #64b5f6; }
+  .turn-type.tool-result { color: #81c784; }
+  .turn-type.tool-error { color: #ef5350; }
+  .turn-type.prompt { color: #ce93d8; }
+  .turn-tool { color: #aaa; min-width: 65px; }
+  .turn-output { color: #888; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .title-label { font-size: 11px; color: #666; margin-top: 4px; text-align: center; font-style: italic; }
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- ANNOTATIONS -->
+  <div class="annotation arrow-down" style="top: -4px; left: 120px;">
+    Pipeline tabs — one per --dot file.<br>Shows graph ID from DOT source.
+  </div>
+  <div class="annotation arrow-down" style="top: -4px; right: 50px;">
+    CXDB connection indicator.<br>Green = all instances OK.
+  </div>
+  <div class="annotation arrow-left" style="top: 140px; right: -14px; max-width: 170px;">
+    Detail panel opens on node click. Shows DOT attrs + CXDB turns.
+  </div>
+  <div class="annotation arrow-right" style="top: 500px; left: -10px; max-width: 180px;">
+    Status colors from CXDB:<br>
+    Gray = pending<br>
+    Blue+pulse = running<br>
+    Green = complete<br>
+    Red = error<br>
+    Orange = stale
+  </div>
+  <div class="annotation arrow-up" style="bottom: 20px; left: 320px; max-width: 220px;">
+    SVG rendered client-side via Graphviz WASM from DOT file. Layout is deterministic.
+  </div>
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="tabs">
+      <div class="tab active">kilroy-build</div>
+      <div class="tab">kilroy-test</div>
+      <div class="tab">kilroy-deploy</div>
+    </div>
+    <div class="cxdb-status">
+      <span class="status-dot green"></span>
+      <span>CXDB OK</span>
+    </div>
+  </div>
+
+  <!-- MAIN AREA -->
+  <div class="main">
+    <!-- GRAPH AREA -->
+    <div class="graph-area">
+      <div class="pipeline-graph" style="height: 780px;">
+        <!-- Edge SVG layer -->
+        <svg class="edge-svg" viewBox="0 0 700 780" preserveAspectRatio="xMidYMid meet">
+          <!-- start -> expand_spec -->
+          <line x1="350" y1="45" x2="350" y2="90"/>
+          <polygon points="350,90 346,82 354,82"/>
+          <!-- expand_spec -> check_expand -->
+          <line x1="350" y1="134" x2="350" y2="170"/>
+          <polygon points="350,170 346,162 354,162"/>
+          <!-- check_expand -> implement (fail) -->
+          <path d="M 310 200 Q 250 230 280 265" />
+          <polygon points="280,265 276,257 284,257"/>
+          <text x="235" y="235">fail</text>
+          <!-- check_expand -> verify (pass) -->
+          <path d="M 390 200 Q 450 230 420 265"/>
+          <polygon points="420,265 416,257 424,257"/>
+          <text x="445" y="235">pass</text>
+          <!-- implement -> check_fmt -->
+          <line x1="280" y1="309" x2="280" y2="345"/>
+          <polygon points="280,345 276,337 284,337"/>
+          <!-- check_fmt -> check_test -->
+          <line x1="280" y1="389" x2="280" y2="425"/>
+          <polygon points="280,425 276,417 284,417"/>
+          <!-- check_test -> check_goal -->
+          <line x1="280" y1="469" x2="320" y2="510"/>
+          <polygon points="320,510 314,504 322,502"/>
+          <!-- check_goal -> implement (fail loop) -->
+          <path d="M 310 540 Q 180 540 210 309"/>
+          <polygon points="210,309 206,317 214,317"/>
+          <text x="175" y="440">fail</text>
+          <!-- check_goal -> review (pass) -->
+          <path d="M 390 540 Q 460 560 440 595"/>
+          <polygon points="440,595 436,587 444,587"/>
+          <text x="455" y="570">pass</text>
+          <!-- verify -> done -->
+          <line x1="420" y1="309" x2="420" y2="430"/>
+          <polygon points="420,430 416,422 424,422"/>
+          <!-- review -> done -->
+          <line x1="440" y1="639" x2="420" y2="710"/>
+          <polygon points="420,710 416,702 424,702"/>
+        </svg>
+
+        <!-- Nodes -->
+        <!-- Start (Mdiamond) -->
+        <div class="node node-mdiamond status-complete" style="left: 320px; top: 10px;">
+          <span>Start</span>
+        </div>
+
+        <!-- expand_spec (box, LLM Task) -->
+        <div class="node node-box status-complete" style="left: 280px; top: 90px;">
+          expand_spec
+        </div>
+
+        <!-- check_expand (diamond, Conditional) -->
+        <div class="node node-diamond status-complete" style="left: 300px; top: 165px;">
+          <span>check</span>
+        </div>
+
+        <!-- implement (box, LLM Task) - RUNNING with pulse -->
+        <div class="node node-box status-running" style="left: 210px; top: 265px; border-width: 3px; box-shadow: 0 0 12px rgba(66,165,245,0.4);">
+          implement
+        </div>
+
+        <!-- check_fmt (parallelogram, Tool Gate) -->
+        <div class="node node-parallelogram status-pending" style="left: 210px; top: 345px;">
+          <span>check_fmt</span>
+        </div>
+
+        <!-- check_test (parallelogram, Tool Gate) -->
+        <div class="node node-parallelogram status-pending" style="left: 210px; top: 425px;">
+          <span>check_test</span>
+        </div>
+
+        <!-- check_goal (diamond, Conditional + goal gate) -->
+        <div class="node node-diamond status-pending" style="left: 300px; top: 505px;">
+          <span>goal</span>
+        </div>
+
+        <!-- verify (box, LLM Task) -->
+        <div class="node node-box status-error" style="left: 350px; top: 265px; border-width: 3px; box-shadow: 0 0 12px rgba(239,83,80,0.4);">
+          verify_result
+        </div>
+
+        <!-- review (hexagon, Human Gate) -->
+        <div class="node node-hexagon status-pending" style="left: 375px; top: 595px;">
+          review
+        </div>
+
+        <!-- done (Msquare, Exit) -->
+        <div class="node node-msquare status-pending" style="left: 390px; top: 710px;">
+          Done
+        </div>
+      </div>
+    </div>
+
+    <!-- DETAIL PANEL -->
+    <div class="detail-panel">
+      <div class="panel-header">
+        <div>
+          <h2>implement</h2>
+          <div style="display:flex; gap:6px; margin-top:6px;">
+            <span class="badge badge-running">Running</span>
+            <span class="badge badge-llm">LLM Task</span>
+          </div>
+        </div>
+        <button class="close-btn">✕</button>
+      </div>
+
+      <div class="panel-section">
+        <h3>DOT Attributes</h3>
+        <div class="panel-field">
+          <span class="label">Node ID</span>
+          <span class="value">implement</span>
+        </div>
+        <div class="panel-field">
+          <span class="label">Type</span>
+          <span class="value">LLM Task (box)</span>
+        </div>
+        <div class="panel-field">
+          <span class="label">Class</span>
+          <span class="value">hard (Opus)</span>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h3>Prompt</h3>
+        <div class="prompt-text">Implement the feature according to the specification. Follow the coding standards in CONTRIBUTING.md. Run tests after making changes to verify correctness.</div>
+      </div>
+
+      <div class="panel-section">
+        <h3>CXDB Activity</h3>
+        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">CXDB-0 / Context 33 — 14 turns</div>
+        <div class="turn-list">
+          <div class="turn-item">
+            <span class="turn-type tool-call">ToolCall</span>
+            <span class="turn-tool">shell</span>
+            <span class="turn-output">cargo test --lib</span>
+          </div>
+          <div class="turn-item">
+            <span class="turn-type tool-result">ToolResult</span>
+            <span class="turn-tool">shell</span>
+            <span class="turn-output">test result: ok. 23 passed; 0 failed</span>
+          </div>
+          <div class="turn-item">
+            <span class="turn-type tool-call">ToolCall</span>
+            <span class="turn-tool">write_file</span>
+            <span class="turn-output">src/pipeline/executor.rs</span>
+          </div>
+          <div class="turn-item">
+            <span class="turn-type tool-result">ToolResult</span>
+            <span class="turn-tool">write_file</span>
+            <span class="turn-output">File written successfully</span>
+          </div>
+          <div class="turn-item">
+            <span class="turn-type prompt">Prompt</span>
+            <span class="turn-tool"></span>
+            <span class="turn-output">Now verify the implementation handles edge...</span>
+          </div>
+          <div class="turn-item">
+            <span class="turn-type tool-call">ToolCall</span>
+            <span class="turn-tool">shell</span>
+            <span class="turn-output">cargo clippy -- -D warnings</span>
+          </div>
+          <div class="turn-item">
+            <span class="turn-type tool-error">ToolResult</span>
+            <span class="turn-tool">shell</span>
+            <span class="turn-output" style="color: #ef5350;">error[E0308]: mismatched types...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

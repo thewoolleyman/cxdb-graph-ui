@@ -2,14 +2,16 @@
 
 Scenarios proposed during spec critique rounds that need review before incorporation into the holdout scenarios document.
 
+All previously proposed scenarios have been incorporated into `cxdb-graph-ui-holdout-scenarios.md`.
+
 ---
 
-## Per-context error scoping in "Agent stuck in error loop" scenario
+## Proposed: RunStarted with null or empty graph_name
 
-**Source:** v22-opus critique, Issue #5
+**Source:** v26-opus, Issue #3
 
-**Problem:** The existing "Agent stuck in error loop" holdout scenario is ambiguous about per-context scoping. The spec's `applyErrorHeuristic` pseudocode (Section 6.2) clearly defines per-context scoping via `getMostRecentToolResultsForNodeInContext`, but the holdout scenario doesn't reflect this.
+**Scenario:** A CXDB context has a valid `RunStarted` first turn with `run_id` present but `graph_name` is null (field absent from msgpack payload, since it is marked `optional: true` in the registry bundle) or empty string.
 
-**Proposed changes:**
-1. Update the existing "Agent stuck in error loop" scenario to clarify that error detection is scoped per-context (errors in one context don't affect another context's node status)
-2. Add a negative case: errors occurring across multiple contexts for the same node should NOT trigger the error heuristic unless they occur within a single context's recent tool results
+**Expected behavior:** The context is excluded from pipeline discovery (cached as a null mapping, same as non-Kilroy contexts). It does not match any pipeline tab. No error is surfaced to the user. The context is not retried on subsequent polls.
+
+**Why current holdout scenarios are insufficient:** The existing "Context does not match any loaded pipeline" scenario assumes the context has a valid `graph_name` that simply does not match any loaded DOT file. The null/empty `graph_name` case is a distinct code path (the guard fires before the pipeline matching loop) and exercises the optional-field handling in the msgpack decoder.
