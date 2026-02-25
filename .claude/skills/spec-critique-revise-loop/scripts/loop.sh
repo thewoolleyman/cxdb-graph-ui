@@ -190,10 +190,14 @@ while true; do
   mkdir -p "$CRITIQUES_DIR"
   before_critique=$(ls "$CRITIQUES_DIR" 2>/dev/null | sort)
 
-  # Build the critique prompt
-  full_critique_prompt="/spec:critique"
+  # Build critique prompt expansions (type-aware):
+  # - skill/raw critics: {CRITIQUE_PROMPT} → "/spec:critique [extra]"
+  # - bash critics:      {CRITIQUE_PROMPT} → ". Additional instructions: [extra]" (or "")
+  skill_critique_prompt="/spec:critique"
+  bash_critique_prompt=""
   if [ -n "$critique_prompt" ]; then
-    full_critique_prompt="/spec:critique $critique_prompt"
+    skill_critique_prompt="/spec:critique $critique_prompt"
+    bash_critique_prompt=". Additional instructions: $critique_prompt"
   fi
 
   # Launch all critics in parallel.
@@ -203,7 +207,12 @@ while true; do
   set +e
   for i in "${!critic_commands[@]}"; do
     cmd="${critic_commands[$i]}"
-    cmd="${cmd//\{CRITIQUE_PROMPT\}/$full_critique_prompt}"
+    # Substitute {CRITIQUE_PROMPT} based on critic type
+    if [[ "$cmd" =~ ^bash[[:space:]] ]]; then
+      cmd="${cmd//\{CRITIQUE_PROMPT\}/$bash_critique_prompt}"
+    else
+      cmd="${cmd//\{CRITIQUE_PROMPT\}/$skill_critique_prompt}"
+    fi
     cmd="${cmd//\{CRITIQUE_TOOLS\}/$CRITIQUE_TOOLS}"
 
     exit_file="$critic_output_dir/exit_$i"
@@ -333,22 +342,22 @@ while true; do
   sort -u "$all_issues_tmp" > "$prev_issues_file"
   rm -f "$all_issues_tmp"
 
+  # Record outcome but always continue to Step E (revise) so that
+  # acknowledgement files are written for every critique, even on convergence.
   if [ "$all_converged" -eq 1 ]; then
     echo ""
-    echo "ALL critics converged."
+    echo "ALL critics converged. Running revise to write acknowledgements."
     exit_reason="converged"
-    break
   elif [ "$any_continue" -eq 1 ]; then
     echo ""
     echo "Major issues found — continuing to revise."
   elif [ "$any_stuck" -eq 1 ]; then
     echo ""
-    echo "Stuck — no new issues from any critic."
+    echo "Stuck — no new issues from any critic. Running revise to write acknowledgements."
     exit_reason="stuck"
-    break
   fi
 
-  # --- Step E: Run revise ---
+  # --- Step E: Run revise (always — writes acknowledgements for new critiques) ---
 
   _status "round=$round step=E revise"
 
@@ -429,6 +438,11 @@ while true; do
 
   echo ""
   echo "=== ROUND $round of $max_rounds COMPLETE ==="
+
+  # Break after acknowledgements have been written (converged or stuck)
+  if [ -n "$exit_reason" ]; then
+    break
+  fi
 
 done
 

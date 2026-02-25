@@ -227,13 +227,19 @@ set -e
 assert_eq "round 2 exit code" "1" "$exit2"
 assert_contains "converged message" "CONVERGED" "$output2"
 
-# Round 2 should NOT have revise step (converged at D)
-if echo "$output2" | grep -qE "Step E.*Running /spec:revise"; then
-  echo "  FAIL: round 2 should not have revise step"
-  fail=$((fail + 1))
-else
-  echo "  PASS: round 2 stopped at convergence (no revise)"
+# Round 2 MUST run revise to write acknowledgements, even though it converged
+assert_matches "round 2 still runs revise for acknowledgements" \
+  "Step E \(round 2 of 3, elapsed [0-9]+:[0-9]{2}\): Running /spec:revise" "$output2"
+
+# Verify acknowledgement file was written for the converged critique
+ack_file2=$(ls "$MOCK_PROJ/specification/critiques/"*-test-acknowledgement.md 2>/dev/null | sort | tail -1 || true)
+if [ -n "$ack_file2" ] && [ "$(ls "$MOCK_PROJ/specification/critiques/"*-test-acknowledgement.md 2>/dev/null | wc -l | tr -d ' ')" -eq 2 ]; then
+  echo "  PASS: acknowledgement written for converged round (2 total)"
   pass=$((pass + 1))
+else
+  ack_total=$(ls "$MOCK_PROJ/specification/critiques/"*-test-acknowledgement.md 2>/dev/null | wc -l | tr -d ' ')
+  echo "  FAIL: expected 2 acknowledgement files (one per round), got $ack_total"
+  fail=$((fail + 1))
 fi
 
 # --- Test 4: Report generation ---

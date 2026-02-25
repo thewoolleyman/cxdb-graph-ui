@@ -170,9 +170,11 @@ bash .claude/skills/spec-critique-revise-loop/scripts/check_exit.sh \
 ```
 
 **Decision logic (all critics must converge):**
-- If ALL return exit code 1 → **converged**. Set `EXIT_REASON=converged`. Stop looping.
-- If ANY return exit code 0 → **continue** to revise.
-- If ANY return exit code 2 and NONE return 0 → **stuck**. Set `EXIT_REASON=stuck`. Stop looping.
+- If ALL return exit code 1 → **converged**. Set `EXIT_REASON=converged`. **Do NOT stop yet** — continue to Step 5f to write acknowledgements.
+- If ANY return exit code 0 → **continue**. Proceed to Step 5f as normal.
+- If ANY return exit code 2 and NONE return 0 → **stuck**. Set `EXIT_REASON=stuck`. **Do NOT stop yet** — continue to Step 5f to write acknowledgements.
+
+Acknowledgements must always be written for every critique round. Never skip Step 5f.
 
 Note: `check_exit.sh` updates `$STATE_DIR/prev_issues` as a side effect. When checking multiple files, use a temporary copy per critic and merge after (sort -u) to avoid cross-contamination.
 
@@ -198,7 +200,7 @@ If exit code is 1 → set `EXIT_REASON=loop_timeout`. Skip to Step 6.
 
 Extract the version identifier(s) from the new critique files (e.g., `v45` from `v45-opus.md`) and include them in the Step 5f header: `*Step 5f (round N/MAX_ROUNDS, elapsed MM:SS): Run revise for v45*`. When multiple critics produce different versions, join them with commas (e.g., `v45, v46`).
 
-If continuing, launch a single Task subagent to revise:
+**Always** launch a single Task subagent to revise (regardless of whether converged, stuck, or continuing — acknowledgements must be written):
 
 ```
 Task tool:
@@ -209,6 +211,8 @@ Task tool:
 ```
 
 Wait for the revise subagent to complete. Print a summary of the result.
+
+After revise completes: if `EXIT_REASON` is `converged` or `stuck`, stop looping and go to Step 6.
 
 #### Step 5g: Round summary
 

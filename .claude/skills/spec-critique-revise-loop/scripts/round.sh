@@ -319,23 +319,23 @@ done
 sort -u "$all_issues_tmp" > "$prev_issues_file"
 rm -f "$all_issues_tmp"
 
-# Decision: all critics must converge
+# Decision: record outcome but always continue to Step E (revise) so that
+# acknowledgement files are written for every critique, even on convergence.
 if [ "$all_converged" -eq 1 ]; then
   echo ""
-  echo "ALL critics converged."
-  echo "$cumulative_issues $cumulative_applied $cumulative_partial $cumulative_skipped" > "$state_dir/cumulative"
-  exit 1
+  echo "ALL critics converged. Running revise to write acknowledgements."
+  round_exit_code=1
 elif [ "$any_continue" -eq 1 ]; then
   echo ""
   echo "Major issues found — continuing to revise."
+  round_exit_code=0
 elif [ "$any_stuck" -eq 1 ]; then
   echo ""
-  echo "Stuck — no new issues from any critic."
-  echo "$cumulative_issues $cumulative_applied $cumulative_partial $cumulative_skipped" > "$state_dir/cumulative"
-  exit 2
+  echo "Stuck — no new issues from any critic. Running revise to write acknowledgements."
+  round_exit_code=2
 fi
 
-# --- Step E: Run revise ---
+# --- Step E: Run revise (always — writes acknowledgements for new critiques) ---
 
 _status "round=$round step=E revise"
 
@@ -419,5 +419,5 @@ echo "$cumulative_issues $cumulative_applied $cumulative_partial $cumulative_ski
 echo ""
 echo "=== ROUND $round of $max_rounds COMPLETE ==="
 
-# Exit 0 = continue to next round
-exit 0
+# Exit with the deferred decision from Step D
+exit "${round_exit_code:-0}"

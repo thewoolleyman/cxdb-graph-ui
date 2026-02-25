@@ -95,7 +95,14 @@ CEOF
   echo "=== CRITIQUE SKILL COMPLETE ==="
 
 elif [[ "$prompt" == /spec:revise* ]]; then
-  echo "revise:$(date +%s)" >> "$INVOCATION_LOG"
+  # Log pre-loop vs loop revise calls by checking if the loop has started.
+  # The round counter file is created on the FIRST critique call; if it
+  # exists at revise time, we are inside the loop (not pre-loop).
+  if [ -f "$COUNTER_FILE" ]; then
+    echo "loop_revise:$(date +%s)" >> "$INVOCATION_LOG"
+  else
+    echo "preloop_revise:$(date +%s)" >> "$INVOCATION_LOG"
+  fi
 
   # Create acknowledgement files for all unacked critiques
   for f in "$CRITIQUES_DIR"/v*-*.md; do
@@ -220,9 +227,11 @@ set -e
 assert_eq "test1: exit code 0" "0" "$exit1"
 assert_not_contains "test1: no pre-loop revise message" "Found " "$output1"
 
-# Only 1 critique invocation (for round 1), no revise invocation
-revise_count1=$(count_lines "$INVOCATION_LOG")
-assert_eq "test1: no pre-loop revise calls" "0" "$revise_count1"
+# No pre-loop revise (no unacked critiques), but loop revise runs on convergence
+preloop_revise_count1=$(awk '/^preloop_revise:/{c++} END{print c+0}' "$INVOCATION_LOG" 2>/dev/null)
+loop_revise_count1=$(awk '/^loop_revise:/{c++} END{print c+0}' "$INVOCATION_LOG" 2>/dev/null)
+assert_eq "test1: no pre-loop revise calls" "0" "$preloop_revise_count1"
+assert_eq "test1: loop revise ran once (on convergence)" "1" "$loop_revise_count1"
 
 echo ""
 
@@ -271,9 +280,11 @@ assert_contains "test2: reports 1 unacknowledged critique" "1 unacknowledged" "$
 assert_contains "test2: names the file" "v1-previous.md" "$output2"
 assert_contains "test2: says running revise" "Running /spec:revise" "$output2"
 
-# Revise was called once pre-loop
-revise_count2=$(count_lines "$INVOCATION_LOG")
-assert_eq "test2: pre-loop revise called once" "1" "$revise_count2"
+# Pre-loop revise ran once; loop revise also ran once on convergence
+preloop_revise_count2=$(awk '/^preloop_revise:/{c++} END{print c+0}' "$INVOCATION_LOG" 2>/dev/null)
+loop_revise_count2=$(awk '/^loop_revise:/{c++} END{print c+0}' "$INVOCATION_LOG" 2>/dev/null)
+assert_eq "test2: pre-loop revise called once" "1" "$preloop_revise_count2"
+assert_eq "test2: loop revise ran once (on convergence)" "1" "$loop_revise_count2"
 
 # Acknowledgement file created for the pre-existing critique
 assert_file_exists "test2: ack created for v1-previous" \
@@ -337,9 +348,11 @@ set -e
 assert_eq "test3: exit code 0" "0" "$exit3"
 assert_contains "test3: reports 2 unacknowledged critiques" "2 unacknowledged" "$output3"
 
-# Revise called exactly once (not once per file)
-revise_count3=$(count_lines "$INVOCATION_LOG")
-assert_eq "test3: revise called exactly once" "1" "$revise_count3"
+# Pre-loop revise ran once (not once per file); loop revise also ran on convergence
+preloop_revise_count3=$(awk '/^preloop_revise:/{c++} END{print c+0}' "$INVOCATION_LOG" 2>/dev/null)
+loop_revise_count3=$(awk '/^loop_revise:/{c++} END{print c+0}' "$INVOCATION_LOG" 2>/dev/null)
+assert_eq "test3: pre-loop revise called exactly once (not per-file)" "1" "$preloop_revise_count3"
+assert_eq "test3: loop revise ran once (on convergence)" "1" "$loop_revise_count3"
 
 # Both ack files created
 assert_file_exists "test3: ack created for v3-alpha" \
@@ -387,9 +400,11 @@ set -e
 assert_eq "test4: exit code 0" "0" "$exit4"
 assert_not_contains "test4: no pre-loop revise triggered" "Found " "$output4"
 
-# No pre-loop revise called
-revise_count4=$(count_lines "$INVOCATION_LOG")
-assert_eq "test4: no pre-loop revise calls" "0" "$revise_count4"
+# No pre-loop revise (all critiques acknowledged), but loop revise runs on convergence
+preloop_revise_count4=$(awk '/^preloop_revise:/{c++} END{print c+0}' "$INVOCATION_LOG" 2>/dev/null)
+loop_revise_count4=$(awk '/^loop_revise:/{c++} END{print c+0}' "$INVOCATION_LOG" 2>/dev/null)
+assert_eq "test4: no pre-loop revise calls" "0" "$preloop_revise_count4"
+assert_eq "test4: loop revise ran once (on convergence)" "1" "$loop_revise_count4"
 
 echo ""
 

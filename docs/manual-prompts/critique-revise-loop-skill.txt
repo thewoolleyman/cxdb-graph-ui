@@ -1,0 +1,2 @@
+/spec:critique-revise-loop MAX_ROUNDS=3 CRITIQUE_PROMPT="ensure that you use the knowledge-graph MCP server to search the ../cxdb and ../kilroy project source to inform
+  your work" REVISE_PROMPT=""ensure that you use the knowledge-graph MCP server to search the ../cxdb and ../kilroy project source to inform your work" 

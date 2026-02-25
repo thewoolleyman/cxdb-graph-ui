@@ -297,13 +297,13 @@ assert_contains "final report" "FINAL REPORT" "$output"
 assert_contains "exit reason converged" "Exit reason:       converged" "$output"
 assert_contains "rounds completed" "Rounds completed:  2" "$output"
 
-# Round 2 should NOT have revise/summary (converged at step D)
+# Round 2 MUST run revise even after converging, to write acknowledgements
 if echo "$output" | grep -qE "Step E \(round 2 of 3.*Running /spec:revise"; then
-  echo "  FAIL: round 2 should not have revise step (converged at D)"
-  fail=$((fail + 1))
-else
-  echo "  PASS: round 2 correctly stopped at convergence"
+  echo "  PASS: round 2 runs revise to write acknowledgements before exiting"
   pass=$((pass + 1))
+else
+  echo "  FAIL: round 2 must run revise (to write acknowledgements) even when converged"
+  fail=$((fail + 1))
 fi
 
 # Verify files were created
@@ -322,11 +322,11 @@ else
   fail=$((fail + 1))
 fi
 
-if [ "$ack_count" -eq 1 ]; then
-  echo "  PASS: 1 acknowledgement file created (only round 1 revised)"
+if [ "$ack_count" -eq 2 ]; then
+  echo "  PASS: 2 acknowledgement files created (both rounds, including converged)"
   pass=$((pass + 1))
 else
-  echo "  FAIL: expected 1 acknowledgement file, got $ack_count"
+  echo "  FAIL: expected 2 acknowledgement files (revise runs every round), got $ack_count"
   fail=$((fail + 1))
 fi
 
