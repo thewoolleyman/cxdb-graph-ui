@@ -1,3 +1,9 @@
+# Codebase Search
+
+When searching codebases, always attempt to use the `knowledge-graph` MCP server first. It indexes code structure and relationships, making searches faster and more accurate than raw file/grep searches. Fall back to Glob/Grep/Read tools only if the knowledge graph doesn't have the information you need.
+
+---
+
 # Dependencies
 
 This project uses [Kilroy](https://github.com/danshapiro/kilroy), an AI software factory CLI built on
@@ -25,6 +31,8 @@ Graphviz WASM (CDN-loaded). No build toolchain, no npm, no framework.
 
 ---
 
+# Internal directories (this repo)
+
 ## Skills (`.claude/skills/`)
 
 Slash-command skills that automate specification and Kilroy pipeline workflows.
@@ -47,8 +55,6 @@ Slash-command skills that automate specification and Kilroy pipeline workflows.
 **IMPORTANT — Pipeline DOT file is a generated artifact:**
 The `pipeline.dot` file at the repo root is compiled output. **NEVER edit it directly.** Always update the YAML/prompt sources under `pipeline-config/` and then regenerate via `/kilroy:generate-pipeline`. Direct edits will be overwritten on the next generation and will diverge from the source-of-truth config.
 
----
-
 ## Specification
 
 | Path | Purpose |
@@ -57,7 +63,37 @@ The `pipeline.dot` file at the repo root is compiled output. **NEVER edit it dir
 | `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` | Behavioral test scenarios (Given/When/Then) covering DOT rendering, CXDB status overlay, pipeline discovery, detail panel, connection handling, and server operations. |
 | `specification/critiques/` | Iterative critique/acknowledgement pairs used during spec refinement. |
 
+## Scripts (`script/`)
+
+Shell scripts for environment setup, infrastructure management, and testing.
+
+| Script | What it does |
+|---|---|
+| `setup.sh` | One-time workspace bootstrap: downloads Go modules (if go.mod exists), clones the CXDB repo, and builds the CXDB Docker image. Pass `--rebuild-cxdb` to force a Docker image rebuild. |
+| `start-cxdb.sh` | Starts the CXDB Docker container by delegating to `../kilroy/script/start-cxdb.sh` with line-buffered output for real-time logging. |
+| `stop-cxdb.sh` | Stops the CXDB Docker container (`kilroy-cxdb`). Respects `KILROY_CXDB_CONTAINER_NAME` env var. |
+| `start-cxdb-ui.sh` | Opens the CXDB web UI by delegating to `../kilroy/script/start-cxdb-ui.sh`. Forces the UI URL to port 9020 (nginx frontend) instead of 9010 (raw API). |
+| `smoke-test-suite-full` | Runs the full smoke test suite: `go vet ./...` and `go test ./...`. Exits non-zero on any failure. |
+
+## Path conventions
+
+All paths in run configs and pipeline configs MUST be portable:
+- **Never** hardcode absolute paths (e.g. `/Users/cwoolley/workspace/...`)
+- `repo.path` in run YAMLs: use `.` (self) or `../sibling-repo` (resolved from CWD at invocation)
+- `modeldb` paths: use `../kilroy/...` (resolved from CWD at invocation)
+
+## Documentation (`docs/`)
+
+Reference documentation for the project. **Keep these in sync when skills, workflows, or architecture change.**
+
+| File | What it covers |
+|---|---|
+| `docs/software-factory.md` | **Primary guide.** Architecture overview (Attractor, Kilroy, CXDB), what parts of Kilroy we use, skill reference, pipeline configuration, validation tiers, manual instructions. Update this when skills change or Kilroy usage evolves. |
+| `docs/cxdb-console-guide.md` | CXDB web console usage: dashboard layout, turn-by-turn inspection, keyboard shortcuts, interpreting agent activity. |
+
 ---
+
+# External peer repos
 
 ## Kilroy (`../kilroy`)
 
@@ -77,30 +113,23 @@ Go CLI for running AI software-factory pipelines. Converts English requirements 
 
 **Build:** `go build -o ./kilroy ./cmd/kilroy` | **Test:** `go test ./...` | **Validate:** `./kilroy attractor validate --graph <file.dot>`
 
----
+## CXDB (`../cxdb`)
 
-## Scripts (`script/`)
+AI Context Store for agents and LLMs. Provides fast, branch-friendly storage for conversation histories and tool outputs with content-addressed deduplication. Built on a Turn DAG + Blob CAS architecture.
 
-Shell scripts for environment setup, infrastructure management, and testing.
+**Key features:** Branch-from-any-turn, fast append, BLAKE3 content deduplication, type-safe msgpack storage with typed JSON projections, built-in React UI.
 
-| Script | What it does |
+**Key directories:**
+
+| Path | What's there |
 |---|---|
-| `setup.sh` | One-time workspace bootstrap: downloads Go modules (if go.mod exists), clones the CXDB repo, and builds the CXDB Docker image. Pass `--rebuild-cxdb` to force a Docker image rebuild. |
-| `start-cxdb.sh` | Starts the CXDB Docker container by delegating to `../kilroy/script/start-cxdb.sh` with line-buffered output for real-time logging. |
-| `stop-cxdb.sh` | Stops the CXDB Docker container (`kilroy-cxdb`). Respects `KILROY_CXDB_CONTAINER_NAME` env var. |
-| `start-cxdb-ui.sh` | Opens the CXDB web UI by delegating to `../kilroy/script/start-cxdb-ui.sh`. Forces the UI URL to port 9020 (nginx frontend) instead of 9010 (raw API). |
-| `smoke-test-suite-full` | Runs the full smoke test suite: `go vet ./...` and `go test ./...`. Exits non-zero on any failure. |
+| `server/` | Rust server: binary protocol (:9009) and HTTP API (:9010) |
+| `gateway/` | Go gateway: OAuth, frontend serving, reverse proxy to server |
+| `frontend/` | React frontend: turn visualization, custom renderers |
+| `clients/` | Client SDKs for interacting with CXDB |
+| `docs/` | Protocol and API documentation |
 
----
-
-## Path conventions
-
-All paths in run configs and pipeline configs MUST be portable:
-- **Never** hardcode absolute paths (e.g. `/Users/cwoolley/workspace/...`)
-- `repo.path` in run YAMLs: use `.` (self) or `../sibling-repo` (resolved from CWD at invocation)
-- `modeldb` paths: use `../kilroy/...` (resolved from CWD at invocation)
-
----
+**Build:** `cargo build --release` (server) | `cd gateway && go build` (gateway) | **Ports:** 9009 (binary), 9010 (HTTP API), 9020 (nginx frontend via gateway)
 
 ## Attractor (`../attractor`)
 
@@ -113,14 +142,3 @@ Three NLSpecs (Natural Language Specifications) that define the architecture Kil
 | `unified-llm-spec.md` | Provider-agnostic LLM SDK. Single interface across all providers, streaming-first, middleware/interceptor pattern, structured outputs. Four layers: provider spec → utilities → core client → high-level API. |
 
 **Architecture stack:** Unified LLM Client (bottom) → Coding Agent Loop (middle) → Pipeline Orchestration (top). Changes to Kilroy should align with these specs.
-
----
-
-## Documentation (`docs/`)
-
-Reference documentation for the project. **Keep these in sync when skills, workflows, or architecture change.**
-
-| File | What it covers |
-|---|---|
-| `docs/software-factory.md` | **Primary guide.** Architecture overview (Attractor, Kilroy, CXDB), what parts of Kilroy we use, skill reference, pipeline configuration, validation tiers, manual instructions. Update this when skills change or Kilroy usage evolves. |
-| `docs/cxdb-console-guide.md` | CXDB web console usage: dashboard layout, turn-by-turn inspection, keyboard shortcuts, interpreting agent activity. |
