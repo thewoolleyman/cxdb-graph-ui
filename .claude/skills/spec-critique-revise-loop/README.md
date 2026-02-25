@@ -4,20 +4,22 @@ Automated loop that alternates `/spec:critique` and `/spec:revise` until the cri
 
 ## Architecture
 
-The loop is driven by a **deterministic bash script** — not LLM loop control. This ensures the loop always completes the correct number of rounds regardless of LLM behavior after sub-skill invocations.
+The loop uses a **per-round driver** architecture. Each round is a separate Bash tool call so that output is visible between rounds (the Claude Code Bash tool buffers output until a command completes). The SKILL.md agent drives a trivial loop that just checks integer exit codes — all real logic is in bash scripts.
 
 ```
-SKILL.md (thin wrapper — parses args, invokes loop.sh)
-  └── scripts/loop.sh (deterministic loop driver)
+SKILL.md (per-round driver — parses args, calls round.sh in a loop)
+  └── scripts/round.sh (single-round executor)
         ├── claude -p "/spec:critique ..." (sub-skill)
         ├── scripts/check_exit.sh (exit condition check)
         ├── claude -p "/spec:revise ..." (sub-skill)
         └── scripts/round_summary.sh (parse acknowledgement)
+  └── scripts/report.sh (final report from state dir)
 ```
 
-- **Bash owns the loop**: round counting, exit conditions, state tracking
+- **Bash owns each round**: critique, exit checking, revision, summary
 - **LLM owns the work**: critique analysis and spec revision (via `claude -p`)
-- **No LLM involvement in loop control**: exit conditions are checked with `grep`/`awk`
+- **Exit conditions are pure bash**: `grep`/`awk`/`comm` — no LLM involvement
+- **Per-round execution**: output appears every ~10 minutes instead of buffering for the entire run
 
 ## Usage
 
@@ -47,44 +49,22 @@ SKILL.md (thin wrapper — parses args, invokes loop.sh)
 ### Loop Flow
 
 ```
-┌──────────────────────────┐
-│  Parse ARGUMENTS         │
-│  Run scripts/loop.sh     │
-└────────────┬─────────────┘
-             │
-┌────────────▼─────────────┐
-│  [A] round++             │◄──────────────────────────┐
-│      round > MAX?        │                           │
-│      yes → FINAL REPORT  │                           │
-└────────────┬─────────────┘                           │
-         no  │                                         │
-┌────────────▼─────────────┐                           │
-│  [B] claude -p           │                           │
-│      "/spec:critique"    │                           │
-└────────────┬─────────────┘                           │
-             │                                         │
-┌────────────▼─────────────┐                           │
-│  [C] Find critique file  │                           │
-│      (ls diff)           │                           │
-└────────────┬─────────────┘                           │
-             │                                         │
-┌────────────▼─────────────┐                           │
-│  [D] check_exit.sh       │                           │
-│      converged → REPORT  │                           │
-│      stuck → REPORT      │                           │
-└────────────┬─────────────┘                           │
-         no  │                                         │
-┌────────────▼─────────────┐                           │
-│  [E] claude -p           │                           │
-│      "/spec:revise"      │                           │
-└────────────┬─────────────┘                           │
-             │                                         │
-┌────────────▼─────────────┐                           │
-│  [F] round_summary.sh    │                           │
-│      Parse ack files     │───────────────────────────┘
-└──────────────────────────┘
-
-FINAL REPORT (printed by loop.sh)
+SKILL.md agent:
+  1. Create state dir (mktemp -d)
+  2. Print header
+  3. For round = 1 to MAX_ROUNDS:
+  │   └── bash round.sh --round N --state-dir $DIR ...
+  │       │   [A] Print round header
+  │       │   [B] claude -p "/spec:critique"
+  │       │   [C] Find new critique file (ls diff)
+  │       │   [D] check_exit.sh → converged? stuck?
+  │       │   [E] claude -p "/spec:revise"
+  │       │   [F] round_summary.sh → parse acknowledgement
+  │       └── Exit code: 0=continue, 1=converged, 2=stuck
+  │
+  │   Check exit code → break if non-zero
+  4. bash report.sh --state-dir $DIR ...
+  5. Clean up state dir
 ```
 
 ### Exit Conditions (all checked in bash, not LLM)
@@ -107,13 +87,21 @@ Output streams to stdout in real time. The `--allowed-tools` flag pre-authorizes
 
 ```
 spec-critique-revise-loop/
-├── SKILL.md              # Thin wrapper (parse args → run loop.sh)
+├── SKILL.md              # Per-round driver (parse args, call round.sh in loop)
 ├── README.md             # This file
 ├── specification.md      # Detailed design spec
 └── scripts/
-    ├── loop.sh           # Main loop driver
+    ├── round.sh          # Single-round executor (critique → check → revise → summary)
+    ├── report.sh         # Final report generator (reads state dir)
+    ├── loop.sh           # Full loop driver (used by tests, runs all rounds in one process)
     ├── check_exit.sh     # Exit condition checker (grep/awk)
-    └── round_summary.sh  # Parse acknowledgement files
+    ├── round_summary.sh  # Parse acknowledgement files
+    └── tests/
+        ├── test_round.sh          # Per-round integration test (21 assertions)
+        ├── test_loop.sh           # Full loop integration test (18 assertions)
+        ├── test_check_exit.sh     # Exit condition unit tests (17 assertions)
+        ├── test_round_summary.sh  # Summary parser tests (11 assertions)
+        └── test_io_streaming.sh   # I/O streaming proof (19 assertions)
 ```
 
 ## Round Summary Output
