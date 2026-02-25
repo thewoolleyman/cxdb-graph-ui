@@ -365,7 +365,7 @@ Then the implement node is colored red (error), not blue (running)
   And the detail panel shows the RunFailed reason
 ```
 
-**Expected behavior:** The `updateContextStatusMap` algorithm has an explicit `RunFailed` case that sets `newStatus = "error"` and `hasLifecycleResolution = true`. `RunFailed` is treated as an authoritative lifecycle turn (alongside `StageFinished` and `StageFailed`) that unconditionally overrides the node's current status. Kilroy's `cxdbRunFailed` always passes a `node_id`, so in practice `RunFailed` turns always enter the status derivation.
+**Expected behavior:** The `updateContextStatusMap` algorithm has an explicit `RunFailed` case that sets `newStatus = "error"` and `hasLifecycleResolution = true`. `RunFailed` is treated as an authoritative lifecycle turn (alongside `StageFinished` and `StageFailed`) that unconditionally overrides the node's current status. Kilroy's `cxdbRunFailed` always includes a `node_id` key, but the value may be an empty string if the run fails before entering any node — when non-empty, the turn enters the status derivation for the named node.
 
 **Why current holdout scenarios are insufficient:** The existing scenarios test `StageFinished` (per-node completion), `StageFailed` (per-node failure with optional retry), and the error loop heuristic (3 consecutive `ToolResult` errors). `RunFailed` is a distinct pipeline-level catastrophic failure event — it marks the node where the pipeline failed but represents a pipeline-wide halt, not a per-node lifecycle transition. Without explicit coverage, an implementer could omit the `RunFailed` case from the status derivation (as the pseudocode originally did before v39), causing `RunFailed` turns to fall through to the "infer running" default and leave the failed node as blue (running) instead of red (error).
 
@@ -653,3 +653,47 @@ Then the implement node is colored red (error), not green (complete)
 **Expected behavior:** The `updateContextStatusMap` algorithm checks `StageFinished.data.status`. When `status == "fail"`, the node is set to "error" (red) instead of "complete" (green). The `hasLifecycleResolution` flag is set to `true` because `StageFinished` is an authoritative lifecycle turn regardless of the status value.
 
 **Why current holdout scenarios are insufficient:** The existing "Pipeline completed successfully" and "Pipeline completed — last node marked complete via StageFinished" scenarios assume all nodes finished with non-fail status. The "Agent stuck in error loop" scenario tests the ToolResult error heuristic, not lifecycle-level failure. The `StageFinished { status: "fail" }` → red path is documented in the spec's Definition of Done but not exercised by any holdout scenario. An implementer could handle all `StageFinished` turns as "complete" (ignoring the `status` field check) and pass every existing holdout. Note: this supersedes the similar v38-opus proposed scenario by being more concise and focused.
+
+---
+
+## Proposed: Gap recovery bounded by MAX_GAP_PAGES advances cursor to oldest recovered turn
+
+**Source:** v45-opus, Issue #4
+
+**Scenario:**
+```
+Given a pipeline run is active with a context that accumulated 2000+ turns during a poll gap
+  And the gap recovery issues MAX_GAP_PAGES (10) paginated requests covering 1000 turns
+  And a StageFinished turn for node A exists beyond the 1000-turn recovery window
+When gap recovery completes
+Then lastSeenTurnId is set to the oldest recovered turn's turn_id (not the newest)
+  And node A retains its previous status (running) since the StageFinished was not recovered
+  And the next poll cycle's 100-turn window contains the most recent state
+```
+
+**Expected behavior:** When gap recovery exhausts `MAX_GAP_PAGES` (10 pages × 100 turns = 1,000 turns), the spec requires setting `lastSeenTurnId = recoveredTurns[0].turn_id` — the oldest recovered turn. This ensures the next poll cycle detects a gap from the oldest recovered point (not from the newest), preserving the possibility of catching up on the window just before the boundary. An implementer who mistakenly uses the newest recovered turn as the new cursor would advance past unrecovered turns, which would never be fetched. The `lastSeenTurnId` cursor is specifically set to the oldest (not the newest) recovered turn to bound the window correctly.
+
+**Why current holdout scenarios are insufficient:** The existing "Lifecycle turn missed during poll gap is recovered" scenario tests the basic gap recovery case (gap fits within MAX_GAP_PAGES). It does not cover the MAX_GAP_PAGES truncation case, which exercises the cursor-advancement logic specifically. The spec documents the correct cursor assignment (`recoveredTurns[0].turn_id` = oldest) versus the common implementation mistake (using the newest recovered turn). Without this scenario, an implementer who uses `max(turn_id)` for the post-gap cursor — which is correct for the normal flow but incorrect for the truncated-gap case — would pass all existing holdouts.
+
+---
+
+## Proposed: Nodes and edges inside subgraphs are included in /nodes and /edges responses
+
+**Source:** v45-codex, Issue #2
+
+**Scenario:**
+```
+Given a DOT file contains:
+  subgraph cluster_a { a [shape=box] }
+  subgraph cluster_b { b [shape=diamond] }
+  a -> b [label="go"]
+When the browser fetches /dots/{name}/nodes and /dots/{name}/edges
+Then the nodes response includes a and b
+  And the edges response includes (a, b, "go")
+  And a has shape "box" and b has shape "diamond"
+```
+
+**Expected behavior:** Nodes defined inside `subgraph` blocks are included in the `/dots/{name}/nodes` response with their attributes. Edges defined at the top level (or inside subgraphs) connecting subgraph-scoped nodes are included in the `/dots/{name}/edges` response. Subgraphs are used in real pipeline DOT files for layout grouping (e.g., `cluster_` prefixed subgraphs) and contain valid node definitions. Section 3.2 requires that nodes and edges inside subgraphs be included.
+
+**Why current holdout scenarios are insufficient:** The existing DOT parsing scenarios exercise edge chains, port stripping, and basic node parsing — all with top-level node definitions. None verify that a parser correctly descends into subgraph blocks to extract node and edge definitions. A parser that only processes top-level graph statements (ignoring the recursive structure of subgraphs) would silently drop nodes and edges that appear in real Kilroy DOT files using `subgraph cluster_` for layout.
+
