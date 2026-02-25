@@ -290,7 +290,7 @@ The title contains `source->target` with HTML entity encoding for `->` (`&#45;&g
 
 When multiple DOT files are provided via `--dot`, the UI renders a tab bar. Each tab is labeled with the DOT file's graph ID or the filename as a fallback.
 
-**Graph ID extraction.** The browser extracts the graph ID from the DOT source when the file is first fetched, using a regex pattern that handles both quoted and unquoted names: `/digraph\s+("(?:[^"\\]|\\.)*"|\w+)/`. If the regex does not match (e.g., the DOT file uses `graph` instead of `digraph`, or has unusual formatting), the tab falls back to the base filename. Tabs initially display filenames (from the `/api/dots` response) and update to graph IDs as each DOT file is fetched and parsed.
+**Graph ID extraction.** The browser extracts the graph ID from the DOT source when the file is first fetched, using a regex pattern that handles both `digraph` and `graph` keywords, and both quoted and unquoted names: `/(di)?graph\s+("(?:[^"\\]|\\.)*"|\w+)/`. If the name is quoted, the UI unquotes it (strips the outer `"` characters) and unescapes internal `\"` sequences before using it as the graph ID. If the regex does not match (e.g., unusual formatting or anonymous graphs), the tab falls back to the base filename. Tabs initially display filenames (from the `/api/dots` response) and update to graph IDs as each DOT file is fetched and parsed. Pipeline discovery in Section 5.5 matches `RunStarted.data.graph_name` against the normalized (unquoted, unescaped) graph ID.
 
 Switching tabs fetches the DOT file fresh and re-renders the SVG. If a cached status map exists for the newly selected pipeline (from a previous poll cycle), it is immediately reapplied to the new SVG. Otherwise, all nodes start as pending. The next poll cycle refreshes the status with live data. This avoids a gray flash when switching between tabs for pipelines that have already been polled.
 
@@ -617,10 +617,14 @@ The condition uses `oldestFetched > lastSeenTurnId` (without `+ 1`) because CXDB
 
 ```
 -- Gap recovery: fetch turns between lastSeenTurnId and the main batch
+-- Bounded to MAX_GAP_PAGES (10) to prevent a long outage from blocking the poller.
+MAX_GAP_PAGES = 10
 recoveredTurns = []
 cursor = response.next_before_turn_id
-WHILE cursor IS NOT null:
+pagesFetched = 0
+WHILE cursor IS NOT null AND pagesFetched < MAX_GAP_PAGES:
     gapResponse = fetchTurns(cxdbIndex, contextId, limit=100, before_turn_id=cursor)
+    pagesFetched = pagesFetched + 1
     IF gapResponse.turns IS EMPTY:
         BREAK
     recoveredTurns = gapResponse.turns + recoveredTurns  -- prepend to maintain oldest-first
@@ -630,11 +634,18 @@ WHILE cursor IS NOT null:
         BREAK
     cursor = gapResponse.next_before_turn_id
 
+-- If the page limit was hit before reaching lastSeenTurnId, advance the cursor
+-- to the oldest recovered turn. Some intermediate turns are lost, but the persistent
+-- status map ensures statuses are never demoted, and the next poll's 100-turn window
+-- will contain the most recent state.
+IF pagesFetched >= MAX_GAP_PAGES AND cursor IS NOT null:
+    lastSeenTurnId = recoveredTurns[0].turn_id  -- oldest recovered turn becomes new cursor
+
 -- Prepend recovered turns to the main batch
 turns = recoveredTurns + turns
 ```
 
-This ensures lifecycle events (e.g., `StageFinished`) that occurred during a CXDB outage are not permanently lost. The gap recovery procedure runs at most once per context per poll cycle. Within the procedure, multiple paginated requests may be issued (one per 100 missed turns). The recovered turns are prepended (in oldest-first order) to the context's turn batch before step 5 caches them and step 6 processes them for status derivation.
+This ensures lifecycle events (e.g., `StageFinished`) that occurred during a CXDB outage are not permanently lost. The gap recovery procedure runs at most once per context per poll cycle. Within the procedure, up to `MAX_GAP_PAGES` (10) paginated requests are issued (one per 100 turns, covering up to 1,000 missed turns). This bounds recovery time: a context with thousands of accumulated turns during a long outage will recover the most recent 1,000 turns and advance the cursor, rather than blocking the entire poll cycle with dozens of sequential HTTP requests. The tradeoff is that intermediate turns beyond the 1,000-turn window are lost — but because statuses are never demoted (Section 6.2), any promotions from lost turns are not critical. The next poll cycle's 100-turn window contains the most recent state. The recovered turns are prepended (in oldest-first order) to the context's turn batch before step 5 caches them and step 6 processes them for status derivation.
 
 ### 6.2 Node Status Map
 
@@ -868,7 +879,7 @@ The detail panel displays node attributes extracted from the DOT source. Attribu
 
 The detail panel shows recent CXDB turns for the selected node. Turns are sourced from the per-pipeline turn cache (Section 6.1, step 5), filtered to those where `turn.data.node_id` matches the selected node's DOT ID.
 
-**Context-grouped display.** When the selected node has matching turns across multiple contexts (e.g., parallel branches), turns are displayed grouped by context rather than interleaved. Each context's turns appear in a collapsible section labeled with the CXDB instance index and context ID (e.g., "CXDB-0 / Context 33"). Within each section, turns are displayed newest-first (the UI reverses the API's oldest-first order) by `turn_id` — this is safe because `turn_id` is monotonically increasing within a single context's parent chain (see Section 6.2). Sections are ordered by recency: for each context that has matching turns, compute the highest `turn_id` among its turns for the selected node. The context with the highest such `turn_id` appears first. This uses intra-context `turn_id` ordering (safe within a single context's parent chain). When contexts span multiple CXDB instances, sections from different instances are not interleaved by `turn_id` — CXDB instances have independent turn ID counters with no temporal relationship, so cross-instance `turn_id` comparison would produce arbitrary ordering rather than temporal ordering.
+**Context-grouped display.** When the selected node has matching turns across multiple contexts (e.g., parallel branches), turns are displayed grouped by context rather than interleaved. Each context's turns appear in a collapsible section labeled with the CXDB instance index and context ID (e.g., "CXDB-0 / Context 33"). Within each section, turns are displayed newest-first (the UI reverses the API's oldest-first order) by `turn_id` — this is safe because `turn_id` is monotonically increasing within a single context's parent chain (see Section 6.2). Sections are ordered using a two-level sort: first by CXDB instance index (lower index first), then by highest `turn_id` among the context's matching turns (descending — most recent first). This groups contexts by instance, where `turn_id` comparison is meaningful (monotonically increasing within a single instance), and uses a stable, deterministic ordering across instances. CXDB instances have independent turn ID counters with no temporal relationship, so cross-instance `turn_id` comparison is not attempted.
 
 | Column | Source | Description |
 |--------|--------|-------------|
