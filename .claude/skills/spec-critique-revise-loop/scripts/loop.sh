@@ -114,6 +114,52 @@ echo "Project dir:     $PROJ_DIR"
 echo "============================================"
 echo ""
 
+# --- Step 4: Process unacknowledged critiques ---
+
+echo ""
+echo "============================================"
+echo "  Step 4: Process unacknowledged critiques"
+echo "============================================"
+
+mkdir -p "$CRITIQUES_DIR"
+unacked=()
+for _f in "$CRITIQUES_DIR"/v*-*.md; do
+  [ -f "$_f" ] || continue
+  [[ "$_f" == *acknowledgement* ]] && continue
+  _base=$(basename "$_f" .md)
+  if [ ! -f "$CRITIQUES_DIR/${_base}-acknowledgement.md" ]; then
+    unacked+=("$(basename "$_f")")
+  fi
+done
+
+if [ ${#unacked[@]} -gt 0 ]; then
+  echo "Found ${#unacked[@]} unacknowledged critique(s):"
+  for _name in "${unacked[@]}"; do
+    echo "  $_name"
+  done
+  echo ""
+  echo "Running /spec:revise to process them before starting the loop..."
+
+  full_revise_prompt_preloop="/spec:revise"
+  if [ -n "$revise_prompt" ]; then
+    full_revise_prompt_preloop="/spec:revise $revise_prompt"
+  fi
+
+  set +e
+  (cd "$PROJ_DIR" && claude -p "$full_revise_prompt_preloop" --allowed-tools "$REVISE_TOOLS")
+  preloop_revise_exit=$?
+  set -e
+
+  if [ "$preloop_revise_exit" -ne 0 ]; then
+    echo "ERROR: pre-loop /spec:revise failed with exit code $preloop_revise_exit"
+    echo "Aborting loop."
+    exit 1
+  fi
+  echo "Pre-loop revise complete."
+else
+  echo "No unacknowledged critiques. Proceeding to loop."
+fi
+
 # --- Main loop ---
 
 while true; do

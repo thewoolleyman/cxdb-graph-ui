@@ -51,7 +51,34 @@ Substitute `{CRITIQUE_PROMPT}` in each line with the full critique prompt: `/spe
 
 Print the number of critics found.
 
-### Step 4: Run rounds
+### Step 4: Process unacknowledged critiques
+
+Before starting the loop, check for critique files in `specification/critiques/` that have no corresponding `*-acknowledgement.md` file. These are critiques from a previous interrupted run that were never processed.
+
+```bash
+ls specification/critiques/ 2>/dev/null | sort
+```
+
+For each `v*-*.md` file (excluding `*acknowledgement*`) that has no matching `*-acknowledgement.md`:
+- Collect it as an unacknowledged critique.
+
+If any unacknowledged critiques are found:
+1. Print the count and filenames.
+2. Launch a single Task subagent to revise:
+
+```
+Task tool:
+  subagent_type: "general-purpose"
+  prompt: "/spec:revise {REVISE_PROMPT_ARG}"  (or just "/spec:revise" if no extra prompt)
+  description: "Pre-loop revise: process unacknowledged critiques"
+  max_turns: 40
+```
+
+Wait for the subagent to complete. Print a summary of the result.
+
+If no unacknowledged critiques are found, print a message and proceed.
+
+### Step 5: Run rounds
 
 For each round from 1 to `{MAX_ROUNDS}`:
 
@@ -62,11 +89,11 @@ LOOP_START=$(cat "$STATE_DIR/loop_start")
 ELAPSED=$(bash .claude/skills/spec-critique-revise-loop/scripts/elapsed_time.sh "$LOOP_START")
 ```
 
-Then print the header in **bold** with this format: `*Step 4x (round N/MAX_ROUNDS, elapsed MM:SS): Description*`
+Then print the header in **bold** with this format: `*Step 5x (round N/MAX_ROUNDS, elapsed MM:SS): Description*`
 
-Example: `*Step 4b (round 2/10, elapsed 15:30): Launch ALL critics in parallel*`
+Example: `*Step 5c (round 2/10, elapsed 15:30): Launch ALL critics in parallel*`
 
-#### Step 4-pre: Check timeouts before starting round
+#### Step 5a: Check timeouts before starting round
 
 Before each round, check both the loop timeout and record the round start time:
 
@@ -75,13 +102,13 @@ LOOP_START=$(cat "$STATE_DIR/loop_start")
 bash .claude/skills/spec-critique-revise-loop/scripts/check_timeout.sh "$LOOP_START" {LOOP_TIMEOUT_MINUTES} "loop"
 ```
 
-If exit code is 1 → set `EXIT_REASON=loop_timeout`. Skip to Step 5.
+If exit code is 1 → set `EXIT_REASON=loop_timeout`. Skip to Step 6.
 
 ```bash
 date +%s > "$STATE_DIR/round_start"
 ```
 
-#### Step 4a: Snapshot critiques directory
+#### Step 5b: Snapshot critiques directory
 
 ```bash
 ls specification/critiques/ 2>/dev/null | sort
@@ -89,7 +116,7 @@ ls specification/critiques/ 2>/dev/null | sort
 
 Save this listing for comparison after critics run.
 
-#### Step 4b: Launch ALL critics in parallel
+#### Step 5c: Launch ALL critics in parallel
 
 For each critic from the config, launch a Task subagent. **Launch ALL critics concurrently in a single message with multiple Task tool calls.**
 
@@ -116,19 +143,19 @@ Each Task subagent will return when done (or when `max_turns` is reached). Wait 
 
 Print a brief summary of each critic's result.
 
-#### Step 4c: Find new critique files
+#### Step 5d: Find new critique files
 
 ```bash
 ls specification/critiques/ 2>/dev/null | sort
 ```
 
-Compare with the snapshot from Step 4a using `comm -13` to find new files. Filter out `*acknowledgement*` files — those are from revise, not critique.
+Compare with the snapshot from Step 5b using `comm -13` to find new files. Filter out `*acknowledgement*` files — those are from revise, not critique.
 
 If no new critique files found, this is an error. Stop.
 
 Print the new critique files found.
 
-#### Step 4d: Check exit conditions
+#### Step 5e: Check exit conditions
 
 For each new critique file, run:
 
@@ -146,7 +173,7 @@ bash .claude/skills/spec-critique-revise-loop/scripts/check_exit.sh \
 
 Note: `check_exit.sh` updates `$STATE_DIR/prev_issues` as a side effect. When checking multiple files, use a temporary copy per critic and merge after (sort -u) to avoid cross-contamination.
 
-#### Step 4e: Check round timeout, then run revise
+#### Step 5f: Check round timeout, then run revise
 
 Before launching revise, check the round timeout:
 
@@ -155,7 +182,7 @@ ROUND_START=$(cat "$STATE_DIR/round_start")
 bash .claude/skills/spec-critique-revise-loop/scripts/check_timeout.sh "$ROUND_START" {ROUND_TIMEOUT_MINUTES} "round"
 ```
 
-If exit code is 1 → set `EXIT_REASON=round_timeout`. Skip to Step 5.
+If exit code is 1 → set `EXIT_REASON=round_timeout`. Skip to Step 6.
 
 Also check the loop timeout:
 
@@ -164,9 +191,9 @@ LOOP_START=$(cat "$STATE_DIR/loop_start")
 bash .claude/skills/spec-critique-revise-loop/scripts/check_timeout.sh "$LOOP_START" {LOOP_TIMEOUT_MINUTES} "loop"
 ```
 
-If exit code is 1 → set `EXIT_REASON=loop_timeout`. Skip to Step 5.
+If exit code is 1 → set `EXIT_REASON=loop_timeout`. Skip to Step 6.
 
-Extract the version identifier(s) from the new critique files (e.g., `v45` from `v45-opus.md`) and include them in the Step 4e header: `*Step 4e (round N/MAX_ROUNDS, elapsed MM:SS): Run revise for v45*`. When multiple critics produce different versions, join them with commas (e.g., `v45, v46`).
+Extract the version identifier(s) from the new critique files (e.g., `v45` from `v45-opus.md`) and include them in the Step 5f header: `*Step 5f (round N/MAX_ROUNDS, elapsed MM:SS): Run revise for v45*`. When multiple critics produce different versions, join them with commas (e.g., `v45, v46`).
 
 If continuing, launch a single Task subagent to revise:
 
@@ -180,7 +207,7 @@ Task tool:
 
 Wait for the revise subagent to complete. Print a summary of the result.
 
-#### Step 4f: Round summary
+#### Step 5g: Round summary
 
 Find new acknowledgement files (compare critiques dir before/after revise, filter for `*acknowledgement*`).
 
@@ -200,7 +227,7 @@ Print: `=== ROUND {N} of {MAX_ROUNDS} COMPLETE ===`
 
 If all rounds complete without converging or getting stuck, set `EXIT_REASON=round_limit`.
 
-### Step 5: Print final report
+### Step 6: Print final report
 
 ```bash
 bash .claude/skills/spec-critique-revise-loop/scripts/report.sh \
@@ -210,7 +237,7 @@ bash .claude/skills/spec-critique-revise-loop/scripts/report.sh \
   --exit-criteria "{LOOP_EXIT_CRITERIA}"
 ```
 
-### Step 6: Clean up
+### Step 7: Clean up
 
 ```bash
 rm -rf "$STATE_DIR"

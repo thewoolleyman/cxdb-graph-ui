@@ -86,10 +86,10 @@ assert_eq "real config has 2 critic lines" "2" "$line_count"
 # --- Test 2: First line is skill:opus ---
 
 echo ""
-echo "Test 2: First critic is skill:opus"
+echo "Test 2: First critic is skill:sonnet"
 
 first_line=$(echo "$parsed" | head -1)
-assert_contains "first line type is skill" "skill opus" "$first_line"
+assert_contains "first line type is skill" "skill sonnet" "$first_line"
 assert_contains "first line has CRITIQUE_PROMPT placeholder" "{CRITIQUE_PROMPT}" "$first_line"
 
 # --- Test 3: Second line is bash ---
