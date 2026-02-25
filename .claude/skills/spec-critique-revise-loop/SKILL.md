@@ -48,6 +48,8 @@ Print the number of critics found.
 
 For each round from 1 to `{MAX_ROUNDS}`:
 
+When printing each substep header, always include the round info. Format: `Step 4x (round N/MAX_ROUNDS): ...`
+
 #### Step 4a: Snapshot critiques directory
 
 ```bash
