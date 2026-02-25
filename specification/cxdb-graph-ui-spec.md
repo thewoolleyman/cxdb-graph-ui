@@ -538,19 +538,19 @@ Returns (turns are always ordered oldest-first — ascending by depth within the
 | `com.kilroy.attractor.RunCompleted` | Pipeline run completed (pipeline-level) | `run_id`, `final_status`, `final_git_commit_sha`, `cxdb_context_id`, `cxdb_head_turn_id` |
 | `com.kilroy.attractor.RunFailed` | Pipeline run failed (pipeline-level) | `run_id`, `reason`, `node_id` (optional), `git_commit_sha` |
 | `com.kilroy.attractor.Prompt` | LLM prompt sent to agent | `node_id`, `text` |
-| `com.kilroy.attractor.ToolCall` | Agent invoked a tool | `node_id` (optional per registry, always populated in practice), `tool_name`, `arguments_json` |
-| `com.kilroy.attractor.ToolResult` | Tool result | `node_id` (optional per registry, always populated in practice), `tool_name`, `output`, `is_error` |
+| `com.kilroy.attractor.ToolCall` | Agent invoked a tool | `node_id` (optional per registry, always populated in practice), `tool_name`, `arguments_json`, `call_id` |
+| `com.kilroy.attractor.ToolResult` | Tool result | `node_id` (optional per registry, always populated in practice), `tool_name`, `output`, `is_error`, `call_id` |
 | `com.kilroy.attractor.AssistantMessage` | LLM response | `node_id` (optional), `text`, `model`, `input_tokens`, `output_tokens`, `tool_use_count` |
-| `com.kilroy.attractor.GitCheckpoint` | Git commit at node boundary | `node_id`, `git_commit_sha` |
+| `com.kilroy.attractor.GitCheckpoint` | Git commit at node boundary | `node_id`, `git_commit_sha`, `status` |
 | `com.kilroy.attractor.CheckpointSaved` | Checkpoint saved to disk | `run_id`, `node_id` (optional), `checkpoint_path` |
 | `com.kilroy.attractor.Artifact` | Build artifact produced | `node_id` (optional), `name`, `mime`, `content_hash` |
 | `com.kilroy.attractor.BackendTraceRef` | LLM backend trace reference | `node_id` (optional), `provider`, `backend` |
 | `com.kilroy.attractor.Blob` | Raw binary data | `bytes` |
-| `com.kilroy.attractor.StageStarted` | Node execution began | `node_id`, `handler_type` (optional), `attempt` (optional) |
+| `com.kilroy.attractor.StageStarted` | Node execution began | `node_id`, `handler_type` (optional) |
 | `com.kilroy.attractor.StageFinished` | Node execution completed | `node_id`, `status`, `preferred_label` (optional), `failure_reason` (optional), `notes` (optional), `suggested_next_ids` (optional, array) |
 | `com.kilroy.attractor.StageFailed` | Node execution failed | `node_id`, `failure_reason`, `will_retry` (optional, boolean), `attempt` (optional) |
 | `com.kilroy.attractor.StageRetrying` | Node about to retry | `node_id`, `attempt`, `delay_ms` (optional) |
-| `com.kilroy.attractor.ParallelStarted` | Parallel execution began | `node_id`, `branch_count` |
+| `com.kilroy.attractor.ParallelStarted` | Parallel execution began | `node_id`, `branch_count`, `join_policy`, `error_policy` |
 | `com.kilroy.attractor.ParallelBranchStarted` | Single parallel branch began | `node_id`, `branch_key`, `branch_index` |
 | `com.kilroy.attractor.ParallelBranchCompleted` | Parallel branch finished | `node_id`, `branch_key`, `branch_index`, `status`, `duration_ms` |
 | `com.kilroy.attractor.ParallelCompleted` | All parallel branches finished | `node_id`, `success_count`, `failure_count`, `duration_ms` |
@@ -559,6 +559,8 @@ Returns (turns are always ordered oldest-first — ascending by depth within the
 | `com.kilroy.attractor.InterviewTimeout` | Human gate timed out | `node_id`, `question_text`, `duration_ms` |
 
 Types with `node_id` are processed by the status derivation algorithm (Section 6.2). Types without `node_id` (RunStarted, RunCompleted, Blob) are silently skipped via the `IF nodeId IS null` guard. RunFailed carries an optional `node_id` — when present, it participates in status derivation; when absent, it is skipped. GitCheckpoint, CheckpointSaved, Artifact, BackendTraceRef, and AssistantMessage may or may not carry `node_id` depending on context — the null guard handles both cases. These types are defined in the `kilroy-attractor-v1` registry bundle (in the Kilroy/Attractor codebase) and their fields should be verified against the bundle if field-level details are needed beyond what is documented here. The `optional` annotations in the table above match the registry bundle definition (e.g., `ToolCall.node_id` is `opt()` in the registry), not necessarily the current Kilroy emitting code (which always populates them in practice). Fields marked optional in the registry may be absent from turns emitted by future Kilroy versions or third-party Attractor implementations. The `IF nodeId IS null` guard in the status derivation algorithm (Section 6.2) handles all cases regardless of optionality.
+
+**Field notes for specific turn types.** `GitCheckpoint.status` records the `StageStatus` (e.g., `"success"`, `"fail"`, `"retry"`) at the time the git checkpoint was made — it uses the same `StageStatus` value set as `StageFinished.status` (see `runtime/status.go`). This field does not affect UI rendering since `GitCheckpoint` falls through to the "Other/unknown" detail panel row, but operators examining raw turn data in CXDB will see it. `ToolCall.call_id` and `ToolResult.call_id` are a correlation ID linking a tool invocation round-trip: the same `call_id` appears in both the `ToolCall` turn and its corresponding `ToolResult` turn. For LLM-driven tool calls (CLI stream path), `call_id` is the Anthropic `tool_use` ID (e.g., `"toolu_abc"`). For tool gate invocations (`handlers.go`), it is a ULID generated at call time. For Codergen-routed calls (`codergen_router.go`), it is also a ULID. The `call_id` field is not rendered by the detail panel but is present in all real-world Kilroy `ToolCall` and `ToolResult` turns. `ParallelStarted.join_policy` and `ParallelStarted.error_policy` are string values from Kilroy's parallel handler configuration that describe how the parallel fan-out is coordinated — specifically which branches must complete and what happens on branch failure. These fields do not affect UI rendering since `ParallelStarted` falls through to the "Other/unknown" detail panel row, but they are operationally significant for operators debugging failing parallel nodes.
 
 **Kilroy types vs. CXDB canonical types.** The `com.kilroy.attractor.*` types above are distinct from CXDB's own canonical conversation type (`cxdb.ConversationItem`, defined in `clients/go/types/conversation.go` in the CXDB repository). The CXDB types use an `item_type` discriminator with variants like `user_input`, `assistant_turn`, `tool_call`, `tool_result`, `system`, and `handoff` — they have no concept of `node_id`, `graph_name`, `run_id`, `StageStarted`, `StageFinished`, or `StageFailed`. The Kilroy types are defined in the Kilroy/Attractor codebase (not the CXDB codebase) and are published to CXDB via the registry bundle mechanism. An implementer cannot verify the Kilroy field tags or type IDs from the CXDB source alone — the canonical source for the `kilroy-attractor-v1` bundle definition is the Attractor repository. The `decodeFirstTurn` tags (tag 1 = `run_id`, tag 8 = `graph_name`) are documented inline in Section 5.5 and are stable within bundle version 1 per CXDB's versioning model (existing tags are never reassigned).
 
@@ -578,6 +580,10 @@ Kilroy contexts are identified by their `client_tag`, which follows the format `
 FUNCTION discoverPipelines(cxdbInstances, knownMappings, cqlSupported):
     FOR EACH (index, instance) IN cxdbInstances:
         -- Phase 1: Fetch Kilroy contexts (CQL search or fallback)
+        -- supplementalNullTagCandidates collects null-tag contexts encountered during
+        -- the supplemental context list fetch (CQL-empty path). These are merged into
+        -- nullTagCandidates below for backlog processing.
+        supplementalNullTagCandidates = []
         IF cqlSupported[index] != false:
             TRY:
                 searchResponse = fetchCqlSearch(index, 'tag ^= "kilroy/"')
@@ -593,6 +599,15 @@ FUNCTION discoverPipelines(cxdbInstances, knownMappings, cqlSupported):
                     FOR EACH ctx IN supplemental:
                         IF ctx.client_tag IS NOT null AND ctx.client_tag.startsWith("kilroy/"):
                             contexts.append(ctx)
+                        ELSE IF ctx.client_tag IS null:
+                            -- Null-tag context from the supplemental fetch. This context
+                            -- may be a completed Kilroy run whose session has disconnected
+                            -- (client_tag permanently null because key 30 is absent and the
+                            -- session fallback in context_to_json is no longer available).
+                            -- We cannot filter by prefix here, so collect it for the
+                            -- null-tag backlog. The (index, ctx.context_id) key will be
+                            -- checked against knownMappings in the backlog processing block.
+                            supplementalNullTagCandidates.append(ctx)
             CATCH httpError:
                 IF httpError.status == 404:
                     cqlSupported[index] = false
@@ -608,16 +623,50 @@ FUNCTION discoverPipelines(cxdbInstances, knownMappings, cqlSupported):
         ELSE:
             contexts = fetchContexts(index, limit=10000)
 
+        -- Null-tag backlog: contexts whose client_tag is null from either discovery path.
+        -- These may be completed Kilroy runs whose session disconnected (making
+        -- client_tag permanently null because key 30 is absent and context_to_json's
+        -- session fallback no longer resolves the tag). Two sources feed this backlog:
+        -- (1) the supplemental context list fetch (CQL-empty path on CQL-enabled CXDB),
+        -- collected above into supplementalNullTagCandidates; and
+        -- (2) the full context list fallback (CQL not supported), collected in the
+        -- main context loop below into nullTagCandidates directly.
+        -- We attempt fetchFirstTurn for up to NULL_TAG_BATCH_SIZE of the newest such
+        -- contexts per poll cycle, prioritised by descending context_id (newest first).
+        -- Contexts that are confirmed Kilroy are cached normally; confirmed
+        -- non-Kilroy or transient errors are handled by the logic below.
+        -- knownMappings is checked again in the batch processing block to handle
+        -- supplementalNullTagCandidates that were not filtered against knownMappings
+        -- in the supplemental fetch loop above.
+        NULL_TAG_BATCH_SIZE = 5
+        nullTagCandidates = supplementalNullTagCandidates  -- seed from supplemental path
+
         FOR EACH context IN contexts:
             key = (index, context.context_id)
             IF key IN knownMappings:
                 CONTINUE  -- already discovered (positive or negative)
 
-            -- When using fallback (no CQL), apply client-side prefix filter
+            -- When using fallback (no CQL), apply client-side prefix filter.
+            -- IMPORTANT: Only cache a null mapping when client_tag is PRESENT but
+            -- does NOT start with "kilroy/". If client_tag is null (absent), the
+            -- context is a candidate for the null-tag backlog (see below).
+            -- Rationale: on older CXDB versions (precisely those that use this fallback
+            -- path), client_tag is resolved from the active session via context_to_json's
+            -- .or_else fallback. This means client_tag can be legitimately null in two
+            -- situations: (1) immediately after context creation before the session
+            -- registers the context in context_to_session (brief startup window), and
+            -- (2) after the run finishes and the session disconnects (SessionTracker.
+            -- unregister removes the context-to-session mapping). For historical runs
+            -- on legacy CXDB (completed + session gone), client_tag is PERMANENTLY
+            -- null — so simply doing CONTINUE here would prevent those runs from ever
+            -- being discovered. Instead, we enqueue them into the null-tag backlog.
             IF cqlSupported[index] == false:
-                IF context.client_tag IS null OR NOT context.client_tag.startsWith("kilroy/"):
-                    knownMappings[key] = null  -- not a Kilroy context
+                IF context.client_tag IS NOT null AND NOT context.client_tag.startsWith("kilroy/"):
+                    knownMappings[key] = null  -- confirmed non-Kilroy context (tag present but wrong prefix)
                     CONTINUE
+                ELSE IF context.client_tag IS null:
+                    nullTagCandidates.append(context)
+                    CONTINUE  -- will be processed in the null-tag batch below
 
             -- Phase 2: Fetch RunStarted turn (first turn of the context)
             -- fetchFirstTurn may fail due to transient errors (non-200 response,
@@ -649,6 +698,39 @@ FUNCTION discoverPipelines(cxdbInstances, knownMappings, cqlSupported):
                 CONTINUE
             ELSE:
                 knownMappings[key] = null  -- has kilroy tag but confirmed non-RunStarted first turn
+
+        -- Null-tag batch: attempt fetchFirstTurn for the newest N null-tag contexts.
+        -- Sort descending by context_id (newest first — monotonic proxy for recency).
+        -- This enables discovery of completed Kilroy runs on both CQL-enabled CXDB
+        -- (supplemental path, post-disconnect) and legacy CXDB (fallback path).
+        -- Note: contexts from the supplemental path (supplementalNullTagCandidates) were
+        -- not filtered against knownMappings before being added; check here to avoid
+        -- redundant fetchFirstTurn calls for already-cached contexts.
+        nullTagCandidates.sortByDescending(c => parseInt(c.context_id, 10))
+        FOR EACH context IN nullTagCandidates[0..NULL_TAG_BATCH_SIZE]:
+            key = (index, context.context_id)
+            IF key IN knownMappings:
+                CONTINUE  -- already cached (positive or negative); skip
+            TRY:
+                firstTurn = fetchFirstTurn(index, context.context_id, context.head_depth)
+            CATCH fetchError:
+                -- Transient failure: do NOT cache, retry next poll.
+                CONTINUE
+
+            IF firstTurn IS NOT null AND firstTurn.declared_type.type_id == "com.kilroy.attractor.RunStarted":
+                graphName = firstTurn.data.graph_name
+                runId = firstTurn.data.run_id
+                IF graphName IS null OR graphName == "":
+                    knownMappings[key] = null  -- RunStarted but no graph_name; immutable, cache negative
+                    CONTINUE
+                knownMappings[key] = { graphName, runId }
+            ELSE IF firstTurn IS null:
+                -- Empty context. Leave unmapped, retry next poll.
+                CONTINUE
+            ELSE:
+                -- First turn is not RunStarted → confirmed non-Kilroy.
+                -- Cache null to avoid re-fetching.
+                knownMappings[key] = null
 
     RETURN knownMappings
 ```
@@ -779,7 +861,7 @@ The `graph_name` from the `RunStarted` turn is matched against the normalized gr
 
 The `RunStarted` turn also contains a `run_id` field (see Section 5.4 for the full field inventory) that uniquely identifies the pipeline run. All contexts belonging to the same run (e.g., parallel branches) share the same `run_id`. The discovery algorithm records both `graph_name` and `run_id` for each context.
 
-**Caching.** The context-to-pipeline mapping is cached in memory, keyed by `(cxdb_index, context_id)`. Both positive results (RunStarted contexts mapped to a pipeline) and negative results (non-Kilroy contexts and confirmed non-RunStarted contexts stored as `null`) are cached. The first turn of a context is immutable — once a context is successfully classified, it is never re-fetched. Only newly appeared context IDs (and previously failed or empty fetches that were not cached) trigger discovery requests. The `client_tag` prefix filter (whether server-side via CQL or client-side in the fallback path) prevents fetching turns for non-Kilroy contexts entirely. Two cases are left unmapped (not cached as `null`) and retried on subsequent polls: (a) when a `fetchFirstTurn` call fails due to a transient error (non-200 response, timeout), and (b) when `fetchFirstTurn` returns `null` (empty context with no turns yet — common during early pipeline startup or transient CXDB lag). This prevents both transient failures and premature classification of empty contexts from permanently classifying a valid Kilroy context as non-Kilroy.
+**Caching.** The context-to-pipeline mapping is cached in memory, keyed by `(cxdb_index, context_id)`. Both positive results (RunStarted contexts mapped to a pipeline) and negative results (non-Kilroy contexts and confirmed non-RunStarted contexts stored as `null`) are cached. The first turn of a context is immutable — once a context is successfully classified, it is never re-fetched. Only newly appeared context IDs (and previously failed or empty fetches that were not cached) trigger discovery requests. The `client_tag` prefix filter (whether server-side via CQL or client-side in the fallback path) prevents fetching turns for non-Kilroy contexts entirely. Three cases are left unmapped (not cached as `null`) and retried on subsequent polls: (a) when a `fetchFirstTurn` call fails due to a transient error (non-200 response, timeout), (b) when `fetchFirstTurn` returns `null` (empty context with no turns yet — common during early pipeline startup or transient CXDB lag), and (c) when `client_tag` is `null` — null-tag contexts are queued in the null-tag backlog (up to `NULL_TAG_BATCH_SIZE` = 5 per poll cycle, newest first by context_id) and subjected to `fetchFirstTurn`. This applies in both discovery paths: the CQL-empty supplemental path (CQL-enabled CXDB where Kilroy lacks key 30 and the session has disconnected) and the full context list fallback path (legacy CXDB without CQL). If `fetchFirstTurn` confirms the context is a Kilroy run (first turn is `RunStarted`), it is cached positively. If it confirms a non-Kilroy first turn, it is cached as `null`. If the fetch fails transiently, the context remains uncached and is retried in a future poll cycle. This mechanism enables discovery of completed Kilroy runs on both CQL-enabled and legacy CXDB deployments where `client_tag` is permanently `null` after session disconnect. This prevents transient failures, empty contexts, and transiently-missing tags from permanently classifying a valid Kilroy context as non-Kilroy.
 
 **`client_tag` stability requirement and current limitation.** The `client_tag` prefix filter assumes `client_tag` is stable across polls. CXDB resolves `client_tag` with a fallback chain: first from stored metadata (extracted from the first turn's msgpack payload key 30), then from the active session's tag. If the first turn's payload does not include context metadata (key 30 is absent), the `client_tag` in the context list is only present while the session is active (`is_live == true`). Once the session disconnects, `client_tag` becomes `null`, and the UI's prefix filter would fail to match — permanently excluding the context from discovery if it has already been cached as non-Kilroy. **Kilroy must embed `client_tag` in the first turn's context metadata** (key 30) for reliable classification.
 
@@ -791,11 +873,11 @@ The `RunStarted` turn also contains a `run_id` field (see Section 5.4 for the fu
 
 - **Context list fallback works only during active sessions.** The fallback endpoint resolves `client_tag` from the active session's tag via `context_to_json`'s `.or_else` fallback. This works while the Kilroy agent is connected. After session disconnect (`SessionTracker.unregister` in `metrics.rs` removes all context-to-session mappings), `client_tag` becomes `null` for all that run's contexts. Completed pipelines become undiscoverable on fresh page loads.
 
-- **The UI's `knownMappings` cache mitigates this partially.** Once a context is discovered during an active session, it remains in the cache. But a fresh page load after pipeline completion (or after all sessions disconnect) will fail to discover the contexts because `client_tag` is no longer available from either source.
+- **The UI's `knownMappings` cache and null-tag backlog mitigate this.** Once a context is discovered during an active session, it remains in the cache. For a fresh page load after pipeline completion (when `client_tag` is permanently null), the null-tag backlog mechanism (`NULL_TAG_BATCH_SIZE` = 5 per poll cycle) attempts `fetchFirstTurn` for unclassified null-tag contexts. This applies in both paths: for CQL-enabled CXDB (where CQL returns zero results and the supplemental context list fetch returns null-tag contexts after session disconnect), and for legacy CXDB without CQL (where the full context list returns null-tag contexts). Discovery completes within a bounded number of poll cycles proportional to the number of null-tag contexts divided by `NULL_TAG_BATCH_SIZE`.
 
 **Required Kilroy-side change (prerequisite).** For reliable discovery — both CQL search and post-disconnect context list lookups — Kilroy must embed context metadata at key 30 in the first turn's payload. This can be done by: (a) adding a tag 30 field to the `RunStarted` type in the `kilroy-attractor-v1` registry bundle, or (b) wrapping the encoded payload in an outer map that includes key 30 alongside the registry-encoded data. Until this change is made, the context list fallback with session-tag resolution is the only reliable discovery path, limited to active sessions. The UI's existing `knownMappings` cache and the graceful-degradation principle (Section 1.2) ensure that pipelines discovered during an active session remain visible for the duration of the browser session.
 
-**Fallback behavior until Kilroy implements key 30.** The `discoverPipelines` algorithm handles the current state via the supplemental context list fetch: CQL search returns zero Kilroy contexts, the CQL endpoint returns a valid (but empty) response (not 404), so `cqlSupported` remains `true`. Because the response is empty, the algorithm issues a supplemental `fetchContexts(index, limit=10000)` and filters for `kilroy/`-prefixed `client_tag` values. This discovers Kilroy contexts whose `client_tag` is resolved from the active session's tag (available while the pipeline agent is connected). After session disconnect, `client_tag` becomes `null` and the supplemental fetch also returns no matches — completed pipelines remain discoverable only through the `knownMappings` cache (populated during the active session). A fresh page load after all sessions disconnect will not discover completed pipelines until Kilroy implements key 30. The supplemental fetch adds one additional HTTP request per CXDB instance per poll cycle only when CQL returns empty results, which is minimal overhead.
+**Fallback behavior until Kilroy implements key 30.** The `discoverPipelines` algorithm handles the current state via the supplemental context list fetch: CQL search returns zero Kilroy contexts, the CQL endpoint returns a valid (but empty) response (not 404), so `cqlSupported` remains `true`. Because the response is empty, the algorithm issues a supplemental `fetchContexts(index, limit=10000)` and filters for `kilroy/`-prefixed `client_tag` values. This discovers Kilroy contexts whose `client_tag` is resolved from the active session's tag (available while the pipeline agent is connected). After session disconnect, `client_tag` becomes `null` in the supplemental fetch (the session fallback in `context_to_json` is no longer available and key 30 is absent), so those contexts appear with `client_tag: null`. These null-tag contexts are collected into `supplementalNullTagCandidates` and processed via the null-tag backlog: up to `NULL_TAG_BATCH_SIZE` = 5 per poll cycle are subjected to `fetchFirstTurn`, enabling discovery of completed pipelines on CQL-enabled CXDB instances even after all sessions disconnect. A fresh page load after all sessions disconnect will therefore discover completed pipelines within a bounded number of poll cycles, proportional to the number of null-tag contexts divided by `NULL_TAG_BATCH_SIZE`. The supplemental fetch adds one additional HTTP request per CXDB instance per poll cycle only when CQL returns empty results, which is minimal overhead.
 
 **Metadata extraction asymmetry for forked contexts.** CXDB populates the `context_metadata_cache` via two paths: (1) on append, `maybe_cache_metadata` (`store.rs` lines 161-178) extracts metadata from the first turn appended to the context — for new contexts this is the depth-0 `RunStarted` turn, but for forked contexts this is the first turn appended to the child (at depth = base_depth + 1), which is an application turn (e.g., `StageStarted`, `Prompt`), not `RunStarted`; (2) on cache miss (e.g., after CXDB restart), `load_context_metadata` (`store.rs` lines 151-156) calls `get_first_turn(context_id)`, which walks the parent chain to depth=0 — crossing context boundaries for forked contexts and finding the parent's `RunStarted` turn. For forked contexts, these two paths extract metadata from **different turns** with potentially different payloads. The Go client types confirm the convention: `conversation.go` line 165 says "By convention, only included in the first turn (depth=1) of a context."
 
@@ -820,6 +902,26 @@ The `RunStarted` turn also contains a `run_id` field (see Section 5.4 for the fu
 The UI polls all configured CXDB instances every 3 seconds. Each poll cycle:
 
 1. For each CXDB instance, fetch Kilroy contexts using the CQL search endpoint or fallback (see Section 5.2 and 5.5's `discoverPipelines` for the CQL/fallback selection logic). On success, store the **discovery-effective context list** in `cachedContextLists[i]` (replacing any previous cached value). The discovery-effective list is: the CQL search results when non-empty, the supplemental context list when CQL returns zero results (see Section 5.5's `discoverPipelines` for the supplemental fetch path), or the full context list when using the fallback. This ensures that `cachedContextLists[i]` always reflects the same contexts used for discovery in the current poll cycle — in particular, when CQL returns empty results and the supplemental context list discovers active Kilroy contexts via session-tag resolution, those contexts (with their `is_live` field) are stored in `cachedContextLists[i]` so that `lookupContext` and `checkPipelineLiveness` can find them. Without this, CQL-empty polls would overwrite `cachedContextLists[i]` with `[]`, causing `checkPipelineLiveness` to return `false` and `applyStaleDetection` to misclassify running nodes as stale. If an instance is unreachable (502), skip it, retain its per-context status maps from the last successful poll, and use `cachedContextLists[i]` as the context list for that instance in subsequent steps. This ensures that `lookupContext`, `determineActiveRuns`, and `checkPipelineLiveness` continue to function using the last known context data during transient outages — preserving active-run determination and liveness signals rather than losing them.
+
+   **`cqlSupported` flag reset on reconnection.** The UI tracks a per-instance `instanceReachable[i]` flag. On each poll step 1, before issuing any discovery request: if `instanceReachable[i]` was `false` in the previous cycle (the instance was unreachable), and the current attempt succeeds with a non-502 response, set `instanceReachable[i] = true` and reset `cqlSupported[i] = undefined` (allowing the next poll cycle to retry CQL). This reset is applied regardless of whether the instance was previously `cqlSupported[i] = false` (no CQL) or `cqlSupported[i] = true` (CQL worked but could be affected by an upgrade). The reset happens at reachability detection time — not inside the CQL path itself — so it applies whether the non-502 response comes from a CQL search, context list, or any other proxied request. If the current attempt returns 502, set `instanceReachable[i] = false` and skip the instance as before. In pseudocode:
+
+   ```
+   -- At the top of each poll cycle for instance[i]:
+   currentlyReachable = (fetchContextsOrCql(i) does NOT return 502)
+   IF NOT currentlyReachable:
+       instanceReachable[i] = false
+       SKIP instance i this cycle
+   ELSE:
+       IF instanceReachable[i] == false:
+           -- Instance just reconnected after being unreachable.
+           -- Reset cqlSupported so the next poll retries CQL
+           -- (the instance may have been upgraded while down).
+           cqlSupported[i] = undefined
+       instanceReachable[i] = true
+       -- proceed with discovery
+   ```
+
+   This ensures that an instance upgraded from non-CQL to CQL while unreachable will have CQL re-probed on the next poll after it comes back, rather than permanently skipping CQL based on a pre-outage 404.
 2. Run pipeline discovery for any new `(index, context_id)` pairs (Section 5.5)
 3. **Determine active run per pipeline.** For each loaded pipeline, group discovered contexts by `run_id`. The active run is the one whose contexts have the highest `context_id` value (see Section 5.5 for why `context_id` is used instead of `created_at_unix_ms`). Contexts from non-active runs are excluded from steps 4–7. When the active `run_id` changes for a pipeline (a new run has started), reset all per-context status maps and `lastSeenTurnId` cursors for that pipeline's old-run contexts, and clear the per-pipeline turn cache (step 5) for that pipeline. This implements the "most recent run" rule described in Section 5.5. The algorithm also maintains a `previousActiveRunIds` map (keyed by pipeline graph ID) across poll cycles to detect run changes.
 
@@ -1248,6 +1350,8 @@ The detail panel shows recent CXDB turns for the selected node. Turns are source
 This mapping ensures all turn types that may appear in the turn cache render meaningfully. The high-value additions are: `AssistantMessage` (shows model name and LLM response text — a high-frequency turn type critical for the "mission control" use case), `InterviewStarted`/`InterviewCompleted`/`InterviewTimeout` (human gate interaction events — `InterviewStarted` includes `question_type` to distinguish gate modes, `InterviewCompleted` includes `duration_ms` to show how long the pipeline waited for human input), `StageRetrying` (shows retry attempt count and backoff delay), and `RunCompleted`/`RunFailed` (pipeline-level lifecycle events). `StageFailed` now renders `failure_reason` instead of a generic label. The remaining low-value types (`Artifact`, `Blob`, `BackendTraceRef`, `CheckpointSaved`, `GitCheckpoint`, `ParallelStarted`, `ParallelBranchStarted`, `ParallelBranchCompleted`, `ParallelCompleted`) fall through to the "Other/unknown" row — they carry no user-facing content beyond what is already reflected in the status overlay. The `StageStarted` lifecycle turn displays its `handler_type` field (e.g., "Stage started: codergen", "Stage started: tool", "Stage started: wait.human") to help operators identify what kind of execution is beginning — particularly useful for conditional nodes with `TypeOverride` that use a different handler than their shape would suggest. The `handler_type` value comes from Kilroy's `resolvedHandlerType` function (`cxdb_events.go` line 72, `handlers.go` lines 174-182). `StageFinished` renders its `status`, `preferred_label`, `failure_reason`, `notes`, and `suggested_next_ids` fields because these carry substantive operator-facing information: `status` distinguishes success from failure (a node with `status: "fail"` displays as red/error in the overlay), `preferred_label` shows which edge the pipeline chose at a conditional node, `failure_reason` explains why a node failed, `notes` provides a concise handler-generated summary of what happened during node execution (e.g., "applied workaround for flaky test", "retried 2 times before success") — the only narrative record beyond the raw tool call/result stream, and `suggested_next_ids` shows which downstream nodes the pipeline selected (useful for understanding branching decisions at conditional/routing nodes). Both `notes` and `suggested_next_ids` are always emitted by Kilroy's `cxdbStageFinished` (`cxdb_events.go` lines 87-88) but may be empty. `StageRetrying` renders `delay_ms` alongside `attempt` to show the backoff delay between retry attempts — this helps operators judge whether a persistent failure (escalating delays) warrants intervention.
 
 **Kilroy-side truncation.** Kilroy truncates three high-frequency text fields at the source before appending to CXDB: `AssistantMessage.text`, `ToolCall.arguments_json`, and `ToolResult.output` are each capped at 8,000 characters by the Kilroy engine (`cli_stream_cxdb.go` lines 46, 66, 87). The UI's client-side truncation (below) operates within this limit for these fields. Expanding a truncated turn row via "Show more" shows at most 8,000 characters for these fields, not the full original content (e.g., a complete LLM response may exceed 8,000 characters but only the truncated version reaches CXDB). **`Prompt.text` is NOT truncated** — `cxdbPrompt` in `cxdb_events.go` passes the full assembled LLM prompt directly to CXDB without calling `truncate`. Prompt text commonly ranges from 5,000 to 50,000+ characters for complex LLM tasks. Other text fields (`StageFailed.failure_reason`, `RunFailed.reason`, `InterviewStarted.question_text`) are also not truncated at the Kilroy side but are typically short. The client-side Output column truncation (500 characters / 8 lines) handles visual presentation for all fields regardless of source-side truncation. An implementer should not assume all text values fit within 8,000 characters — `Prompt.text` in particular may be significantly larger.
+
+**Prompt expansion behavior.** Because `Prompt.text` is not truncated at the source, clicking "Show more" on a `Prompt` turn expands to the full prompt text — which may be 50,000+ characters. Implementations must handle this gracefully. The required behavior is to apply the same 8,000-character secondary cap on expansion for `Prompt` turns as for `AssistantMessage`, `ToolCall`, and `ToolResult` turns. When a `Prompt` turn is capped at 8,000 characters on expansion, the UI must display a disclosure note (e.g., "(truncated to 8,000 characters — full prompt available in CXDB)") so the operator knows the content is not complete. This cap prevents unbounded DOM growth and maintains consistent UX across all expandable turn types. Implementations that expand `Prompt` turns without a secondary cap are not spec-compliant — the combination of an unbounded prompt (no source-side truncation) and a no-cap expansion would inject tens of thousands of characters into a single DOM element, creating visible layout and performance issues.
 
 **Truncation and expansion.** The Output column truncates content to the first 500 characters or 8 lines, whichever limit is reached first. Truncation is applied after HTML-escaping and before rendering in the `white-space: pre-wrap` container. When content is truncated, a "Show more" toggle appears inline below the visible excerpt. Clicking "Show more" expands the row to display the full content (still whitespace-preserved) and changes the toggle to "Show less" to re-collapse. Each turn row has its own independent expand/collapse state. Line breaks in the visible truncated excerpt are preserved (truncation does not collapse whitespace). Fixed-label outputs (lifecycle turns, unknown types) are never truncated.
 

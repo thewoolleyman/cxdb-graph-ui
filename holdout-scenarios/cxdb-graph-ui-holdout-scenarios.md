@@ -678,6 +678,45 @@ Then the detail panel shows the StageStarted turn
   With Output: "Stage started" (no colon suffix)
 ```
 
+### Scenario: StageFinished with suggested_next_ids renders Next line in detail panel
+```
+Given CXDB contains a StageFinished turn for a conditional node with:
+  - status: "pass"
+  - preferred_label: "pass"
+  - suggested_next_ids: ["check_goal", "finalize"]
+When the user clicks that node
+Then the detail panel shows the StageFinished turn
+  With Output: "Stage finished: pass — pass\nNext: check_goal, finalize"
+  And the "\nNext:" portion uses a literal newline before "Next:"
+  And the Error column is not highlighted (status is not "fail")
+```
+
+### Scenario: StageFinished with empty suggested_next_ids omits Next line
+```
+Given CXDB contains a StageFinished turn with:
+  - status: "pass"
+  - preferred_label: "done"
+  - suggested_next_ids: [] (empty array) or absent
+When the user clicks that node
+Then the detail panel shows the StageFinished turn
+  With Output: "Stage finished: pass — done"
+  And no "\nNext:" line is appended
+```
+
+### Scenario: Prompt turn Show more expansion is capped at 8,000 characters with disclosure
+```
+Given CXDB contains a Prompt turn for an LLM task node
+  And the Prompt.text is 50,000 characters (not truncated at source by Kilroy)
+  And the detail panel has client-side-truncated the output to 500 characters
+When the user clicks "Show more" on that Prompt turn row
+Then the expanded output is capped at 8,000 characters (not 50,000)
+  And a disclosure note is displayed indicating the content is truncated
+    (e.g., "(truncated to 8,000 characters — full prompt available in CXDB)")
+  And the expanded output does not inject more than 8,000 characters into the DOM
+  And this behaviour matches the expansion cap applied to AssistantMessage,
+    ToolCall, and ToolResult turns
+```
+
 ### Scenario: Human gate choices available on first pipeline without tab switch
 ```
 Given the server was started with --dot /path/to/pipeline.dot
@@ -760,6 +799,21 @@ Then the UI resets the cqlSupported flag for that instance
   And subsequent polls use CQL search instead of the fallback
 ```
 
+### Scenario: cqlSupported flag resets on reconnection even when instance had no CQL
+```
+Given a CXDB instance without CQL support (GET /v1/contexts/search returns 404)
+  And the UI has set cqlSupported[0] to false for that instance
+  And the UI is using the context list fallback
+When the CXDB instance becomes unreachable (returns 502) for one poll cycle
+  And then reconnects (returns a non-502 response) on the next poll cycle
+Then the UI resets cqlSupported[0] to undefined (not false)
+  And retries CQL search on the first poll cycle after reconnection
+  And the CQL search again returns 404 (instance still lacks CQL)
+  And the UI sets cqlSupported[0] back to false
+  And falls back to the context list endpoint for that poll cycle
+  And discovery continues normally without interruption
+```
+
 ### Scenario: CXDB downgrades and CQL becomes unavailable mid-session
 ```
 Given the UI has been polling CXDB-0 successfully using CQL search
@@ -771,6 +825,79 @@ Then the next CQL search attempt returns 404
   And falls back to the context list endpoint for that poll cycle
   And subsequent polls use the context list fallback without retrying CQL
   And pipeline discovery continues uninterrupted
+```
+
+### Scenario: Fallback discovery does not permanently blacklist contexts with null client_tag
+```
+Given a CXDB instance without CQL support (GET /v1/contexts/search returns 404)
+  And the UI is using the context list fallback for that instance
+  And CXDB contains a context whose Kilroy session has just disconnected
+  And the context list returns that context with client_tag: null
+    (because context_to_json's session fallback is no longer available)
+When the UI runs pipeline discovery
+Then the context with null client_tag is left unmapped (no knownMappings entry)
+  And no null mapping is cached for that context
+  And the context is retried on the next poll cycle
+When the Kilroy session reconnects to CXDB for a new run on the same context
+  And the context list now returns client_tag: "kilroy/01KJ7..."
+Then the UI proceeds with Phase 2 (fetchFirstTurn) for that context
+  And the context is correctly mapped to its pipeline
+```
+
+### Scenario: Fallback discovery finds completed run after session disconnect on legacy CXDB
+```
+Given CXDB lacks CQL support (GET /v1/contexts/search returns 404)
+  And the UI is using the context list fallback for that instance
+  And a Kilroy run has completed and its session has disconnected
+  And the context now appears in GET /v1/contexts with client_tag: null and is_live: false
+  And the context has NOT been previously cached in knownMappings
+When the UI polls for discovery
+Then the context is enqueued in the null-tag backlog (up to NULL_TAG_BATCH_SIZE per cycle)
+  And the UI fetches the first turn for that context via fetchFirstTurn
+  And the first turn has declared_type "com.kilroy.attractor.RunStarted"
+  And the UI decodes graph_name and run_id from the msgpack payload
+  And the context is mapped to the correct pipeline tab in knownMappings
+  And the status overlay shows the run's final state (e.g., completed or failed nodes)
+```
+
+### Scenario: CQL-empty supplemental discovery handles null client_tag after session disconnect
+```
+Given CXDB supports CQL search but Kilroy contexts omit key 30 metadata
+  And GET /v1/contexts/search?q=tag ^= "kilroy/" returns 200 with contexts: []
+  And the supplemental GET /v1/contexts?limit=10000 returns a completed Kilroy context with client_tag: null and is_live: false
+  And the context has NOT been previously cached in knownMappings
+When the UI polls for discovery
+Then the context is collected into supplementalNullTagCandidates during the supplemental fetch
+  And it is merged into nullTagCandidates despite cqlSupported being true
+  And fetchFirstTurn is invoked for that context (up to NULL_TAG_BATCH_SIZE per cycle)
+  And the first turn has declared_type "com.kilroy.attractor.RunStarted"
+  And the UI decodes graph_name and run_id from the msgpack payload
+  And the context is mapped to the correct pipeline tab in knownMappings
+  And the status overlay shows the completed run's status
+```
+
+### Scenario: Fallback discovery still blacklists contexts with wrong-prefix client_tag
+```
+Given a CXDB instance without CQL support (GET /v1/contexts/search returns 404)
+  And the UI is using the context list fallback for that instance
+  And CXDB contains a context whose client_tag is "claude/abc123" (not "kilroy/" prefix)
+When the UI runs pipeline discovery
+Then the context is immediately cached as null (knownMappings[key] = null)
+  And the context is NOT retried on subsequent polls
+  And no fetchFirstTurn request is issued for that context
+```
+
+### Scenario: Pipeline discovery uses view=raw to survive unpublished type registry
+```
+Given a CXDB instance has a Kilroy pipeline context
+  And the Kilroy type registry bundle has NOT yet been published to CXDB
+  And GET /turns?view=typed for that context would return a 500 error (unknown types)
+When the UI runs pipeline discovery (fetchFirstTurn)
+Then the UI requests the first turn with view=raw (not view=typed)
+  And the CXDB server returns the raw msgpack payload as bytes_b64
+  And the UI decodes the msgpack payload client-side to extract graph_name and run_id
+  And the context is successfully mapped to its pipeline
+  And no discovery failure occurs due to the missing registry
 ```
 
 ---
