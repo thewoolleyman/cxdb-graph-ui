@@ -18,6 +18,7 @@ trap 'rm -rf "$TMPDIR_TEST"' EXIT
 
 MOCK_PROJ="$TMPDIR_TEST/project"
 mkdir -p "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts"
+mkdir -p "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/config"
 mkdir -p "$MOCK_PROJ/specification/critiques"
 
 # Copy the real scripts into the mock project
@@ -214,6 +215,11 @@ else
 fi
 MOCK_EOF
 chmod +x "$MOCK_CLAUDE"
+
+# --- Create critic config pointing to mock claude ---
+cat > "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/config/critic-commands.conf" <<CONF_EOF
+claude -p "{CRITIQUE_PROMPT}" --allowed-tools "{CRITIQUE_TOOLS}"
+CONF_EOF
 
 # --- Run the test ---
 

@@ -7,6 +7,10 @@ set -euo pipefail
 # so that each round's output is visible as soon as it completes (the Claude
 # Code Bash tool buffers output until the command finishes).
 #
+# Multi-critic support: reads critic commands from config/critic-commands.conf
+# and runs all critics in parallel. The loop only converges when ALL critics
+# agree there are no major issues.
+#
 # Usage: round.sh [options]
 #   --round <N>              Current round number (required)
 #   --max-rounds <N>         Maximum rounds allowed
@@ -22,7 +26,7 @@ set -euo pipefail
 #   10 = error (critique or revise failed)
 #
 # State directory contents (read/written between rounds):
-#   prev_issues       — sorted issue titles from previous round
+#   prev_issues       — sorted issue titles from previous round (union of all critics)
 #   cumulative        — "issues applied partial skipped" counts
 #   critique_files    — newline-separated list of critique files created
 #   ack_files         — newline-separated list of acknowledgement files created
@@ -59,6 +63,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # scripts/ → spec-critique-revise-loop/ → skills/ → .claude/ → project root
 PROJ_DIR="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 CRITIQUES_DIR="$PROJ_DIR/specification/critiques"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+CRITIC_CONFIG="$SKILL_DIR/config/critic-commands.conf"
 
 CHECK_EXIT="$SCRIPT_DIR/check_exit.sh"
 ROUND_SUMMARY="$SCRIPT_DIR/round_summary.sh"
@@ -76,6 +82,7 @@ unset CLAUDECODE 2>/dev/null || true
 mkdir -p "$state_dir"
 prev_issues_file="$state_dir/prev_issues"
 touch "$prev_issues_file"
+
 
 # Read cumulative counts
 if [ -f "$state_dir/cumulative" ]; then
@@ -102,86 +109,211 @@ echo "=========================================="
 
 _status "round=$round step=A"
 
-# --- Step B: Run critique ---
+# --- Step B: Run critics (in parallel) ---
 
 _status "round=$round step=B critique"
 echo ""
-echo "[STEP B] (round $round of $max_rounds) Running /spec:critique..."
+echo "[STEP B] (round $round of $max_rounds) Running critics..."
 echo "---"
 
 # Snapshot critiques directory before running
 mkdir -p "$CRITIQUES_DIR"
 before_critique=$(ls "$CRITIQUES_DIR" 2>/dev/null | sort)
 
-# Build the critique prompt
+# Build the full critique prompt
 full_critique_prompt="/spec:critique"
 if [ -n "$critique_prompt" ]; then
   full_critique_prompt="/spec:critique $critique_prompt"
 fi
 
-# Run critique as a non-interactive claude session
+# Read critic commands from config
+if [ ! -f "$CRITIC_CONFIG" ]; then
+  echo "ERROR: critic config not found: $CRITIC_CONFIG"
+  exit 10
+fi
+
+# Parse config: strip comments and blank lines
+critic_commands=()
+while IFS= read -r line; do
+  # Skip comments and blank lines
+  [[ "$line" =~ ^[[:space:]]*# ]] && continue
+  [[ -z "${line// /}" ]] && continue
+  critic_commands+=("$line")
+done < "$CRITIC_CONFIG"
+
+if [ ${#critic_commands[@]} -eq 0 ]; then
+  echo "ERROR: no critic commands found in $CRITIC_CONFIG"
+  exit 10
+fi
+
+echo "Running ${#critic_commands[@]} critic(s) in parallel..."
+
+# Launch all critics in parallel.
+# Each critic's stdout/stderr is captured to a file so output isn't lost
+# when the Bash tool's pipe closes (background processes inherit fd handles
+# that the Bash tool doesn't drain properly).
+critic_pids=()
+critic_output_dir="$state_dir/critic_output"
+mkdir -p "$critic_output_dir"
 set +e
-(cd "$PROJ_DIR" && claude -p "$full_critique_prompt" --allowed-tools "$CRITIQUE_TOOLS")
-critique_exit=$?
+for i in "${!critic_commands[@]}"; do
+  cmd="${critic_commands[$i]}"
+  # Substitute variables
+  cmd="${cmd//\{CRITIQUE_PROMPT\}/$full_critique_prompt}"
+  cmd="${cmd//\{CRITIQUE_TOOLS\}/$CRITIQUE_TOOLS}"
+
+  exit_file="$critic_output_dir/exit_$i"
+  output_file="$critic_output_dir/output_$i"
+  echo ""
+  echo "  [Critic $((i+1))/${#critic_commands[@]}] Launching: ${cmd:0:80}..."
+
+  # Run in background subshell, capture output and exit code to files
+  (
+    cd "$PROJ_DIR" && eval "$cmd" > "$output_file" 2>&1
+    echo $? > "$exit_file"
+  ) &
+  critic_pids+=($!)
+done
+
+# Wait for all critics to finish
+critic_failed=0
+for i in "${!critic_pids[@]}"; do
+  pid="${critic_pids[$i]}"
+  wait "$pid" 2>/dev/null || true
+
+  exit_file="$critic_output_dir/exit_$i"
+  output_file="$critic_output_dir/output_$i"
+
+  # Print this critic's captured output
+  echo ""
+  echo "  --- Critic $((i+1))/${#critic_commands[@]} output ---"
+  if [ -f "$output_file" ]; then
+    cat "$output_file"
+  fi
+
+  if [ -f "$exit_file" ]; then
+    exit_code=$(cat "$exit_file")
+  else
+    exit_code=1
+  fi
+  if [ "$exit_code" -ne 0 ]; then
+    echo ""
+    echo "  WARNING: Critic $((i+1)) exited with code $exit_code"
+    critic_failed=$((critic_failed + 1))
+  fi
+  echo "  --- End critic $((i+1)) ---"
+done
+rm -rf "$critic_output_dir"
 set -e
 
-if [ "$critique_exit" -ne 0 ]; then
+if [ "$critic_failed" -eq "${#critic_commands[@]}" ]; then
   echo ""
-  echo "ERROR: /spec:critique failed with exit code $critique_exit"
+  echo "ERROR: ALL critics failed"
   echo "Aborting round."
   exit 10
+elif [ "$critic_failed" -gt 0 ]; then
+  echo ""
+  echo "  WARNING: $critic_failed of ${#critic_commands[@]} critic(s) failed, continuing with successful ones"
 fi
 
 echo ""
 echo "---"
 
-# --- Step C: Find the new critique file ---
+# --- Step C: Find new critique files ---
 
 echo ""
-echo "[STEP C] (round $round of $max_rounds) Finding critique file..."
+echo "[STEP C] (round $round of $max_rounds) Finding critique files..."
 
 after_critique=$(ls "$CRITIQUES_DIR" 2>/dev/null | sort)
-critique_file=""
+critique_files=()
 
 while IFS= read -r f; do
   if [ -n "$f" ] && [[ "$f" != *acknowledgement* ]]; then
-    critique_file="$CRITIQUES_DIR/$f"
+    critique_files+=("$CRITIQUES_DIR/$f")
     echo "$f" >> "$state_dir/critique_files"
   fi
 done < <(comm -13 <(echo "$before_critique") <(echo "$after_critique"))
 
-if [ -z "$critique_file" ]; then
-  echo "ERROR: no new critique file found after running /spec:critique"
+if [ ${#critique_files[@]} -eq 0 ]; then
+  echo "ERROR: no new critique files found after running critics"
   echo "Files before: $(echo "$before_critique" | tr '\n' ' ')"
   echo "Files after:  $(echo "$after_critique" | tr '\n' ' ')"
   exit 10
 fi
 
-echo "New critique file: $critique_file"
+echo "New critique files (${#critique_files[@]}):"
+for f in "${critique_files[@]}"; do
+  echo "  $f"
+done
 
-# --- Step D: Check exit condition ---
+# --- Step D: Check exit condition (all critics must converge) ---
 
 echo ""
 echo "[STEP D] (round $round of $max_rounds) Checking exit condition..."
 
-set +e
-check_result=$("$CHECK_EXIT" "$critique_file" "$exit_criteria" "$prev_issues_file")
-check_exit_code=$?
-set -e
+# We need a temp file for aggregating issue titles across all critics.
+# check_exit.sh writes to prev_issues_file as a side effect, so we use
+# a per-critic temp file and merge after.
+all_issues_tmp=$(mktemp)
+trap 'rm -f "$CRASH_LOG" "$all_issues_tmp" 2>/dev/null' EXIT
 
-echo "$check_result"
+any_continue=0
+any_stuck=0
+all_converged=1
 
-if [ "$check_exit_code" -eq 1 ]; then
-  # Converged — save state and exit
+for crit_file in "${critique_files[@]}"; do
+  echo ""
+  echo "  Checking: $(basename "$crit_file")"
+
+  # Use a per-critic prev_issues to avoid cross-contamination
+  per_critic_prev=$(mktemp)
+  cp "$prev_issues_file" "$per_critic_prev"
+
+  set +e
+  check_result=$("$CHECK_EXIT" "$crit_file" "$exit_criteria" "$per_critic_prev")
+  check_exit_code=$?
+  set -e
+
+  echo "  $check_result"
+
+  if [ "$check_exit_code" -eq 0 ]; then
+    any_continue=1
+    all_converged=0
+  elif [ "$check_exit_code" -eq 1 ]; then
+    : # converged for this critic
+  elif [ "$check_exit_code" -eq 2 ]; then
+    any_stuck=1
+    all_converged=0
+  else
+    echo "ERROR: check_exit.sh returned unexpected code $check_exit_code"
+    rm -f "$per_critic_prev"
+    exit 10
+  fi
+
+  # Aggregate issue titles for stuck detection in next round
+  # per_critic_prev now contains the sorted issues from this critic
+  cat "$per_critic_prev" >> "$all_issues_tmp"
+  rm -f "$per_critic_prev"
+done
+
+# Save merged issue titles for next round's stuck detection
+sort -u "$all_issues_tmp" > "$prev_issues_file"
+rm -f "$all_issues_tmp"
+
+# Decision: all critics must converge
+if [ "$all_converged" -eq 1 ]; then
+  echo ""
+  echo "ALL critics converged."
   echo "$cumulative_issues $cumulative_applied $cumulative_partial $cumulative_skipped" > "$state_dir/cumulative"
   exit 1
-elif [ "$check_exit_code" -eq 2 ]; then
-  # Stuck — save state and exit
+elif [ "$any_continue" -eq 1 ]; then
+  echo ""
+  echo "Major issues found — continuing to revise."
+elif [ "$any_stuck" -eq 1 ]; then
+  echo ""
+  echo "Stuck — no new issues from any critic."
   echo "$cumulative_issues $cumulative_applied $cumulative_partial $cumulative_skipped" > "$state_dir/cumulative"
   exit 2
-elif [ "$check_exit_code" -ne 0 ]; then
-  echo "ERROR: check_exit.sh returned unexpected code $check_exit_code"
-  exit 10
 fi
 
 # --- Step E: Run revise ---

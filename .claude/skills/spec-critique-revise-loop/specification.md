@@ -1,82 +1,91 @@
-# spec:critique-revise-loop — Deterministic Bash Loop Specification
+# spec:critique-revise-loop — Design Specification
 
 ## Problem
 
-The LLM-driven loop in `spec:critique-revise-loop` repeatedly fails to maintain loop control. After sub-skill invocations (`/spec:critique`, `/spec:revise`), the agent stops despite prompt engineering (step labels, post-skill reminders, sub-skill exit warnings). Natural language loop control is fundamentally unreliable.
+Running `claude -p` as a subprocess from within the Claude Code Bash tool produces no visible output. This is a known TTY dependency issue (GitHub issue #9026) — `claude -p` requires terminal presence even in pipe mode. When spawned as a background or foreground process inside the Bash tool, all stdout is lost, including echo statements before and after the `claude -p` call.
+
+The original architecture used bash scripts (`round.sh`, `loop.sh`) that invoked `claude -p` for critique and revise work. While the scripts executed correctly (files were created, exit codes were correct), no output was visible to the user.
 
 ## Solution
 
-Split execution into per-round bash scripts called individually by the SKILL.md agent:
-1. Each round runs as a separate Bash tool call (~10 minutes)
-2. Output is visible between rounds (not buffered for the entire 40-minute run)
-3. The agent's loop is trivial: just check integer exit codes (0=continue, 1=converged, 2=stuck)
-4. All real logic (critique, exit checking, revision, summary) is in bash scripts
+Use **Task subagents** for all LLM work instead of `claude -p`. The SKILL.md agent drives each round directly:
+
+1. **Critics** launch as parallel Task subagents — Claude critics use native skill invocation, external critics (opencode) use Bash within the subagent
+2. **Revise** launches as a Task subagent running `/spec:revise`
+3. **Deterministic work** (exit checks, file detection, summaries) runs via Bash — these scripts don't invoke `claude -p` so they work fine
+
+This eliminates `claude -p` entirely from the main flow. The Task tool handles all inter-process communication natively.
 
 ## Architecture
 
 ```
-SKILL.md (per-round driver — parses args, calls round.sh in a loop)
-  └── scripts/round.sh (single-round executor)
-        ├── claude -p "/spec:critique ..." (sub-skill via CLI)
-        ├── scripts/check_exit.sh (exit condition checker)
-        ├── claude -p "/spec:revise ..." (sub-skill via CLI)
-        └── scripts/round_summary.sh (parse acknowledgement)
-  └── scripts/report.sh (final report from state dir)
+SKILL.md (loop driver)
+  ├── [parallel] Task subagent: /spec:critique (Claude, model from config)
+  ├── [parallel] Task subagent: opencode (external, via Bash in subagent)
+  ├── Bash: check_exit.sh (deterministic exit condition check)
+  ├── Task subagent: /spec:revise
+  ├── Bash: round_summary.sh (parse acknowledgement files)
+  └── Bash: report.sh (final report from state dir)
 ```
 
-The bash scripts own each round. The LLM owns critique and revise work. Exit conditions are checked deterministically. The SKILL.md agent's only job is to call round.sh repeatedly and check its exit code.
+### Why Task subagents instead of `claude -p`?
 
-### Why per-round execution?
+| Approach | Output visible? | Parallel? | TTY issues? |
+|----------|----------------|-----------|-------------|
+| `claude -p` in Bash tool | No (all lost) | Yes (background `&`) | Yes (known bug) |
+| Task subagents | Yes (returned by Task tool) | Yes (multiple calls in one message) | No |
 
-The Claude Code Bash tool captures all stdout/stderr and only returns it when the command completes. Running `loop.sh` (all rounds in one process) means 40+ minutes of "Running..." with zero visible output. By splitting into per-round calls, output appears every ~10 minutes.
+### Multi-critic config
 
-State persists between rounds via a temporary state directory (`mktemp -d`).
+Critic commands are in `config/critic-commands.conf`:
 
-## Key Design Decisions
+```conf
+skill:opus /spec:critique {CRITIQUE_PROMPT}
+bash opencode run --agent build --model ... "..."
+```
 
-### Sub-skill invocation via `claude -p`
+Format:
+- `skill:<model> <prompt>` — Task subagent with specified model
+- `bash <command>` — Command run via Task subagent's Bash tool
+- `{CRITIQUE_PROMPT}` — substituted with the full critique prompt
 
-Each sub-skill runs as a **non-interactive one-shot** `claude -p` process:
-- Output streams to stdout in real time
-- Exit code indicates success/failure
-- The skill's own `allowed-tools` header restricts tool access
-- `--allowed-tools` on the CLI pre-authorizes tools to avoid interactive prompts
+### Convergence rule
 
-### Exit condition checking is pure bash
+ALL critics must find only minor/no issues to stop. Decision per round:
+- All `check_exit.sh` return 1 → converged
+- Any returns 0 → continue to revise
+- Any returns 2, none return 0 → stuck
 
-- **Issue counting**: `grep -c '## Issue #' critique_file` counts issues
-- **Minor classification**: `awk` scans each issue section for minor/nitpick/cosmetic/trivial/optional keywords
-- **Stuck detection**: `comm -23` compares sorted issue title lists between rounds
+### State management
 
-### State is bash variables
+State persists between rounds via a temporary directory (`mktemp -d`):
 
-- `round` — current round number
-- `prev_issues_file` — tempfile with sorted issue titles from last round
-- `cumulative_*` — running totals across rounds
-- `exit_reason` — converged / stuck / round_limit
+| File | Contents |
+|------|----------|
+| `prev_issues` | Sorted issue titles from previous round (union across all critics) |
+| `cumulative` | `"issues applied partial skipped"` count string |
+| `critique_files` | Newline-separated list of critique files created |
+| `ack_files` | Newline-separated list of acknowledgement files created |
 
-### No `--dangerously-skip-permissions`
+## Exit Conditions (pure bash)
 
-The `--allowed-tools` flag pre-authorizes exactly the tools each sub-skill declares in its YAML frontmatter. This maintains the permission model.
+| Condition | Detection | Script |
+|-----------|-----------|--------|
+| No issues | `grep` finds zero `## Issue #` headings | `check_exit.sh` → exit 1 |
+| All minor | `awk` finds all issues contain minor keywords | `check_exit.sh` → exit 1 |
+| Stuck | `comm -23` shows current ⊆ previous | `check_exit.sh` → exit 2 |
+| Round limit | Loop counter in SKILL.md | N/A |
 
 ## File Inventory
 
 | File | Purpose |
 |------|---------|
-| `SKILL.md` | Per-round driver: parse `$ARGUMENTS`, call `round.sh` in a loop |
-| `scripts/round.sh` | Single-round executor (critique → check → revise → summary) |
-| `scripts/report.sh` | Final report generator (reads state dir) |
-| `scripts/loop.sh` | Full loop driver (used by tests, runs all rounds in one process) |
-| `scripts/check_exit.sh` | Exit condition checker (grep/awk) |
+| `SKILL.md` | Loop driver: parse args, run rounds via Task subagents |
+| `config/critic-commands.conf` | Critic commands (type + command per line) |
+| `scripts/check_exit.sh` | Exit condition checker (grep/awk/comm) |
 | `scripts/round_summary.sh` | Parse acknowledgement files for summary |
+| `scripts/report.sh` | Final report generator (reads state dir) |
+| `scripts/round.sh` | Single-round executor (used by unit tests, uses `claude -p`) |
+| `scripts/loop.sh` | Full loop driver (used by unit tests, uses `claude -p`) |
 | `specification.md` | This file |
 | `README.md` | User-facing documentation |
-
-## Exit Conditions
-
-| Condition | How Detected | Exit Code |
-|-----------|-------------|-----------|
-| Converged (no issues) | `grep` finds zero `## Issue #` headings | `check_exit.sh` returns 1 |
-| Converged (all minor) | `awk` finds all issues contain minor keywords | `check_exit.sh` returns 1 |
-| Stuck | `comm -23` shows current issues are subset of previous | `check_exit.sh` returns 2 |
-| Round limit | `round > max_rounds` in bash | Loop breaks in `loop.sh` |
