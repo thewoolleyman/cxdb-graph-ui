@@ -47,7 +47,10 @@ Read `.claude/skills/spec-critique-revise-loop/config/critic-commands.conf`. Par
 - `skill:<model> <prompt>` — Task subagent critic
 - `bash <command>` — Bash command critic
 
-Substitute `{CRITIQUE_PROMPT}` in each line with the full critique prompt: `/spec:critique {CRITIQUE_PROMPT_ARG}` (or just `/spec:critique` if no extra prompt was given).
+Substitute `{CRITIQUE_PROMPT}` in each line. The expansion differs by critic type:
+
+- **`skill:<model>` critics**: `{CRITIQUE_PROMPT}` → `/spec:critique {CRITIQUE_PROMPT_ARG}` (or just `/spec:critique` if no extra prompt was given). The subagent will invoke the spec:critique skill with the extra instructions as `$ARGUMENTS`.
+- **`bash` critics**: `{CRITIQUE_PROMPT}` → `. Additional instructions: {CRITIQUE_PROMPT_ARG}` (or empty string `""` if no extra prompt was given). This appends the extra instructions inline into the command string.
 
 Print the number of critics found.
 

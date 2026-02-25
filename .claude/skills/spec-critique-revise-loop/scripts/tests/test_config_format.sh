@@ -100,6 +100,7 @@ echo "Test 3: Second critic is bash (opencode)"
 second_line=$(echo "$parsed" | tail -1)
 assert_contains "second line type is bash" "bash -" "$second_line"
 assert_contains "second line has opencode" "opencode" "$second_line"
+assert_contains "second line has CRITIQUE_PROMPT placeholder" "{CRITIQUE_PROMPT}" "$second_line"
 
 # --- Test 4: Comments and blank lines are skipped ---
 
