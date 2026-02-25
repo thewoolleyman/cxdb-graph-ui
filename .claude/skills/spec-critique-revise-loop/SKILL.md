@@ -55,7 +55,16 @@ Print the number of critics found.
 
 For each round from 1 to `{MAX_ROUNDS}`:
 
-When printing each substep header, always include the round info. Format: `Step 4x (round N/MAX_ROUNDS): ...`
+When printing each substep header, include round info and elapsed time. Before each header, get the elapsed time:
+
+```bash
+LOOP_START=$(cat "$STATE_DIR/loop_start")
+ELAPSED=$(bash .claude/skills/spec-critique-revise-loop/scripts/elapsed_time.sh "$LOOP_START")
+```
+
+Then print the header in **bold** with this format: `*Step 4x (round N/MAX_ROUNDS, elapsed MM:SS): Description*`
+
+Example: `*Step 4b (round 2/10, elapsed 15:30): Launch ALL critics in parallel*`
 
 #### Step 4-pre: Check timeouts before starting round
 
