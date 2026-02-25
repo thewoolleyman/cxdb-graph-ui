@@ -48,11 +48,20 @@ REVISE_TOOLS="Read,Write,Edit,Glob,Bash(ls:*),Bash(pwd:*),Bash(date:*)"
 # Allow nested claude invocation (we're called from inside a claude session)
 unset CLAUDECODE 2>/dev/null || true
 
+# --- Log file ---
+# The Bash tool buffers all output until the command finishes (~10 min/round).
+# Tee everything to a log file so the user can `tail -f` it for progress.
+
+LOG_FILE="$PROJ_DIR/specification/critiques/.loop-progress.log"
+
+# Redirect all subsequent stdout+stderr through tee
+exec > >(tee "$LOG_FILE") 2>&1
+
 # --- State ---
 
 round=0
 prev_issues_file=$(mktemp)
-trap 'rm -f "$prev_issues_file"' EXIT
+trap 'rm -f "$prev_issues_file" "$LOG_FILE" 2>/dev/null' EXIT
 
 cumulative_issues=0
 cumulative_applied=0

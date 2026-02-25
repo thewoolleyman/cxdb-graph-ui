@@ -14,7 +14,9 @@ Parse `$ARGUMENTS` for named `KEY=VALUE` parameters. Ignore non-parameter text.
 | `CRITIQUE_PROMPT` | Quoted string | _(empty)_ |
 | `REVISE_PROMPT` | Quoted string | _(empty)_ |
 
-Print the parsed arguments, then run the deterministic bash loop:
+Print the parsed arguments, then run the deterministic bash loop.
+
+**IMPORTANT:** This loop takes approximately 10-15 minutes per round. You MUST set the Bash tool timeout to 600000 (10 minutes per round, maximum 600000ms). Example for 3 rounds:
 
 ```bash
 bash .claude/skills/spec-critique-revise-loop/scripts/loop.sh \
@@ -25,6 +27,8 @@ bash .claude/skills/spec-critique-revise-loop/scripts/loop.sh \
 ```
 
 Omit `--critique-prompt` and `--revise-prompt` flags entirely if their values are empty.
+
+**Progress monitoring:** The script writes real-time progress to `specification/critiques/.loop-progress.log`. Tell the user they can monitor progress in another terminal with: `tail -f specification/critiques/.loop-progress.log`
 
 The bash script handles everything: invoking sub-skills via `claude -p`, checking exit conditions, tracking state, and printing the final report. Do NOT add any loop logic here — just parse args and run the script.
 
