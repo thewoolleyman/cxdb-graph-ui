@@ -18,11 +18,15 @@ run_step() {
   echo
 }
 
-# Go vet
-run_step "go vet" go vet "${REPO_ROOT}/..."
-
-# Go tests
-run_step "go test" go test "${REPO_ROOT}/..."
+# Go vet/test — only run if ui/ exists (created by the Kilroy implement node)
+if [ -d "${REPO_ROOT}/ui" ]; then
+  run_step "go vet" bash -c "cd '${REPO_ROOT}/ui' && go vet ./..."
+  run_step "go test" bash -c "cd '${REPO_ROOT}/ui' && go test ./..."
+else
+  echo "==> go vet/test"
+  echo "    (skipped: ui/ not yet created)"
+  echo
+fi
 
 if [ "$failed" -ne 0 ]; then
   echo "Some steps failed."

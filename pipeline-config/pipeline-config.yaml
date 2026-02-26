@@ -1,0 +1,211 @@
+target: cxdb-graph-ui
+repo_path: .
+output_dot: pipeline.dot
+
+graph_id: cxdb_graph_ui_pipeline
+graph_goal: "a Go HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per the specification at specification/cxdb-graph-ui-spec.md"
+topology: no-fanout
+default_max_retry: 3
+retry_target: implement
+fallback_retry_target: postmortem
+
+nodes:
+  - id: start
+    shape: Mdiamond
+  - id: exit
+    shape: Msquare
+  - id: expand_spec
+    shape: box
+  - id: check_expand_spec
+    shape: diamond
+  - id: implement
+    shape: box
+    class: hard
+  - id: check_implement
+    shape: diamond
+  - id: fix_fmt
+    shape: parallelogram
+  - id: verify_fmt
+    shape: parallelogram
+  - id: check_fmt
+    shape: diamond
+  - id: verify_vet
+    shape: parallelogram
+  - id: check_vet
+    shape: diamond
+  - id: verify_build
+    shape: parallelogram
+  - id: check_build
+    shape: diamond
+  - id: verify_tests
+    shape: parallelogram
+  - id: check_tests
+    shape: diamond
+  - id: review_final
+    shape: box
+    class: verify
+    goal_gate: true
+  - id: postmortem
+    shape: box
+  - id: human_gate
+    shape: hexagon
+    options: "Retry after manual fix,Abort pipeline"
+
+edges:
+  - from: start
+    to: expand_spec
+  - from: expand_spec
+    to: check_expand_spec
+  - from: check_expand_spec
+    to: implement
+    condition: "outcome = success"
+  - from: check_expand_spec
+    to: expand_spec
+    condition: "outcome = fail && context.failure_class = transient_infra"
+    loop_restart: true
+  - from: check_expand_spec
+    to: postmortem
+    condition: "outcome = fail && context.failure_class != transient_infra"
+  - from: check_expand_spec
+    to: postmortem
+  - from: implement
+    to: check_implement
+  - from: check_implement
+    to: fix_fmt
+    condition: "outcome = success"
+  - from: check_implement
+    to: implement
+    condition: "outcome = fail && context.failure_class = transient_infra"
+    loop_restart: true
+  - from: check_implement
+    to: postmortem
+    condition: "outcome = fail && context.failure_class != transient_infra"
+  - from: check_implement
+    to: postmortem
+  - from: fix_fmt
+    to: verify_fmt
+  - from: verify_fmt
+    to: check_fmt
+  - from: check_fmt
+    to: verify_vet
+    condition: "outcome = success"
+  - from: check_fmt
+    to: postmortem
+    condition: "outcome = fail && context.failure_class != transient_infra"
+  - from: check_fmt
+    to: postmortem
+  - from: verify_vet
+    to: check_vet
+  - from: check_vet
+    to: verify_build
+    condition: "outcome = success"
+  - from: check_vet
+    to: postmortem
+    condition: "outcome = fail && context.failure_class != transient_infra"
+  - from: check_vet
+    to: postmortem
+  - from: verify_build
+    to: check_build
+  - from: check_build
+    to: verify_tests
+    condition: "outcome = success"
+  - from: check_build
+    to: postmortem
+    condition: "outcome = fail && context.failure_class != transient_infra"
+  - from: check_build
+    to: postmortem
+  - from: verify_tests
+    to: check_tests
+  - from: check_tests
+    to: review_final
+    condition: "outcome = success"
+  - from: check_tests
+    to: postmortem
+    condition: "outcome = fail && context.failure_class != transient_infra"
+  - from: check_tests
+    to: postmortem
+  - from: review_final
+    to: exit
+    condition: "outcome = success"
+  - from: review_final
+    to: postmortem
+    condition: "outcome = fail"
+  - from: review_final
+    to: postmortem
+  - from: postmortem
+    to: human_gate
+  - from: human_gate
+    to: implement
+    label: "Retry"
+  - from: human_gate
+    to: exit
+    label: "Abort"
+
+goal: |
+  Implement the CXDB Graph UI per the specification at `specification/cxdb-graph-ui-spec.md`.
+
+  The deliverables are two files in `ui/`:
+  - `ui/main.go` — Go HTTP server (standard library only, no external deps)
+  - `ui/index.html` — Browser SPA (single HTML file, inline CSS/JS, CDN-loaded deps)
+  - `ui/go.mod` — Go module file (module name: cxdb-graph-ui, no require directives)
+
+  The server:
+  - Accepts `--port`, `--cxdb` (repeatable), and `--dot` (repeatable) flags
+  - Serves `index.html` (embedded via `//go:embed`)
+  - Serves DOT files at `GET /dots/{name}` (read fresh each request)
+  - Parses and serves node attributes at `GET /dots/{name}/nodes` (JSON)
+  - Parses and serves edges at `GET /dots/{name}/edges` (JSON)
+  - Reverse-proxies CXDB at `GET /api/cxdb/{index}/*`
+  - Serves DOT file list at `GET /api/dots`
+  - Serves CXDB instance list at `GET /api/cxdb/instances`
+
+  The browser SPA:
+  - Renders DOT → SVG via @hpcc-js/wasm-graphviz (esm.sh CDN, pinned version)
+  - Decodes msgpack via @msgpack/msgpack (jsDelivr CDN, pinned version)
+  - Polls CXDB every 3s for execution status and overlays colors onto SVG nodes
+  - Shows a detail panel when a node is clicked
+  - Supports multiple pipeline tabs
+
+rules:
+  - "After default_max_retry exhausted, route to a shape=hexagon human gate instead of failing"
+  - "Human gate question must direct operator to /kilroy:status and .ai/postmortem_latest.md"
+  - "Edge condition expressions MUST have spaces around operators, e.g. context.retry_count >= 3 not context.retry_count>=3"
+  - "The server must use only Go standard library — no external packages, no require directives in go.mod"
+  - "index.html must be a single file with inline CSS and JS — no npm, no bundler, no TypeScript, no framework"
+  - "CDN URLs must be pinned to exact versions as specified in the spec (Section 4.1 and 4.1.1)"
+  - "Both ui/main.go and ui/index.html must be in the ui/ directory (co-located for //go:embed)"
+
+required_gates:
+  - id: fix_fmt
+    tool_command: "mise exec -- sh -c 'cd ui && gofmt -w .'"
+    max_retries: 0
+  - id: verify_fmt
+    tool_command: "mise exec -- sh -c 'out=$(cd ui && gofmt -l .); test -z \"$out\" || { echo \"Files need formatting: $out\"; exit 1; }'"
+    max_retries: 0
+  - id: verify_vet
+    tool_command: "mise exec -- sh -c 'cd ui && go vet ./...'"
+    timeout: "60s"
+  - id: verify_build
+    tool_command: "mise exec -- sh -c 'cd ui && go build ./...'"
+    timeout: "120s"
+  - id: verify_tests
+    tool_command: "mise exec -- sh -c 'cd ui && go test ./...'"
+    timeout: "120s"
+
+expand_spec_prompt: |
+  Read the specification file at `specification/cxdb-graph-ui-spec.md`.
+
+  Copy its content verbatim into `.ai/spec.md`, prepending a header:
+  ```
+  # CXDB Graph UI — Combined Specification
+  Source: specification/cxdb-graph-ui-spec.md
+  Date: <today's date>
+  ```
+
+  Write status to $KILROY_STAGE_STATUS_PATH with schema {"status":"success"}.
+  If $KILROY_STAGE_STATUS_PATH is unavailable, write to $KILROY_STAGE_STATUS_FALLBACK_PATH.
+
+model_stylesheet: |
+  * { llm_model: claude-sonnet-4-6; llm_provider: anthropic; max_tokens: 65536; }
+  .hard { llm_model: claude-sonnet-4-6; llm_provider: anthropic; max_tokens: 65536; }
+  .verify { llm_model: claude-sonnet-4-6; llm_provider: anthropic; max_tokens: 65536; }
