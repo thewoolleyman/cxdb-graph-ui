@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kilroy Pipeline UI</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  background: #f5f5f5;
+  color: #212121;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Top bar */
+#topbar {
+  display: flex;
+  align-items: center;
+  background: #1565c0;
+  color: #fff;
+  padding: 0 12px;
+  height: 40px;
+  flex-shrink: 0;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.tab {
+  padding: 6px 14px;
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+  white-space: nowrap;
+  user-select: none;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid transparent;
+  border-bottom: none;
+  font-size: 13px;
+  color: rgba(255,255,255,0.85);
+  transition: background 0.15s;
+}
+.tab:hover { background: rgba(255,255,255,0.22); }
+.tab.active {
+  background: #f5f5f5;
+  color: #1565c0;
+  font-weight: 600;
+}
+
+#cxdb-indicator {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.15);
+  cursor: default;
+  position: relative;
+}
+#cxdb-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+#cxdb-dot.ok    { background: #69f0ae; }
+#cxdb-dot.warn  { background: #ffee58; }
+#cxdb-dot.error { background: #ef5350; }
+#cxdb-tooltip {
+  display: none;
+  position: absolute;
+  top: 100%; right: 0;
+  margin-top: 4px;
+  background: #212121;
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  white-space: pre;
+  font-size: 11px;
+  z-index: 100;
+}
+#cxdb-indicator:hover #cxdb-tooltip { display: block; }
+
+/* Main content area */
+#content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+#graph-area {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  background: #fff;
+  position: relative;
+}
+
+#graph-area svg {
+  max-width: 100%;
+  height: auto;
+  cursor: pointer;
+}
+
+#graph-msg {
+  color: #555;
+  font-size: 14px;
+  padding: 32px;
+}
+
+/* Detail panel */
+#detail-panel {
+  width: 380px;
+  min-width: 280px;
+  max-width: 50vw;
+  background: #fafafa;
+  border-left: 1px solid #ddd;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+#detail-panel.open { display: flex; }
+
+#detail-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  background: #e8eaf6;
+  border-bottom: 1px solid #c5cae9;
+  gap: 8px;
+}
+#detail-title {
+  font-weight: 600;
+  font-size: 14px;
+  flex: 1;
+  word-break: break-all;
+}
+#detail-close {
+  cursor: pointer;
+  font-size: 18px;
+  color: #555;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+#detail-close:hover { background: rgba(0,0,0,0.1); }
+
+#detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+}
+
+.detail-section { margin-bottom: 16px; }
+.detail-section-title {
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #666;
+  margin-bottom: 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #e0e0e0;
+}
+.detail-row { margin-bottom: 5px; }
+.detail-label { font-weight: 600; color: #444; font-size: 12px; }
+.detail-value {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  color: #212121;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 3px;
+  padding: 4px 6px;
+  margin-top: 2px;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+}
+
+/* CXDB turns table */
+.turns-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.turns-table th {
+  background: #e8eaf6;
+  text-align: left;
+  padding: 4px 6px;
+  font-weight: 600;
+  font-size: 11px;
+  border-bottom: 1px solid #c5cae9;
+  white-space: nowrap;
+}
+.turns-table td {
+  padding: 3px 6px;
+  vertical-align: top;
+  border-bottom: 1px solid #f0f0f0;
+}
+.turn-error { background: #fff3f3; }
+.turn-output {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-size: 11px;
+}
+.show-more-btn {
+  background: none;
+  border: none;
+  color: #1565c0;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+  margin-top: 2px;
+  text-decoration: underline;
+}
+.truncation-note {
+  font-size: 10px;
+  color: #888;
+  font-style: italic;
+}
+
+/* Status badge in detail */
+.status-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.status-badge.pending  { background: #e0e0e0; color: #555; }
+.status-badge.running  { background: #90caf9; color: #0d47a1; }
+.status-badge.complete { background: #a5d6a7; color: #1b5e20; }
+.status-badge.error    { background: #ef9a9a; color: #b71c1c; }
+.status-badge.stale    { background: #ffcc80; color: #e65100; }
+
+/* SVG node status colors */
+.node-pending polygon,  .node-pending ellipse,  .node-pending path  { fill: #e0e0e0 !important; stroke: #9e9e9e !important; }
+.node-running polygon,  .node-running ellipse,  .node-running path  { fill: #90caf9 !important; stroke: #1565c0 !important; animation: pulse 1.5s infinite; }
+.node-complete polygon, .node-complete ellipse, .node-complete path { fill: #a5d6a7 !important; stroke: #2e7d32 !important; }
+.node-error polygon,    .node-error ellipse,    .node-error path    { fill: #ef9a9a !important; stroke: #c62828 !important; }
+.node-stale polygon,    .node-stale ellipse,    .node-stale path    { fill: #ffcc80 !important; stroke: #e65100 !important; }
+.node-selected polygon, .node-selected ellipse, .node-selected path { stroke-width: 2.5px !important; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
+/* Stalled pipeline warning */
+#stalled-warning {
+  display: none;
+  background: #fff3e0;
+  border: 1px solid #ffe082;
+  color: #e65100;
+  padding: 5px 12px;
+  font-size: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div id="tabs"></div>
+  <div id="cxdb-indicator">
+    <div id="cxdb-dot" class="error"></div>
+    <span id="cxdb-text">CXDB connecting...</span>
+    <div id="cxdb-tooltip"></div>
+  </div>
+</div>
+
+<div id="stalled-warning">⚠ Pipeline stalled — no active sessions.</div>
+
+<div id="content">
+  <div id="graph-area">
+    <div id="graph-msg">Loading Graphviz...</div>
+  </div>
+
+  <div id="detail-panel">
+    <div id="detail-header">
+      <div id="detail-title">Node</div>
+      <div id="detail-close" title="Close">×</div>
+    </div>
+    <div id="detail-body"></div>
+  </div>
+</div>
+
+<script type="module">
+import { Graphviz } from "https://esm.sh/@hpcc-js/wasm-graphviz@1.6.1";
+import { decode } from "https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-beta2/dist.es5+esm/mod.min.mjs";
+
+// ─── Constants ──────────────────────────────────────────────────────────────
+const POLL_INTERVAL_MS = 3000;
+const TURN_FETCH_LIMIT = 100;
+const MAX_GAP_PAGES = 10;
+const NULL_TAG_BATCH_SIZE = 5;
+const PAGE_SIZE = 100;
+const MAX_PAGES = 50;
+const STATUS_CLASSES = ["node-pending","node-running","node-complete","node-error","node-stale"];
+const CONTEXT_PRECEDENCE = { "error": 3, "complete": 2, "running": 1, "pending": 0 };
+const MERGE_PRECEDENCE   = { "error": 3, "running": 2, "complete": 1, "pending": 0 };
+
+const SHAPE_TO_TYPE = {
+  "Mdiamond": "Start", "circle": "Start",
+  "Msquare": "Exit",   "doublecircle": "Exit",
+  "box": "LLM Task",   "diamond": "Conditional",
+  "parallelogram": "Tool Gate", "hexagon": "Human Gate",
+  "component": "Parallel", "tripleoctagon": "Parallel Fan-in",
+  "house": "Stack Manager Loop",
+};
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let gv = null;               // Graphviz WASM instance
+let activePipeline = null;   // current tab name (filename)
+let cxdbInstances = [];      // array of {index, url}
+
+// Per-pipeline state keyed by filename
+const pipelines = {};        // name -> { graphId, dotNodeIds:Set, edges:[], svgEl:null, mergedStatusMap:{} }
+
+// Discovery state
+const knownMappings = {};    // "(cxdbIndex,contextId)" -> {graphName, runId} | null
+const cachedContextLists = {}; // cxdbIndex -> []
+const instanceReachable = {}; // cxdbIndex -> bool
+const cqlSupported = {};     // cxdbIndex -> bool | undefined
+const previousActiveRunIds = {}; // graphId -> runId
+// Per-context status & cursor
+const contextStatusMaps = {}; // "(cxdbIndex,contextId)" -> {nodeId: NodeStatus}
+const lastSeenTurnIds = {};   // "(cxdbIndex,contextId)" -> turn_id string | null
+const turnCache = {};         // "(cxdbIndex,contextId)" -> turns array
+
+// Detail panel state
+let selectedNodeId = null;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function numId(id) { return parseInt(id, 10); }
+function ctxKey(i, id) { return i + "," + id; }
+
+function base64ToBytes(b64) {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function normalizeGraphId(dotSrc) {
+  const m = dotSrc.match(/^\s*(strict\s+)?(di)?graph\s+("(?:[^"\\]|\\.)*"|\w+)/m);
+  if (!m) return null;
+  let id = m[3];
+  if (id.startsWith('"') && id.endsWith('"')) {
+    id = id.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+  }
+  return id.trim();
+}
+
+function strPtr(s) { return s === null || s === undefined ? null : s; }
+
+// ─── Initialization ───────────────────────────────────────────────────────────
+async function init() {
+  // Step 1: Load Graphviz WASM
+  try {
+    gv = await Graphviz.load();
+  } catch (e) {
+    showGraphMsg("Failed to load Graphviz WASM: " + e.message);
+  }
+
+  // Steps 2+3 in parallel
+  const [dotsRes, instancesRes] = await Promise.allSettled([
+    fetch("/api/dots").then(r => r.json()),
+    fetch("/api/cxdb/instances").then(r => r.json()),
+  ]);
+
+  const dotList = (dotsRes.status === "fulfilled" && dotsRes.value.dots) ? dotsRes.value.dots : [];
+  if (instancesRes.status === "fulfilled" && instancesRes.value.instances) {
+    cxdbInstances = instancesRes.value.instances.map((url, i) => ({ index: i, url }));
+  } else {
+    cxdbInstances = [{ index: 0, url: "http://127.0.0.1:9110" }];
+  }
+
+  // Build tab bar
+  buildTabs(dotList);
+
+  // Step 4: prefetch node IDs and edges for all pipelines
+  if (dotList.length > 0) {
+    await Promise.allSettled(dotList.map(name => prefetchPipeline(name)));
+  }
+
+  // Step 5: Render first pipeline
+  if (dotList.length > 0) {
+    await switchPipeline(dotList[0]);
+  }
+
+  // Step 6: Start polling
+  pollCycle();
+}
+
+async function prefetchPipeline(name) {
+  if (!pipelines[name]) {
+    pipelines[name] = { graphId: name, dotNodeIds: new Set(), edges: [], svgEl: null, mergedStatusMap: {} };
+  }
+  const [nodesRes, edgesRes] = await Promise.allSettled([
+    fetch("/dots/" + name + "/nodes").then(r => r.ok ? r.json() : Promise.reject(r.status)),
+    fetch("/dots/" + name + "/edges").then(r => r.ok ? r.json() : Promise.reject(r.status)),
+  ]);
+  if (nodesRes.status === "fulfilled") {
+    pipelines[name].dotNodeIds = new Set(Object.keys(nodesRes.value));
+    pipelines[name].nodeAttrs = nodesRes.value;
+  } else {
+    console.warn("Failed to prefetch nodes for", name, nodesRes.reason);
+  }
+  if (edgesRes.status === "fulfilled") {
+    pipelines[name].edges = edgesRes.value;
+  } else {
+    console.warn("Failed to prefetch edges for", name, edgesRes.reason);
+  }
+}
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+function buildTabs(dotList) {
+  const tabsEl = document.getElementById("tabs");
+  tabsEl.innerHTML = "";
+  for (const name of dotList) {
+    const tab = document.createElement("div");
+    tab.className = "tab";
+    tab.textContent = name; // will be updated to graph ID when DOT is fetched
+    tab.dataset.name = name;
+    tab.addEventListener("click", () => switchPipeline(name));
+    tabsEl.appendChild(tab);
+    if (!pipelines[name]) {
+      pipelines[name] = { graphId: name, dotNodeIds: new Set(), edges: [], svgEl: null, mergedStatusMap: {}, nodeAttrs: {} };
+    }
+  }
+}
+
+function setActiveTab(name) {
+  const tabs = document.querySelectorAll(".tab");
+  tabs.forEach(t => t.classList.toggle("active", t.dataset.name === name));
+}
+
+function updateTabLabel(name, label) {
+  const tab = document.querySelector(`.tab[data-name="${CSS.escape(name)}"]`);
+  if (tab) tab.textContent = label; // safe: textContent assignment
+}
+
+// ─── Pipeline switch ──────────────────────────────────────────────────────────
+async function switchPipeline(name) {
+  activePipeline = name;
+  setActiveTab(name);
+
+  // Re-fetch nodes/edges on tab switch
+  const [nodesRes, edgesRes] = await Promise.allSettled([
+    fetch("/dots/" + name + "/nodes").then(r => r.ok ? r.json() : Promise.reject(r.status)),
+    fetch("/dots/" + name + "/edges").then(r => r.ok ? r.json() : Promise.reject(r.status)),
+  ]);
+  if (nodesRes.status === "fulfilled") {
+    const oldIds = pipelines[name]?.dotNodeIds ?? new Set();
+    const newIds = new Set(Object.keys(nodesRes.value));
+    // Reconcile per-context maps if node IDs changed
+    if ([...oldIds].some(id => !newIds.has(id)) || [...newIds].some(id => !oldIds.has(id))) {
+      reconcileNodeIds(name, newIds);
+    }
+    if (pipelines[name]) {
+      pipelines[name].dotNodeIds = newIds;
+      pipelines[name].nodeAttrs = nodesRes.value;
+    }
+  } else {
+    console.warn("Failed to fetch nodes for", name);
+  }
+  if (edgesRes.status === "fulfilled" && pipelines[name]) {
+    pipelines[name].edges = edgesRes.value;
+  } else {
+    console.warn("Failed to fetch edges for", name);
+  }
+
+  // Render DOT
+  showGraphMsg("Loading...");
+  try {
+    const resp = await fetch("/dots/" + name);
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const dotSrc = await resp.text();
+    // Extract graph ID and update tab label
+    const gid = normalizeGraphId(dotSrc);
+    if (gid && pipelines[name]) {
+      pipelines[name].graphId = gid;
+      updateTabLabel(name, gid);
+    }
+    renderSVG(name, dotSrc);
+  } catch (e) {
+    showGraphMsg("Error loading DOT file: " + e.message);
+  }
+}
+
+function reconcileNodeIds(pipelineName, newIds) {
+  // For each context status map, prune removed nodes, add new ones
+  for (const key of Object.keys(contextStatusMaps)) {
+    const map = contextStatusMaps[key];
+    for (const nodeId of Object.keys(map)) {
+      if (!newIds.has(nodeId)) delete map[nodeId];
+    }
+    for (const nodeId of newIds) {
+      if (!(nodeId in map)) {
+        map[nodeId] = { status: "pending", lastTurnId: null, toolName: null, turnCount: 0, errorCount: 0, hasLifecycleResolution: false };
+      }
+    }
+  }
+}
+
+// ─── SVG rendering ───────────────────────────────────────────────────────────
+function renderSVG(pipelineName, dotSrc) {
+  const graphArea = document.getElementById("graph-area");
+  if (!gv) {
+    showGraphMsg("Graphviz WASM not loaded.");
+    return;
+  }
+  let svg;
+  try {
+    svg = gv.layout(dotSrc, "svg", "dot");
+  } catch (e) {
+    showGraphMsg("Graphviz error: " + e.message);
+    return;
+  }
+  graphArea.innerHTML = "";
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = svg;
+  const svgEl = wrapper.querySelector("svg");
+  if (!svgEl) {
+    showGraphMsg("No SVG produced.");
+    return;
+  }
+  // Make SVG interactive
+  svgEl.style.cursor = "pointer";
+  // Attach click handlers to nodes
+  svgEl.querySelectorAll("g.node").forEach(g => {
+    g.style.cursor = "pointer";
+    g.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const titleEl = g.querySelector("title");
+      if (titleEl) {
+        const nodeId = titleEl.textContent.trim();
+        openDetailPanel(nodeId);
+        highlightNode(svgEl, nodeId);
+      }
+    });
+  });
+  // Click on SVG background closes panel
+  svgEl.addEventListener("click", () => closeDetailPanel());
+  graphArea.appendChild(svgEl);
+  if (pipelines[pipelineName]) pipelines[pipelineName].svgEl = svgEl;
+
+  // Apply cached status if available
+  const mergedMap = pipelines[pipelineName]?.mergedStatusMap ?? {};
+  applyStatusToSVG(svgEl, mergedMap);
+}
+
+function showGraphMsg(msg) {
+  const graphArea = document.getElementById("graph-area");
+  graphArea.innerHTML = `<div id="graph-msg">${esc(msg)}</div>`;
+  if (activePipeline && pipelines[activePipeline]) pipelines[activePipeline].svgEl = null;
+}
+
+function highlightNode(svgEl, nodeId) {
+  svgEl.querySelectorAll("g.node").forEach(g => g.classList.remove("node-selected"));
+  const target = findNodeG(svgEl, nodeId);
+  if (target) target.classList.add("node-selected");
+}
+
+function findNodeG(svgEl, nodeId) {
+  if (!svgEl) return null;
+  for (const g of svgEl.querySelectorAll("g.node")) {
+    const titleEl = g.querySelector("title");
+    if (titleEl && titleEl.textContent.trim() === nodeId) return g;
+  }
+  return null;
+}
+
+// ─── Status overlay ───────────────────────────────────────────────────────────
+function applyStatusToSVG(svgEl, mergedMap) {
+  if (!svgEl) return;
+  svgEl.querySelectorAll("g.node").forEach(g => {
+    const titleEl = g.querySelector("title");
+    if (!titleEl) return;
+    const nodeId = titleEl.textContent.trim();
+    const status = mergedMap[nodeId]?.status ?? "pending";
+    g.setAttribute("data-status", status);
+    g.classList.remove(...STATUS_CLASSES);
+    g.classList.add("node-" + status);
+  });
+}
+
+// ─── CXDB polling ─────────────────────────────────────────────────────────────
+async function pollCycle() {
+  try {
+    await doPoll();
+  } catch (e) {
+    console.error("Poll error:", e);
+  }
+  setTimeout(pollCycle, POLL_INTERVAL_MS);
+}
+
+async function doPoll() {
+  // Step 1: Fetch Kilroy contexts from all CXDB instances in parallel
+  const contextFetches = cxdbInstances.map(inst => fetchKilroyContexts(inst.index));
+  const contextResults = await Promise.allSettled(contextFetches);
+
+  let anyReachable = false;
+  let reachableCount = 0;
+  const unreachableURLs = [];
+
+  for (let i = 0; i < cxdbInstances.length; i++) {
+    const result = contextResults[i];
+    if (result.status === "fulfilled" && result.value !== null) {
+      const wasUnreachable = instanceReachable[i] === false;
+      if (wasUnreachable) {
+        cqlSupported[i] = undefined; // reset on reconnect
+      }
+      instanceReachable[i] = true;
+      cachedContextLists[i] = result.value;
+      reachableCount++;
+      anyReachable = true;
+    } else {
+      instanceReachable[i] = false;
+      unreachableURLs.push(cxdbInstances[i].url);
+      // Retain cached context list
+    }
+  }
+
+  // Update CXDB indicator
+  updateCXDBIndicator(reachableCount, cxdbInstances.length, unreachableURLs);
+
+  // Step 2: Pipeline discovery
+  await discoverPipelines();
+
+  // Step 3: Determine active runs
+  const activeContextsByPipeline = determineActiveRuns();
+
+  // Step 4+5: Fetch turns for all active contexts
+  const allActiveContexts = [];
+  for (const gid of Object.keys(activeContextsByPipeline)) {
+    for (const ctx of (activeContextsByPipeline[gid] || [])) {
+      allActiveContexts.push(ctx);
+    }
+  }
+
+  // Fetch turns in parallel
+  const turnFetches = allActiveContexts.map(ctx =>
+    fetchContextTurns(ctx.index, ctx.contextId)
+  );
+  await Promise.allSettled(turnFetches);
+
+  // Step 6: Update status maps and apply overlay for all pipelines
+  for (const pipelineName of Object.keys(pipelines)) {
+    const pipeline = pipelines[pipelineName];
+    const gid = pipeline.graphId;
+    const activeContexts = activeContextsByPipeline[gid] || [];
+    if (pipeline.dotNodeIds.size === 0) continue;
+
+    // Update per-context status maps
+    for (const ctx of activeContexts) {
+      const key = ctxKey(ctx.index, ctx.contextId);
+      if (!contextStatusMaps[key]) {
+        contextStatusMaps[key] = {};
+      }
+      const turns = turnCache[key] || [];
+      const result = updateContextStatusMap(contextStatusMaps[key], pipeline.dotNodeIds, turns, lastSeenTurnIds[key] ?? null);
+      contextStatusMaps[key] = result.map;
+      lastSeenTurnIds[key] = result.newLastSeenTurnId;
+    }
+
+    // Merge
+    const perContextMaps = activeContexts.map(ctx => contextStatusMaps[ctxKey(ctx.index, ctx.contextId)] || {});
+    let merged = mergeStatusMaps(pipeline.dotNodeIds, perContextMaps);
+
+    // Apply error heuristic
+    const perContextCaches = activeContexts.map(ctx => turnCache[ctxKey(ctx.index, ctx.contextId)] || []);
+    merged = applyErrorHeuristic(merged, pipeline.dotNodeIds, perContextCaches);
+
+    // Stale detection
+    const pipelineIsLive = checkPipelineLiveness(activeContexts);
+    merged = applyStaleDetection(merged, pipeline.dotNodeIds, pipelineIsLive);
+
+    // Check for stall warning
+    if (pipelineName === activePipeline) {
+      const hasStale = Object.values(merged).some(ns => ns.status === "stale");
+      document.getElementById("stalled-warning").style.display = hasStale ? "block" : "none";
+    }
+
+    pipeline.mergedStatusMap = merged;
+  }
+
+  // Step 7: Apply CSS to active pipeline
+  if (activePipeline && pipelines[activePipeline]) {
+    const svgEl = pipelines[activePipeline].svgEl;
+    if (svgEl) {
+      applyStatusToSVG(svgEl, pipelines[activePipeline].mergedStatusMap);
+    }
+  }
+
+  // Refresh detail panel if open
+  if (selectedNodeId) {
+    renderDetailPanel(selectedNodeId);
+  }
+}
+
+// ─── CXDB context fetching ────────────────────────────────────────────────────
+async function fetchKilroyContexts(index) {
+  // Try CQL first
+  if (cqlSupported[index] !== false) {
+    try {
+      const url = `/api/cxdb/${index}/v1/contexts/search?q=` + encodeURIComponent('tag ^= "kilroy/"');
+      const resp = await fetch(url);
+      if (resp.status === 404) {
+        cqlSupported[index] = false;
+        // Fall through to fallback
+      } else if (resp.status === 400) {
+        const body = await resp.json().catch(() => ({}));
+        console.warn("CQL query error on instance", index, ":", body.error);
+        return null; // skip this instance this cycle
+      } else if (!resp.ok) {
+        return null; // unreachable
+      } else {
+        cqlSupported[index] = true;
+        const data = await resp.json();
+        let contexts = data.contexts || [];
+
+        // Always run supplemental context list fetch
+        const supplemental = await fetchContextListFallback(index);
+        if (supplemental) {
+          const cqlIds = new Set(contexts.map(c => c.context_id));
+          const nullTagCandidates = [];
+          for (const ctx of supplemental) {
+            if (ctx.client_tag && ctx.client_tag.startsWith("kilroy/")) {
+              if (!cqlIds.has(ctx.context_id)) {
+                contexts.push(ctx);
+                cqlIds.add(ctx.context_id);
+              }
+            } else if (ctx.client_tag == null) {
+              nullTagCandidates.push(ctx);
+            }
+          }
+          // Store null-tag candidates for discovery
+          if (!cachedContextLists._nullTagCandidates) cachedContextLists._nullTagCandidates = {};
+          cachedContextLists._nullTagCandidates[index] = nullTagCandidates;
+        }
+        return contexts;
+      }
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Fallback
+  const result = await fetchContextListFallback(index);
+  return result;
+}
+
+async function fetchContextListFallback(index) {
+  try {
+    const resp = await fetch(`/api/cxdb/${index}/v1/contexts?limit=10000`);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.contexts || [];
+  } catch (e) {
+    return null;
+  }
+}
+
+// ─── Pipeline discovery ───────────────────────────────────────────────────────
+async function discoverPipelines() {
+  for (let i = 0; i < cxdbInstances.length; i++) {
+    if (instanceReachable[i] === false) continue;
+    const contexts = cachedContextLists[i] || [];
+    const nullTagCandidates = [];
+
+    for (const ctx of contexts) {
+      const key = ctxKey(i, ctx.context_id);
+      if (key in knownMappings) continue;
+
+      if (cqlSupported[i] === false) {
+        // Fallback path: client-side filter
+        if (ctx.client_tag && !ctx.client_tag.startsWith("kilroy/")) {
+          knownMappings[key] = null;
+          continue;
+        }
+        if (ctx.client_tag == null) {
+          nullTagCandidates.push(ctx);
+          continue;
+        }
+      }
+
+      // Fetch first turn
+      try {
+        const firstTurn = await fetchFirstTurn(i, ctx.context_id, ctx.head_depth || 0);
+        if (firstTurn === null) continue; // empty context, retry later
+        if (firstTurn.declared_type.type_id === "com.kilroy.attractor.RunStarted") {
+          const graphName = firstTurn.data?.graph_name;
+          const runId = firstTurn.data?.run_id;
+          if (!graphName) {
+            knownMappings[key] = null;
+            continue;
+          }
+          knownMappings[key] = { graphName, runId };
+        } else {
+          knownMappings[key] = null;
+        }
+      } catch (e) {
+        // Transient error - don't cache
+        continue;
+      }
+    }
+
+    // Process null-tag candidates from supplemental fetch
+    const supplementalNulls = (cachedContextLists._nullTagCandidates || {})[i] || [];
+    const combined = [...nullTagCandidates, ...supplementalNulls];
+    combined.sort((a, b) => numId(b.context_id) - numId(a.context_id));
+
+    let nullTagProcessed = 0;
+    for (const ctx of combined) {
+      if (nullTagProcessed >= NULL_TAG_BATCH_SIZE) break;
+      const key = ctxKey(i, ctx.context_id);
+      if (key in knownMappings) continue;
+
+      nullTagProcessed++;
+      try {
+        const firstTurn = await fetchFirstTurn(i, ctx.context_id, ctx.head_depth || 0);
+        if (firstTurn === null) continue;
+        if (firstTurn.declared_type.type_id === "com.kilroy.attractor.RunStarted") {
+          const graphName = firstTurn.data?.graph_name;
+          const runId = firstTurn.data?.run_id;
+          if (!graphName) { knownMappings[key] = null; continue; }
+          knownMappings[key] = { graphName, runId };
+        } else {
+          knownMappings[key] = null;
+        }
+      } catch (e) {
+        // Transient
+      }
+    }
+  }
+}
+
+async function fetchFirstTurn(cxdbIndex, contextId, headDepth) {
+  if (headDepth === 0) {
+    const resp = await fetch(`/api/cxdb/${cxdbIndex}/v1/contexts/${contextId}/turns?limit=1&view=raw`);
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const data = await resp.json();
+    if (!data.turns || data.turns.length === 0) return null;
+    if (data.turns[0].depth === 0) return decodeFirstTurn(data.turns[0]);
+    // Fall through to pagination
+  }
+
+  let cursor = 0;
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    let url = `/api/cxdb/${cxdbIndex}/v1/contexts/${contextId}/turns?limit=${PAGE_SIZE}&view=raw`;
+    if (cursor !== 0) url += `&before_turn_id=${cursor}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const data = await resp.json();
+    if (!data.turns || data.turns.length === 0) return null;
+    if (data.turns[0].depth === 0) return decodeFirstTurn(data.turns[0]);
+    cursor = data.turns[0].turn_id;
+    if (cursor == null) return null;
+  }
+  console.warn(`Discovery deferred: context ${contextId} on instance ${cxdbIndex} exceeds MAX_PAGES pagination cap`);
+  return null;
+}
+
+function decodeFirstTurn(rawTurn) {
+  const typeId = rawTurn.declared_type?.type_id;
+  if (typeId !== "com.kilroy.attractor.RunStarted") {
+    return { declared_type: rawTurn.declared_type, data: null };
+  }
+  const bytes = base64ToBytes(rawTurn.bytes_b64);
+  const payload = decode(bytes);
+  return {
+    declared_type: rawTurn.declared_type,
+    data: {
+      graph_name: payload["8"] ?? payload[8] ?? null,
+      run_id: payload["1"] ?? payload[1] ?? null,
+    }
+  };
+}
+
+// ─── Active run determination ──────────────────────────────────────────────────
+function determineActiveRuns() {
+  const result = {};
+  for (const pipelineName of Object.keys(pipelines)) {
+    const pipeline = pipelines[pipelineName];
+    const gid = pipeline.graphId;
+    const candidates = [];
+    for (const [key, mapping] of Object.entries(knownMappings)) {
+      if (!mapping) continue;
+      if (mapping.graphName !== gid) continue;
+      const [idxStr, contextId] = key.split(",");
+      candidates.push({ index: parseInt(idxStr, 10), contextId, runId: mapping.runId });
+    }
+    if (candidates.length === 0) { result[gid] = []; continue; }
+
+    // Group by runId, find max (ULID lex order = newest)
+    const runGroups = {};
+    for (const c of candidates) {
+      if (!runGroups[c.runId]) runGroups[c.runId] = [];
+      runGroups[c.runId].push(c);
+    }
+    let activeRunId = null;
+    for (const runId of Object.keys(runGroups)) {
+      if (activeRunId === null || runId > activeRunId) activeRunId = runId;
+    }
+
+    // Detect run change
+    if (previousActiveRunIds[gid] != null && previousActiveRunIds[gid] !== activeRunId) {
+      resetPipelineState(gid);
+    }
+    previousActiveRunIds[gid] = activeRunId;
+    result[gid] = runGroups[activeRunId] || [];
+  }
+  return result;
+}
+
+function resetPipelineState(graphId) {
+  // Clear per-context status maps and cursors for all contexts of this pipeline
+  for (const [key, mapping] of Object.entries(knownMappings)) {
+    if (!mapping || mapping.graphName !== graphId) continue;
+    delete contextStatusMaps[key];
+    delete lastSeenTurnIds[key];
+    delete turnCache[key];
+  }
+  // Clear merged status map for all pipelines with this graphId
+  for (const pipelineName of Object.keys(pipelines)) {
+    if (pipelines[pipelineName].graphId === graphId) {
+      pipelines[pipelineName].mergedStatusMap = {};
+    }
+  }
+}
+
+function checkPipelineLiveness(activeContexts) {
+  for (const ctx of activeContexts) {
+    const list = cachedContextLists[ctx.index] || [];
+    const found = list.find(c => c.context_id === ctx.contextId);
+    if (found && found.is_live === true) return true;
+  }
+  return false;
+}
+
+// ─── Turn fetching ─────────────────────────────────────────────────────────────
+async function fetchContextTurns(cxdbIndex, contextId) {
+  const key = ctxKey(cxdbIndex, contextId);
+  try {
+    const resp = await fetch(`/api/cxdb/${cxdbIndex}/v1/contexts/${contextId}/turns?limit=${TURN_FETCH_LIMIT}`);
+    if (!resp.ok) return; // skip, retain cache
+    const data = await resp.json();
+    let turns = data.turns || [];
+
+    // Gap recovery
+    const lastSeen = lastSeenTurnIds[key];
+    if (turns.length > 0 && lastSeen != null) {
+      const oldestFetched = turns[0].turn_id;
+      if (numId(oldestFetched) > numId(lastSeen) && data.next_before_turn_id != null) {
+        const recovered = await recoverGap(cxdbIndex, contextId, data.next_before_turn_id, lastSeen);
+        turns = recovered.concat(turns);
+      }
+    }
+
+    turnCache[key] = turns;
+  } catch (e) {
+    // retain cache
+  }
+}
+
+async function recoverGap(cxdbIndex, contextId, startCursor, lastSeenTurnId) {
+  const recovered = [];
+  let cursor = startCursor;
+  let pagesFetched = 0;
+  while (cursor != null && pagesFetched < MAX_GAP_PAGES) {
+    try {
+      const resp = await fetch(`/api/cxdb/${cxdbIndex}/v1/contexts/${contextId}/turns?limit=100&before_turn_id=${cursor}`);
+      if (!resp.ok) break;
+      const data = await resp.json();
+      pagesFetched++;
+      if (!data.turns || data.turns.length === 0) break;
+      recovered.unshift(...data.turns); // prepend to maintain oldest-first
+      const oldest = data.turns[0].turn_id;
+      if (numId(oldest) <= numId(lastSeenTurnId)) break;
+      cursor = data.next_before_turn_id;
+    } catch (e) {
+      break;
+    }
+  }
+  return recovered;
+}
+
+// ─── Status map update ─────────────────────────────────────────────────────────
+function updateContextStatusMap(existingMap, dotNodeIds, turns, lastSeenTurnId) {
+  // Prune removed nodes
+  for (const nodeId of Object.keys(existingMap)) {
+    if (!dotNodeIds.has(nodeId)) delete existingMap[nodeId];
+  }
+  // Initialize new nodes
+  for (const nodeId of dotNodeIds) {
+    if (!(nodeId in existingMap)) {
+      existingMap[nodeId] = { status: "pending", lastTurnId: null, toolName: null, turnCount: 0, errorCount: 0, hasLifecycleResolution: false };
+    }
+  }
+
+  // Compute new last seen turn id
+  let newLastSeenTurnId = lastSeenTurnId;
+  for (const turn of turns) {
+    if (newLastSeenTurnId === null || numId(turn.turn_id) > numId(newLastSeenTurnId)) {
+      newLastSeenTurnId = turn.turn_id;
+    }
+  }
+
+  for (const turn of turns) {
+    if (lastSeenTurnId !== null && numId(turn.turn_id) <= numId(lastSeenTurnId)) continue;
+
+    const nodeId = turn.data?.node_id;
+    const typeId = turn.declared_type?.type_id;
+    if (!nodeId || !dotNodeIds.has(nodeId)) continue;
+
+    let newStatus = null;
+    let isLifecycle = false;
+
+    if (typeId === "com.kilroy.attractor.StageFinished") {
+      isLifecycle = true;
+      existingMap[nodeId].hasLifecycleResolution = true;
+      newStatus = turn.data.status === "fail" ? "error" : "complete";
+    } else if (typeId === "com.kilroy.attractor.StageFailed") {
+      if (turn.data.will_retry === true) {
+        newStatus = "running";
+        // not lifecycle
+      } else {
+        isLifecycle = true;
+        existingMap[nodeId].hasLifecycleResolution = true;
+        newStatus = "error";
+      }
+    } else if (typeId === "com.kilroy.attractor.RunFailed") {
+      isLifecycle = true;
+      existingMap[nodeId].hasLifecycleResolution = true;
+      newStatus = "error";
+    } else if (typeId === "com.kilroy.attractor.StageStarted") {
+      newStatus = "running";
+    } else {
+      newStatus = "running"; // non-lifecycle turns imply running
+    }
+
+    // Promote status
+    if (isLifecycle) {
+      existingMap[nodeId].status = newStatus;
+    } else if (!existingMap[nodeId].hasLifecycleResolution) {
+      if (newStatus === "error" || CONTEXT_PRECEDENCE[newStatus] > CONTEXT_PRECEDENCE[existingMap[nodeId].status]) {
+        existingMap[nodeId].status = newStatus;
+      }
+    }
+
+    if (turn.data?.is_error === true) existingMap[nodeId].errorCount++;
+    existingMap[nodeId].turnCount++;
+    if (existingMap[nodeId].toolName === null && turn.data?.tool_name) {
+      existingMap[nodeId].toolName = turn.data.tool_name;
+    }
+    if (existingMap[nodeId].lastTurnId === null || numId(turn.turn_id) > numId(existingMap[nodeId].lastTurnId)) {
+      existingMap[nodeId].lastTurnId = turn.turn_id;
+    }
+  }
+
+  return { map: existingMap, newLastSeenTurnId };
+}
+
+function mergeStatusMaps(dotNodeIds, perContextMaps) {
+  const merged = {};
+  for (const nodeId of dotNodeIds) {
+    merged[nodeId] = { status: "pending", lastTurnId: null, toolName: null, turnCount: 0, errorCount: 0, hasLifecycleResolution: false };
+    let allContextsHaveLifecycleResolution = true;
+    let anyContextHasNode = false;
+    for (const contextMap of perContextMaps) {
+      const cs = contextMap[nodeId];
+      if (!cs) continue;
+      if (MERGE_PRECEDENCE[cs.status] > MERGE_PRECEDENCE[merged[nodeId].status]) {
+        merged[nodeId].status = cs.status;
+        merged[nodeId].toolName = cs.toolName;
+        merged[nodeId].lastTurnId = cs.lastTurnId;
+      }
+      merged[nodeId].turnCount += cs.turnCount;
+      merged[nodeId].errorCount += cs.errorCount;
+      if (cs.status !== "pending") {
+        anyContextHasNode = true;
+        if (!cs.hasLifecycleResolution) allContextsHaveLifecycleResolution = false;
+      }
+    }
+    merged[nodeId].hasLifecycleResolution = anyContextHasNode && allContextsHaveLifecycleResolution;
+  }
+  return merged;
+}
+
+function applyErrorHeuristic(mergedMap, dotNodeIds, perContextCaches) {
+  for (const nodeId of dotNodeIds) {
+    const ns = mergedMap[nodeId];
+    if (!ns || ns.status !== "running" || ns.hasLifecycleResolution) continue;
+    for (const contextTurns of perContextCaches) {
+      const recent = getMostRecentToolResultsForNodeInContext(contextTurns, nodeId, 3);
+      if (recent.length >= 3 && recent.every(t => t.data?.is_error === true)) {
+        mergedMap[nodeId].status = "error";
+        break;
+      }
+    }
+  }
+  return mergedMap;
+}
+
+function getMostRecentToolResultsForNodeInContext(turns, nodeId, count) {
+  const results = turns
+    .filter(t => t.data?.node_id === nodeId && t.declared_type?.type_id === "com.kilroy.attractor.ToolResult")
+    .sort((a, b) => numId(b.turn_id) - numId(a.turn_id));
+  return results.slice(0, count);
+}
+
+function applyStaleDetection(mergedMap, dotNodeIds, pipelineIsLive) {
+  if (pipelineIsLive) return mergedMap;
+  for (const nodeId of dotNodeIds) {
+    const ns = mergedMap[nodeId];
+    if (ns && ns.status === "running" && !ns.hasLifecycleResolution) {
+      ns.status = "stale";
+    }
+  }
+  return mergedMap;
+}
+
+// ─── CXDB Indicator ───────────────────────────────────────────────────────────
+function updateCXDBIndicator(reachable, total, unreachableURLs) {
+  const dot = document.getElementById("cxdb-dot");
+  const text = document.getElementById("cxdb-text");
+  const tooltip = document.getElementById("cxdb-tooltip");
+
+  if (reachable === total) {
+    dot.className = "ok";
+    text.textContent = "CXDB OK";
+    tooltip.textContent = "";
+  } else if (reachable > 0) {
+    dot.className = "warn";
+    text.textContent = reachable + "/" + total + " CXDB";
+    tooltip.textContent = "Unreachable:\n" + unreachableURLs.join("\n");
+  } else {
+    dot.className = "error";
+    text.textContent = "CXDB unreachable";
+    tooltip.textContent = "Configured:\n" + cxdbInstances.map(i => i.url).join("\n");
+  }
+}
+
+// ─── Detail Panel ─────────────────────────────────────────────────────────────
+function openDetailPanel(nodeId) {
+  selectedNodeId = nodeId;
+  const panel = document.getElementById("detail-panel");
+  panel.classList.add("open");
+  renderDetailPanel(nodeId);
+}
+
+function closeDetailPanel() {
+  selectedNodeId = null;
+  document.getElementById("detail-panel").classList.remove("open");
+  // Remove highlight
+  if (activePipeline && pipelines[activePipeline]?.svgEl) {
+    pipelines[activePipeline].svgEl.querySelectorAll("g.node").forEach(g => g.classList.remove("node-selected"));
+  }
+}
+
+document.getElementById("detail-close").addEventListener("click", closeDetailPanel);
+
+function renderDetailPanel(nodeId) {
+  const titleEl = document.getElementById("detail-title");
+  titleEl.textContent = nodeId; // safe
+
+  const pipeline = activePipeline ? pipelines[activePipeline] : null;
+  const nodeAttrs = pipeline?.nodeAttrs?.[nodeId] ?? {};
+  const mergedMap = pipeline?.mergedStatusMap ?? {};
+  const ns = mergedMap[nodeId];
+  const status = ns?.status ?? "pending";
+
+  const body = document.getElementById("detail-body");
+  const parts = [];
+
+  // Section: Node Info
+  parts.push(`<div class="detail-section">`);
+  parts.push(`<div class="detail-section-title">Node Info</div>`);
+  parts.push(`<div class="detail-row"><span class="detail-label">ID:</span> ${esc(nodeId)}</div>`);
+  const typeLabel = nodeAttrs.shape ? (SHAPE_TO_TYPE[nodeAttrs.shape] ?? "LLM Task") : "";
+  if (typeLabel) parts.push(`<div class="detail-row"><span class="detail-label">Type:</span> ${esc(typeLabel)}</div>`);
+  if (nodeAttrs.class) parts.push(`<div class="detail-row"><span class="detail-label">Class:</span> ${esc(nodeAttrs.class)}</div>`);
+  parts.push(`<div class="detail-row"><span class="detail-label">Status:</span> <span class="status-badge ${esc(status)}">${esc(status)}</span></div>`);
+  parts.push(`</div>`);
+
+  // Section: DOT Attributes
+  const hasDotAttrs = nodeAttrs.prompt || nodeAttrs.tool_command || nodeAttrs.question || nodeAttrs.goal_gate;
+  if (hasDotAttrs) {
+    parts.push(`<div class="detail-section">`);
+    parts.push(`<div class="detail-section-title">Definition</div>`);
+    if (nodeAttrs.prompt) {
+      parts.push(`<div class="detail-row"><div class="detail-label">Prompt:</div><div class="detail-value">${esc(nodeAttrs.prompt)}</div></div>`);
+    }
+    if (nodeAttrs.tool_command) {
+      parts.push(`<div class="detail-row"><div class="detail-label">Tool Command:</div><div class="detail-value">${esc(nodeAttrs.tool_command)}</div></div>`);
+    }
+    if (nodeAttrs.question) {
+      parts.push(`<div class="detail-row"><div class="detail-label">Question:</div><div class="detail-value">${esc(nodeAttrs.question)}</div></div>`);
+    }
+    if (nodeAttrs.goal_gate) {
+      parts.push(`<div class="detail-row"><div class="detail-label">Goal Gate:</div><div class="detail-value">${esc(nodeAttrs.goal_gate)}</div></div>`);
+    }
+    parts.push(`</div>`);
+  }
+
+  // Section: Edges (choices for human gate etc.)
+  if (pipeline?.edges?.length > 0) {
+    const outgoing = pipeline.edges.filter(e => e.source === nodeId && e.label);
+    if (outgoing.length > 0) {
+      parts.push(`<div class="detail-section">`);
+      parts.push(`<div class="detail-section-title">Choices</div>`);
+      for (const e of outgoing) {
+        parts.push(`<div class="detail-row">→ ${esc(e.target)}: <strong>${esc(e.label)}</strong></div>`);
+      }
+      parts.push(`</div>`);
+    }
+  }
+
+  // Section: CXDB Activity
+  parts.push(`<div class="detail-section">`);
+  parts.push(`<div class="detail-section-title">CXDB Activity</div>`);
+  const turnRows = buildTurnRows(nodeId, pipeline);
+  if (turnRows.length === 0) {
+    parts.push(`<div style="color:#888;font-size:12px;">No recent CXDB activity</div>`);
+  } else {
+    parts.push(renderTurnsTable(turnRows));
+  }
+  parts.push(`</div>`);
+
+  body.innerHTML = parts.join("");
+
+  // Attach "show more" toggle handlers
+  body.querySelectorAll(".show-more-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const row = btn.closest("tr");
+      if (!row) return;
+      const fullEl = row.querySelector(".turn-output-full");
+      const shortEl = row.querySelector(".turn-output-short");
+      if (!fullEl || !shortEl) return;
+      const isExpanded = fullEl.style.display !== "none";
+      fullEl.style.display = isExpanded ? "none" : "";
+      shortEl.style.display = isExpanded ? "" : "none";
+      btn.textContent = isExpanded ? "Show more" : "Show less";
+    });
+  });
+}
+
+function buildTurnRows(nodeId, pipeline) {
+  if (!pipeline) return [];
+  // Collect turns from all contexts, group by context
+  const activeContexts = [];
+  const gid = pipeline.graphId;
+  for (const [key, mapping] of Object.entries(knownMappings)) {
+    if (!mapping || mapping.graphName !== gid) continue;
+    if (previousActiveRunIds[gid] && mapping.runId !== previousActiveRunIds[gid]) continue;
+    const [idxStr, contextId] = key.split(",");
+    activeContexts.push({ index: parseInt(idxStr, 10), contextId, key });
+  }
+
+  const sections = [];
+  for (const ctx of activeContexts) {
+    const turns = (turnCache[ctx.key] || []).filter(t => t.data?.node_id === nodeId);
+    if (turns.length === 0) continue;
+    // Sort newest first
+    const sorted = [...turns].sort((a, b) => numId(b.turn_id) - numId(a.turn_id));
+    const limited = sorted.slice(0, 20);
+    sections.push({ contextId: ctx.contextId, cxdbIndex: ctx.index, turns: limited });
+  }
+
+  // Sort sections by newest turn in context
+  sections.sort((a, b) => {
+    const aMax = a.turns.length > 0 ? numId(a.turns[0].turn_id) : 0;
+    const bMax = b.turns.length > 0 ? numId(b.turns[0].turn_id) : 0;
+    return bMax - aMax;
+  });
+
+  return sections;
+}
+
+function renderTurnsTable(sections) {
+  if (sections.length === 0) return "";
+  let html = `<table class="turns-table"><thead><tr><th>#</th><th>Type</th><th>Output</th></tr></thead><tbody>`;
+  for (const section of sections) {
+    if (sections.length > 1) {
+      html += `<tr><td colspan="3" style="background:#e8eaf6;font-size:10px;padding:2px 6px;">CXDB ${section.cxdbIndex} / ctx ${esc(section.contextId)}</td></tr>`;
+    }
+    for (const turn of section.turns) {
+      html += renderTurnRow(turn);
+    }
+  }
+  html += `</tbody></table>`;
+  return html;
+}
+
+function renderTurnRow(turn) {
+  const typeId = turn.declared_type?.type_id ?? "";
+  const isError = turn.data?.is_error === true;
+  const rowClass = isError ? " class=\"turn-error\"" : "";
+  const turnNum = esc(turn.turn_id);
+
+  const { label, output, highlight } = describeTurn(turn);
+
+  let outputHtml = "";
+  if (output !== null && output !== "") {
+    const MAX_EXPAND = 8000;
+    const SHORT_CHARS = 500;
+    const SHORT_LINES = 8;
+
+    // Apply truncation for display
+    const full = String(output);
+    const truncatedFull = full.length > MAX_EXPAND ? full.slice(0, MAX_EXPAND) : full;
+    const needsTruncNote = full.length > MAX_EXPAND;
+
+    // Compute short version
+    let shortVersion = truncatedFull;
+    const lineBreak = nthIndexOf(truncatedFull, '\n', SHORT_LINES);
+    if (truncatedFull.length > SHORT_CHARS) {
+      shortVersion = truncatedFull.slice(0, SHORT_CHARS);
+    }
+    if (lineBreak >= 0 && lineBreak < shortVersion.length) {
+      shortVersion = truncatedFull.slice(0, lineBreak);
+    }
+    const needsToggle = shortVersion.length < truncatedFull.length || needsTruncNote;
+
+    if (!needsToggle) {
+      outputHtml = `<div class="turn-output">${esc(truncatedFull)}</div>`;
+    } else {
+      outputHtml = `<div class="turn-output turn-output-short">${esc(shortVersion)}</div>`;
+      let fullContent = esc(truncatedFull);
+      if (needsTruncNote) {
+        fullContent += `\n<span class="truncation-note">(truncated to 8,000 characters — full prompt available in CXDB)</span>`;
+      }
+      outputHtml += `<div class="turn-output turn-output-full" style="display:none">${fullContent}</div>`;
+      outputHtml += `<button class="show-more-btn">Show more</button>`;
+    }
+  }
+
+  const highlightStyle = highlight ? ` style="color:#b71c1c;font-weight:600;"` : "";
+  return `<tr${rowClass}><td>${turnNum}</td><td${highlightStyle}>${esc(label)}</td><td>${outputHtml}</td></tr>`;
+}
+
+function nthIndexOf(str, char, n) {
+  let count = 0;
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] === char) {
+      count++;
+      if (count === n) return i;
+    }
+  }
+  return -1;
+}
+
+function describeTurn(turn) {
+  const typeId = turn.declared_type?.type_id ?? "";
+  const d = turn.data ?? {};
+  const short = typeId.replace("com.kilroy.attractor.", "");
+
+  switch (typeId) {
+    case "com.kilroy.attractor.StageStarted":
+      return { label: "Stage started" + (d.handler_type ? ": " + d.handler_type : ""), output: null, highlight: false };
+    case "com.kilroy.attractor.StageFinished": {
+      let label = "Stage finished: " + (d.status ?? "");
+      if (d.preferred_label) label += " — " + d.preferred_label;
+      let parts = [];
+      if (d.failure_reason) parts.push("failure: " + d.failure_reason);
+      if (d.notes) parts.push("notes: " + d.notes);
+      if (d.suggested_next_ids && d.suggested_next_ids.length > 0) parts.push("next: " + d.suggested_next_ids.join(", "));
+      return { label, output: parts.length > 0 ? parts.join("\n") : null, highlight: d.status === "fail" };
+    }
+    case "com.kilroy.attractor.StageFailed": {
+      let label = "Stage failed";
+      if (d.failure_reason) label += ": " + d.failure_reason;
+      if (d.attempt != null) label += " (attempt " + d.attempt + ")";
+      return { label, output: null, highlight: true };
+    }
+    case "com.kilroy.attractor.StageRetrying": {
+      let label = "Retrying (attempt " + (d.attempt ?? "?") + ")";
+      if (d.delay_ms != null && d.delay_ms > 0) label += ", delay " + formatMs(d.delay_ms);
+      return { label, output: null, highlight: false };
+    }
+    case "com.kilroy.attractor.RunStarted":
+      return { label: "Run started: " + (d.run_id ?? ""), output: null, highlight: false };
+    case "com.kilroy.attractor.RunCompleted":
+      return { label: "Run completed: " + (d.final_status ?? ""), output: null, highlight: false };
+    case "com.kilroy.attractor.RunFailed":
+      return { label: "Run failed: " + (d.reason ?? ""), output: null, highlight: true };
+    case "com.kilroy.attractor.Prompt":
+      return { label: "Prompt", output: d.text ?? null, highlight: false };
+    case "com.kilroy.attractor.ToolCall": {
+      let label = "Tool call";
+      if (d.tool_name) label += ": " + d.tool_name;
+      return { label, output: d.arguments_json ?? null, highlight: false };
+    }
+    case "com.kilroy.attractor.ToolResult": {
+      let label = "Tool result";
+      if (d.tool_name) label += ": " + d.tool_name;
+      if (d.is_error) label += " [error]";
+      return { label, output: d.output ?? null, highlight: d.is_error === true };
+    }
+    case "com.kilroy.attractor.AssistantMessage": {
+      let label = "Assistant";
+      if (d.model) label += " [" + d.model + "]";
+      return { label, output: d.text ?? null, highlight: false };
+    }
+    case "com.kilroy.attractor.InterviewStarted": {
+      let label = "Interview: " + (d.question_text ?? "");
+      if (d.question_type) label += " [" + d.question_type + "]";
+      return { label, output: null, highlight: false };
+    }
+    case "com.kilroy.attractor.InterviewCompleted": {
+      let label = "Answer: " + (d.answer_value ?? "");
+      if (d.duration_ms != null && d.duration_ms > 0) label += " (waited " + formatMs(d.duration_ms) + ")";
+      return { label, output: null, highlight: false };
+    }
+    case "com.kilroy.attractor.InterviewTimeout":
+      return { label: "Interview timeout: " + (d.question_text ?? ""), output: null, highlight: true };
+    default:
+      return { label: "[unsupported turn type]", output: null, highlight: false };
+  }
+}
+
+function formatMs(ms) {
+  if (ms >= 1000) {
+    const s = ms / 1000;
+    return (s === Math.floor(s) ? s.toFixed(0) : s.toFixed(1)) + "s";
+  }
+  return ms + "ms";
+}
+
+// ─── Start ────────────────────────────────────────────────────────────────────
+init().catch(e => {
+  console.error("Init error:", e);
+  showGraphMsg("Initialization error: " + e.message);
+});
+</script>
+</body>
+</html>
