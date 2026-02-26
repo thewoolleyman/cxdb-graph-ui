@@ -433,6 +433,20 @@ Then the active run remains run B (not flipped to run A)
   And run A's late branch context is ignored
 ```
 
+### Scenario: Newer run on low-context_id CXDB instance is selected as active run
+```
+Given two CXDB instances are configured (CXDB-0 and CXDB-1)
+  And CXDB-0 contains contexts 500-550 from an old completed run of alpha_pipeline (run_id_old)
+  And run_id_old was created at time T1 (older ULID, lexicographically smaller)
+  And CXDB-1 contains contexts 12-20 from a newer run of alpha_pipeline (run_id_new)
+  And run_id_new was created at time T2 > T1 (newer ULID, lexicographically larger)
+When the UI polls both CXDB instances and runs determineActiveRuns for alpha_pipeline
+Then the active run is run_id_new (the newer run on CXDB-1 with lower context_ids)
+  And the status overlay reflects CXDB-1's contexts 12-20
+  And CXDB-0's contexts 500-550 are excluded from the status overlay
+  And the UI does not incorrectly treat run_id_old as the active run due to higher context_id values
+```
+
 ### Scenario: Conditional node with custom routing outcome shows as complete
 ```
 Given a pipeline run has a conditional node using custom routing
@@ -876,6 +890,67 @@ Then the context is collected into supplementalNullTagCandidates during the supp
   And the status overlay shows the completed run's status
 ```
 
+### Scenario: Null-tag backlog does not starve older contexts when more than NULL_TAG_BATCH_SIZE candidates exist
+```
+Given CXDB lacks CQL support (GET /v1/contexts/search returns 404)
+  And the UI is using the context list fallback for that instance
+  And six completed Kilroy runs have disconnected their sessions
+  And all six contexts appear in GET /v1/contexts with client_tag: null and is_live: false
+  And the five highest-context_id runs are already cached in knownMappings (positive mappings)
+  And the sixth (oldest, lowest context_id) context has NOT been previously cached
+When the UI polls for discovery
+Then the six null-tag contexts are sorted by descending context_id
+  And the five already-cached contexts are each skipped with CONTINUE (not counted toward the batch limit)
+  And the uncached sixth context is reached and fetchFirstTurn is invoked for it
+  And the batch limit counter reaches 1 (not 0) only after that fetch
+  And the sixth context is successfully mapped to its pipeline in knownMappings
+```
+
+### Scenario: Supplemental fetch collects null-tag contexts even when CQL returns non-empty results
+```
+Given CXDB supports CQL search and Kilroy has partially upgraded to emit key 30 metadata
+  And GET /v1/contexts/search?q=tag ^= "kilroy/" returns 200 with one modern context (client_tag: "kilroy/01NEW...")
+  And GET /v1/contexts?limit=10000 returns both the modern context and a legacy context with client_tag: null and is_live: false
+  And the legacy context has NOT been previously cached in knownMappings
+When the UI polls for discovery
+Then the supplemental context list fetch runs despite CQL returning a non-empty result
+  And the legacy null-tag context is collected into supplementalNullTagCandidates
+  And it is merged into nullTagCandidates and processed by the null-tag backlog
+  And fetchFirstTurn is invoked for the legacy context
+  And the legacy context is successfully mapped to its pipeline in knownMappings
+  And the modern context (found via CQL) is NOT duplicated in the contexts list
+```
+
+### Scenario: CQL returns one context, supplemental finds another active Kilroy context absent from CQL
+```
+Given CXDB supports CQL search
+  And GET /v1/contexts/search?q=tag ^= "kilroy/" returns 200 with one context (context_id: "10", client_tag: "kilroy/01NEW...")
+  And GET /v1/contexts?limit=10000 returns context_id "10" plus context_id "7" with client_tag: "kilroy/01OLD..." and is_live: true
+  And context_id "7" has a non-null client_tag (resolved from the active session) but lacks key 30 metadata
+  And neither context has been previously cached in knownMappings
+When the UI polls for discovery
+Then the supplemental context list fetch runs despite CQL returning a non-empty result
+  And context_id "7" is identified as absent from CQL results (NOT in cqlContextIds)
+  And context_id "7" is appended to contexts via the supplemental dedup merge
+  And fetchFirstTurn is invoked for context_id "7" (Phase 2 discovery)
+  And context_id "7" is successfully mapped to its pipeline in knownMappings
+  And context_id "10" is NOT duplicated in the contexts list
+  And both contexts are discovered in the same poll cycle
+```
+
+### Scenario: Live context only in supplemental response keeps liveness check true
+```
+Given CXDB supports CQL search
+  And GET /v1/contexts/search?q=tag ^= "kilroy/" returns 200 with an empty contexts array
+  And GET /v1/contexts?limit=10000 returns one context with client_tag: "kilroy/01RUN..." and is_live: true
+  And the context has been previously cached in knownMappings (mapped to pipeline "alpha_pipeline")
+When the UI runs checkPipelineLiveness for "alpha_pipeline"
+Then cachedContextLists stores the supplemental context list (including the is_live: true context)
+  And lookupContext finds the context with is_live: true
+  And checkPipelineLiveness returns true
+  And running nodes are NOT flipped to stale by applyStaleDetection
+```
+
 ### Scenario: Fallback discovery still blacklists contexts with wrong-prefix client_tag
 ```
 Given a CXDB instance without CQL support (GET /v1/contexts/search returns 404)
@@ -898,6 +973,20 @@ Then the UI requests the first turn with view=raw (not view=typed)
   And the UI decodes the msgpack payload client-side to extract graph_name and run_id
   And the context is successfully mapped to its pipeline
   And no discovery failure occurs due to the missing registry
+```
+
+### Scenario: Context exceeding MAX_PAGES pagination cap emits warning and defers discovery
+```
+Given a CXDB instance has a context whose head_depth exceeds 5000
+  And the context has more than 5000 turns (requiring more than MAX_PAGES=50 pages of 100 turns each to reach depth=0)
+  And the context has client_tag "kilroy/session-abc" (passes Phase 1 filter)
+When the UI runs pipeline discovery for that context (fetchFirstTurn)
+Then fetchFirstTurn issues exactly 50 paginated GET /turns requests (one per page, each with limit=100 and view=raw)
+  And after exhausting MAX_PAGES without finding a turn at depth=0, returns null
+  And the UI emits a warning log containing "discovery deferred" and the context ID
+  And the context is NOT cached as a negative result (knownMappings entry is not set)
+  And on the next poll cycle the context is retried (fetchFirstTurn is invoked again)
+  And no pipeline tab shows the context in its status overlay
 ```
 
 ---
