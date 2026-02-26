@@ -41,13 +41,13 @@ Slash-command skills that automate specification and Kilroy pipeline workflows.
 |---|---|
 | `spec:critique` | Critiques the spec against its goals, invariants, and holdout scenarios. Writes versioned critique files to `specification/critiques/`. |
 | `spec:revise` | Revises the spec based on unacknowledged critique feedback. Edits the spec in place and writes acknowledgement files. |
-| `kilroy:setup` | One-time setup: builds Kilroy binary from `../kilroy`, starts CXDB on ports 9009/9010, verifies prereqs (go, docker, ruby, claude CLI, API key). |
+| `kilroy:setup` | One-time setup: builds Kilroy binary from `../kilroy`, starts CXDB on ports 9109/9110, verifies prereqs (go, docker, ruby, claude CLI, API key). |
 | `kilroy:generate-pipeline` | Compiles pipeline DOT from YAML config + prompt markdown files. Deterministic — no LLM involved. Runs `compile_dot.rb` → `verify_dot.rb` → `kilroy attractor validate`. |
 | `kilroy:run` | Runs pre-flight checks, confirms with user, then executes `kilroy attractor run`. Creates an isolated worktree, runs all pipeline nodes with checkpoint commits. |
 | `kilroy:status` | Lists existing runs, checks status, offers to resume or stop interrupted pipelines. State in `~/.local/state/kilroy/attractor/runs/`. |
 | `kilroy:help` | Displays guide to the Kilroy software factory, available skills, and typical workflow. |
 | `kilroy:land` | Lands a completed run — squash-merges the run branch, runs `script/smoke-test-suite-full`, and pushes. |
-| `cxdb:status` | Queries CXDB API (`http://127.0.0.1:9020`) to show pipeline context status, detect stuck agents, error loops, stale contexts. |
+| `cxdb:status` | Queries CXDB API (`http://127.0.0.1:9120`) to show pipeline context status, detect stuck agents, error loops, stale contexts. |
 | `land-the-plane` | Runs smoke tests, then commits and pushes changes. Stops on first failure. |
 
 **Typical workflow:** `kilroy:setup` → `kilroy:generate-pipeline` → `kilroy:run` → `kilroy:status` / `cxdb:status` to monitor → `kilroy:land` to merge, test, and push.
@@ -72,7 +72,7 @@ Shell scripts for environment setup, infrastructure management, and testing.
 | `setup.sh` | One-time workspace bootstrap: downloads Go modules (if go.mod exists), clones the CXDB repo, and builds the CXDB Docker image. Pass `--rebuild-cxdb` to force a Docker image rebuild. |
 | `start-cxdb.sh` | Starts the CXDB Docker container by delegating to `../kilroy/script/start-cxdb.sh` with line-buffered output for real-time logging. |
 | `stop-cxdb.sh` | Stops the CXDB Docker container (`kilroy-cxdb`). Respects `KILROY_CXDB_CONTAINER_NAME` env var. |
-| `start-cxdb-ui.sh` | Opens the CXDB web UI by delegating to `../kilroy/script/start-cxdb-ui.sh`. Forces the UI URL to port 9020 (nginx frontend) instead of 9010 (raw API). |
+| `start-cxdb-ui.sh` | Opens the CXDB web UI by delegating to `../kilroy/script/start-cxdb-ui.sh`. Forces the UI URL to port 9120 (nginx frontend) instead of 9110 (raw API). |
 | `smoke-test-suite-full` | Runs the full smoke test suite: `go vet ./...` and `go test ./...`. Exits non-zero on any failure. |
 
 ## Path conventions
@@ -123,13 +123,13 @@ AI Context Store for agents and LLMs. Provides fast, branch-friendly storage for
 
 | Path | What's there |
 |---|---|
-| `server/` | Rust server: binary protocol (:9009) and HTTP API (:9010) |
+| `server/` | Rust server: binary protocol (:9109) and HTTP API (:9110) |
 | `gateway/` | Go gateway: OAuth, frontend serving, reverse proxy to server |
 | `frontend/` | React frontend: turn visualization, custom renderers |
 | `clients/` | Client SDKs for interacting with CXDB |
 | `docs/` | Protocol and API documentation |
 
-**Build:** `cargo build --release` (server) | `cd gateway && go build` (gateway) | **Ports:** 9009 (binary), 9010 (HTTP API), 9020 (nginx frontend via gateway)
+**Build:** `cargo build --release` (server) | `cd gateway && go build` (gateway) | **Ports:** 9109 (binary), 9110 (HTTP API), 9120 (nginx frontend via gateway)
 
 ## Attractor (`../attractor`)
 

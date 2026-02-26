@@ -306,7 +306,7 @@ Tests use temp files and don't require CXDB or kilroy to be running.
 
 - Ruby 3+
 - kilroy binary at `../kilroy/kilroy` (run `/kilroy:setup` to build)
-- CXDB running on `localhost:9010` (run `/kilroy:setup` to start)
+- CXDB running on `localhost:9110` (run `/kilroy:setup` to start)
 - `ANTHROPIC_API_KEY` set (via direnv) — only needed for bootstrap mode
 - direnv configured for the project root
 

@@ -4,8 +4,8 @@ repo:
   path: .
 
 cxdb:
-  binary_addr: 127.0.0.1:9009
-  http_base_url: http://127.0.0.1:9010
+  binary_addr: 127.0.0.1:9109
+  http_base_url: http://127.0.0.1:9110
   autostart:
     enabled: false
 

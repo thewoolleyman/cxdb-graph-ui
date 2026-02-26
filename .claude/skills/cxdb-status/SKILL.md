@@ -6,17 +6,17 @@ user-invocable: true
 
 Show a real-time status summary of all CXDB contexts for active Kilroy pipeline runs. Detect problems (error loops, stale agents, failed branches) and suggest fixes.
 
-The CXDB API base URL is `http://127.0.0.1:9020` (nginx frontend).
+The CXDB API base URL is `http://127.0.0.1:9120` (nginx frontend).
 
 ## Step 1 — Fetch all contexts
 
 ```bash
-curl -sf http://127.0.0.1:9020/v1/contexts
+curl -sf http://127.0.0.1:9120/v1/contexts
 ```
 
 If the request fails (connection refused, timeout, non-200), report:
 
-> CXDB is not reachable at `http://127.0.0.1:9020`. Start it with:
+> CXDB is not reachable at `http://127.0.0.1:9120`. Start it with:
 > ```
 > script/start-cxdb.sh
 > ```
@@ -32,7 +32,7 @@ Then stop.
 For each context returned, fetch the 10 most recent turns:
 
 ```bash
-curl -sf http://127.0.0.1:9020/v1/contexts/{CONTEXT_ID}/turns?limit=10&order=desc
+curl -sf http://127.0.0.1:9120/v1/contexts/{CONTEXT_ID}/turns?limit=10&order=desc
 ```
 
 ## Step 3 — Identify the pipeline DOT file
@@ -111,5 +111,5 @@ For each detected problem, print a warning block with a suggested fix:
 After the report, suggest relevant actions:
 
 - **If errors detected:** "Use `/kilroy:status` to stop the run, fix the issue, and re-run."
-- **If everything looks healthy:** "Pipeline is progressing normally. Open `http://localhost:9020` for the full CXDB console."
+- **If everything looks healthy:** "Pipeline is progressing normally. Open `http://localhost:9120` for the full CXDB console."
 - **If run appears complete:** "All contexts are complete. Use `/kilroy:land` to merge and push."

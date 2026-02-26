@@ -42,12 +42,12 @@ If the build fails, report the error and stop.
 ./script/start-cxdb.sh
 ```
 
-This script is idempotent — it reuses a healthy container. CXDB runs on `:9009` (binary protocol) and `:9010` (HTTP UI).
+This script is idempotent — it reuses a healthy container. CXDB runs on `:9109` (binary protocol) and `:9110` (HTTP API).
 
 After the script completes, verify CXDB is responding:
 
 ```bash
-curl -sf http://localhost:9010/healthz > /dev/null
+curl -sf http://localhost:9110/healthz > /dev/null
 ```
 
 If the curl fails, report that CXDB did not start and suggest checking Docker.

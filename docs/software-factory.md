@@ -71,15 +71,15 @@ CXDB is the **observability layer** for Kilroy pipeline runs — a database that
 - Metadata: `node_id`, `branch_key`, `run_id`, `status`, model used
 
 **What it provides:**
-- **Real-time monitoring** — web console at `localhost:9020` with live SSE updates
+- **Real-time monitoring** — web console at `localhost:9120` with live SSE updates
 - **Run history** — persistent record of every turn across every pipeline run
 - **Problem detection** — the `/cxdb:status` skill queries the API to detect error loops, stale agents, failed branches
 - **Debugging** — click into any context, walk through turns, see exactly which file an agent was editing and what went wrong
 
 **Architecture:**
-- Binary protocol on `127.0.0.1:9009` — where Kilroy streams turns during execution
-- HTTP API on `127.0.0.1:9010` — for querying contexts and turns
-- Nginx frontend on `127.0.0.1:9020` — the web console UI
+- Binary protocol on `127.0.0.1:9109` — where Kilroy streams turns during execution
+- HTTP API on `127.0.0.1:9110` — for querying contexts and turns
+- Nginx frontend on `127.0.0.1:9120` — the web console UI
 
 See `docs/cxdb-console-guide.md` for detailed console usage.
 
@@ -100,7 +100,7 @@ All skills are defined in `.claude/skills/` and invoked as slash commands.
 
 | Skill | Usage | What it does |
 |-------|-------|-------------|
-| `/kilroy:setup` | `/kilroy:setup` | One-time setup: builds Kilroy binary from `../kilroy`, starts CXDB on ports 9009/9010, verifies prereqs (go, docker, ruby, claude CLI, API key). |
+| `/kilroy:setup` | `/kilroy:setup` | One-time setup: builds Kilroy binary from `../kilroy`, starts CXDB on ports 9109/9110, verifies prereqs (go, docker, ruby, claude CLI, API key). |
 | `/kilroy:generate-pipeline` | `/kilroy:generate-pipeline` | Compiles pipeline DOT from YAML config + prompt markdown files. Deterministic — no LLM involved. Runs `compile_dot.rb` → `verify_dot.rb` → `kilroy attractor validate`. Falls back to LLM bootstrap mode only when no config YAML exists. |
 | `/kilroy:run` | `/kilroy:run` | Runs pre-flight checks, confirms with user, then executes `kilroy attractor run`. Creates an isolated worktree, runs all pipeline nodes with checkpoint commits. |
 | `/kilroy:status` | `/kilroy:status` | Lists existing runs in `~/.local/state/kilroy/attractor/runs/`, checks status, offers to resume or stop interrupted pipelines. |
@@ -178,7 +178,7 @@ cd ../kilroy && go build -o kilroy ./cmd/kilroy
 ./script/start-cxdb.sh
 ```
 
-Verify: `curl -sf http://localhost:9010/healthz`
+Verify: `curl -sf http://localhost:9110/healthz`
 
 ### Generate the Pipeline (Deterministic)
 
@@ -220,7 +220,7 @@ Kilroy will:
 ../kilroy/kilroy attractor stop --logs-root ~/.local/state/kilroy/attractor/runs/<run_id> --grace-ms 30000
 ```
 
-The CXDB UI at `http://localhost:9020` shows turn-by-turn history. Use `/cxdb:status` for a quick summary.
+The CXDB UI at `http://localhost:9120` shows turn-by-turn history. Use `/cxdb:status` for a quick summary.
 
 ## Known Limitations and Workarounds
 

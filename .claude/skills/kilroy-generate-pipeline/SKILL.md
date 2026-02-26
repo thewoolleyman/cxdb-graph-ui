@@ -94,7 +94,7 @@ exists without a config YAML, the script refuses to continue.
 
 Check that:
 1. `../kilroy/kilroy` binary exists (suggest `/kilroy:setup` if not)
-2. CXDB is running: `curl -sf http://localhost:9010/healthz > /dev/null`
+2. CXDB is running: `curl -sf http://localhost:9110/healthz > /dev/null`
    (suggest `/kilroy:setup` if not)
 3. Ruby 3+ is available: `ruby --version`
 4. Script tests pass:

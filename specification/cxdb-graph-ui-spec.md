@@ -72,7 +72,7 @@ The system has two components: a Go HTTP server and a browser-side single-page a
            │                       │
     ┌──────┴──────┐         ┌──────┴──────┐
     │ CXDB-0      │   ...   │ CXDB-N      │
-    │ :9010       │         │ :9011       │
+    │ :9110       │         │ :9111       │
     └─────────────┘         └─────────────┘
 ```
 
@@ -95,12 +95,12 @@ go run ui/main.go [OPTIONS]
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--port` | integer | `9030` | TCP port for the UI server |
-| `--cxdb` | URL (repeatable) | `http://127.0.0.1:9010` | CXDB HTTP API base URL. May be specified multiple times for multiple CXDB instances. |
+| `--cxdb` | URL (repeatable) | `http://127.0.0.1:9110` | CXDB HTTP API base URL. May be specified multiple times for multiple CXDB instances. |
 | `--dot` | path (repeatable) | (required) | Path to a pipeline DOT file. May be specified multiple times. |
 
 Both `--dot` and `--cxdb` are repeatable. The UI auto-discovers which CXDB instances contain contexts for which pipelines (Section 5.5). No manual pairing is required.
 
-If no `--cxdb` flags are provided, the default (`http://127.0.0.1:9010`) is used as the sole instance. If no `--dot` flags are provided, the server exits with an error message and usage help.
+If no `--cxdb` flags are provided, the default (`http://127.0.0.1:9110`) is used as the sole instance. If no `--dot` flags are provided, the server exits with an error message and usage help.
 
 **Examples:**
 
@@ -118,11 +118,11 @@ go run ui/main.go \
 go run ui/main.go \
   --dot /path/to/pipeline-alpha.dot \
   --dot /path/to/pipeline-beta.dot \
-  --cxdb http://127.0.0.1:9010 \
-  --cxdb http://127.0.0.1:9011
+  --cxdb http://127.0.0.1:9110 \
+  --cxdb http://127.0.0.1:9111
 
 # Custom CXDB address
-go run ui/main.go --dot pipeline.dot --cxdb http://10.0.0.5:9010
+go run ui/main.go --dot pipeline.dot --cxdb http://10.0.0.5:9110
 ```
 
 The server prints the URL on startup: `Kilroy Pipeline UI: http://127.0.0.1:9030`
@@ -234,7 +234,7 @@ Returns a JSON object with a `dots` array containing the available DOT filenames
 The browser fetches `/api/cxdb/instances` to get the list of configured CXDB URLs and their indices. This is a server-generated JSON response, not proxied:
 
 ```json
-{ "instances": ["http://127.0.0.1:9010", "http://127.0.0.1:9011"] }
+{ "instances": ["http://127.0.0.1:9110", "http://127.0.0.1:9111"] }
 ```
 
 ### 3.3 Server Properties
@@ -379,7 +379,7 @@ Steps 2 and 3 run in parallel. Steps 4 and 5 require steps 1 and 2 to complete. 
 
 ### 5.1 API Endpoints Consumed
 
-The UI reads from CXDB HTTP APIs (default port 9010). All requests go through the server's `/api/cxdb/{index}/*` proxy, where `{index}` identifies the CXDB instance.
+The UI reads from CXDB HTTP APIs (default port 9110). All requests go through the server's `/api/cxdb/{index}/*` proxy, where `{index}` identifies the CXDB instance.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|

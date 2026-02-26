@@ -117,7 +117,7 @@ class StepTracker
       when :ingest
         lines << "  - kilroy attractor ingest failed. Common causes:"
         lines << "    - Hit max turns (increase with KILROY_INGEST_MAX_TURNS=50)"
-        lines << "    - CXDB not running (check: curl -sf http://localhost:9010/healthz)"
+        lines << "    - CXDB not running (check: curl -sf http://localhost:9110/healthz)"
         lines << "    - ANTHROPIC_API_KEY not set (check via direnv)"
         lines << "  - Re-run the generation."
       when :patch

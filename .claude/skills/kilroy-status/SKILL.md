@@ -54,7 +54,7 @@ Report the status and then ask the user what they want to do:
   env -u CLAUDECODE direnv exec "$PWD" ../kilroy/kilroy attractor stop --logs-root ~/.local/state/kilroy/attractor/runs/<run_id> --grace-ms 30000
   ```
 
-- **View in CXDB** — remind the user they can open `http://localhost:9010` for the full UI
+- **View in CXDB** — remind the user they can open `http://localhost:9110` for the full UI
 
 - **Nothing** — just report and exit
 
