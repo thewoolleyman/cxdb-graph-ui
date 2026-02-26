@@ -19,6 +19,7 @@
 
 # Go binary output
 /cxdb-graph-ui
+ui/cxdb-graph-ui
 *.exe
 
 ### macOS template
