@@ -1,2 +1,3 @@
-/spec:critique-revise-loop MAX_ROUNDS=3 CRITIQUE_PROMPT="ensure that you use the knowledge-graph MCP server to search the ../cxdb and ../kilroy project source to inform
-  your work" REVISE_PROMPT=""ensure that you use the knowledge-graph MCP server to search the ../cxdb and ../kilroy project source to inform your work" 
+/spec:critique-revise-loop MAX_ROUNDS=5 CRITIQUE_PROMPT="IMPORTANT: This critique should only focus on identifying any blocking issues which would prevent a minimal MVP
+  from being built, which could successfully serve the page and render a single-pipeline graph. Do not flag any other issues that are not blocking for that goal"             
+  REVISE_PROMPT=""ensure that you use the knowledge-graph MCP server to search the ../cxdb and ../kilroy project source to inform your work" 
