@@ -5,6 +5,8 @@ user-invocable: true
 allowed-tools: Bash(bash:*), Bash(ls:*), Bash(cat:*), Bash(comm:*), Bash(sort:*), Bash(mktemp:*), Bash(rm:*), Bash(mkdir:*), Bash(wc:*), Bash(echo:*), Task, Read, Glob
 ---
 
+## Arguments
+
 Parse `$ARGUMENTS` for named `KEY=VALUE` parameters. Ignore non-parameter text.
 
 | Parameter | Values | Default |
