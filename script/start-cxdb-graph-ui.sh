@@ -3,11 +3,14 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 UI_DIR="${REPO_ROOT}/ui"
+BINARY="${UI_DIR}/cxdb-graph-ui"
 PORT="${PORT:-9030}"
 
-echo "==> Building cxdb-graph-ui..."
-cd "${UI_DIR}"
-go build -o cxdb-graph-ui .
+if [ ! -x "${BINARY}" ]; then
+  echo "Error: binary not found at ${BINARY}" >&2
+  echo "Run script/build.sh first." >&2
+  exit 1
+fi
 
 echo "==> Starting server on port ${PORT}..."
 DOT_FLAGS=()
@@ -19,7 +22,7 @@ if [ "${#DOT_FLAGS[@]}" -eq 0 ]; then
   echo "Warning: no .dot files found in repo root — server will require --dot flags passed manually."
 fi
 
-"${UI_DIR}/cxdb-graph-ui" --port "${PORT}" "${DOT_FLAGS[@]+"${DOT_FLAGS[@]}"}" &
+"${BINARY}" --port "${PORT}" "${DOT_FLAGS[@]+"${DOT_FLAGS[@]}"}" &
 SERVER_PID=$!
 
 if [[ "$(uname)" == "Darwin" ]]; then
