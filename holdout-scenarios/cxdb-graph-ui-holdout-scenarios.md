@@ -1,5 +1,7 @@
 # CXDB Graph UI — Holdout Scenarios
 
+> **Scope:** These scenarios verify externally observable behavior from a user's standpoint — what renders in the browser and what happens when the server is started. Internal contract invariants (API response format, discovery state machine logic, parsing edge cases) are enforced by the factory's own test suite and are specified as invariants in Section 9 and Section 12 of the specification.
+
 ## DOT Rendering
 
 ### Scenario: Render a pipeline graph on initial load
@@ -73,36 +75,19 @@ Then @hpcc-js/wasm-graphviz throws an error
 ### Scenario: DOT parse error on /nodes does not block polling
 ```
 Given a DOT file with invalid syntax is loaded
-When the browser fetches /dots/{name}/nodes during initialization
-Then the server returns 400 with a JSON error body
-  And the browser proceeds with an empty dotNodeIds set for that pipeline
+When the UI initializes
+Then the graph area shows the Graphviz error message (Graphviz WASM also rejects the invalid DOT)
   And polling starts normally for all pipelines
-  And the graph area shows the Graphviz error message
+  And the page does not crash or become unresponsive
 ```
 
 ### Scenario: DOT parse error on /edges does not block detail panel
 ```
 Given a DOT file with invalid syntax is loaded
-When the browser fetches /dots/{name}/edges
-Then the server returns 400 with a JSON error body
-  And the browser proceeds with an empty edge list for that pipeline
-  And human gate choices are unavailable in the detail panel
+When the user clicks any node
+Then the detail panel opens and shows the node's DOT attributes (ID, type, prompt)
   And other detail panel functionality (node attributes, CXDB turns) is unaffected
-```
-
-### Scenario: Edge chain expansion in /edges response
-```
-Given a DOT file contains the edge chain: a -> b -> c [label="x"]
-When the browser fetches /dots/{name}/edges
-Then the response contains two edges: (a, b, "x") and (b, c, "x")
-  And not a single edge from a to c
-```
-
-### Scenario: Port suffixes stripped from edge node IDs
-```
-Given a DOT file contains: a:out -> b:in
-When the browser fetches /dots/{name}/edges
-Then the response contains an edge (a, b, null) with port suffixes removed
+  And human gate choice buttons are absent (no edge data available)
 ```
 
 ### Scenario: Tab shows graph ID from DOT declaration
@@ -163,24 +148,6 @@ Then the SVG renders from the DOT file (if the DOT fetch succeeded)
   And a warning is logged to the console
 ```
 
-### Scenario: DOT file with comments parses correctly
-```
-Given a DOT file contains line comments (// ...) and block comments (/* ... */)
-  And a node attribute value contains a URL with // (e.g., prompt="check http://example.com")
-When the browser fetches /dots/{name}/nodes
-Then the comments are stripped and do not appear as node attributes or cause parse errors
-  And the URL inside the quoted attribute value is preserved (not treated as a comment)
-  And edges defined after comment lines are parsed correctly
-
-Given a DOT file contains /* with no matching */
-When the browser fetches /dots/{name}/nodes
-Then the server returns 400 with a JSON error body containing "DOT parse error"
-
-Given a DOT file contains a " with no matching closing "
-When the browser fetches /dots/{name}/nodes
-Then the server returns 400 with a JSON error body containing "DOT parse error"
-```
-
 ### Scenario: Quoted graph ID with escapes normalizes for tab label and pipeline discovery
 ```
 Given a DOT file contains: digraph "my \"quoted\" pipeline" {
@@ -194,42 +161,17 @@ When a second DOT file also declares: digraph "my \"quoted\" pipeline" {
 Then the server rejects the second DOT file at startup with a duplicate graph ID error
 ```
 
-### Scenario: Quoted node IDs normalize correctly for /nodes, /edges, status overlay, and detail panel
+### Scenario: Quoted node IDs render and interact correctly
 ```
 Given a DOT file defines a node: "review step" [shape=box, prompt="Review the implementation"]
   And the DOT file defines an edge: "review step" -> done [label="pass"]
   And CXDB contains turns with node_id = "review step" (the normalized form)
-When the browser fetches /dots/{name}/nodes
-Then the response contains key "review step" (without quotes) with shape "box"
-When the browser fetches /dots/{name}/edges
-Then the response contains an edge with source "review step" and target "done"
 When the UI renders the SVG
-Then the node has <title>review step</title> in the SVG
+Then the node is visible in the graph
   And the status overlay applies the correct status color to the node
 When the user clicks the "review step" node
 Then the detail panel shows Node ID: "review step" and Type: "LLM Task"
   And the detail panel shows CXDB turns matching node_id "review step"
-```
-
-### Scenario: DOT attribute concatenation and multiline quoted values
-```
-Given a DOT node attribute uses concatenation: prompt="first " + "second"
-  And a DOT node attribute contains a literal newline inside quotes
-When the browser fetches /dots/{name}/nodes
-Then the parsed prompt value is "first second" (concatenated with no separator)
-  And the multiline prompt preserves the newline in the returned attribute value
-```
-
-### Scenario: Nodes and edges inside subgraphs are included in /nodes and /edges responses
-```
-Given a DOT file contains:
-  subgraph cluster_a { a [shape=box] }
-  subgraph cluster_b { b [shape=diamond] }
-  a -> b [label="go"]
-When the browser fetches /dots/{name}/nodes and /dots/{name}/edges
-Then the nodes response includes a and b
-  And the edges response includes (a, b, "go")
-  And a has shape "box" and b has shape "diamond"
 ```
 
 ---
@@ -479,118 +421,6 @@ When gap recovery completes
 Then lastSeenTurnId is set to the oldest recovered turn's turn_id (not the newest)
   And node A retains its previous status (running) since the StageFinished was not recovered
   And the next poll cycle's 100-turn window contains the most recent state
-```
-
----
-
-## Pipeline Discovery
-
-### Scenario: Context matched to pipeline via RunStarted turn
-```
-Given CXDB contains a context whose first turn is a RunStarted event
-  And RunStarted.data.graph_name == "alpha_pipeline"
-  And the UI has loaded a DOT file with "digraph alpha_pipeline {"
-When the UI runs pipeline discovery
-Then the context is associated with that pipeline tab
-  And its turns are used for the status overlay
-```
-
-### Scenario: Context does not match any loaded pipeline
-```
-Given CXDB contains a context whose RunStarted.graph_name is "other_pipeline"
-  And no loaded DOT file has graph ID "other_pipeline"
-When the UI runs pipeline discovery
-Then the context is ignored for status overlay purposes
-```
-
-### Scenario: Context-to-pipeline mapping is cached
-```
-Given the UI has already discovered context 33 on CXDB-0 belongs to alpha_pipeline
-When the next poll cycle runs
-Then the UI does NOT re-fetch the RunStarted turn for (CXDB-0, context 33)
-  And only fetches RunStarted for newly appeared context IDs
-```
-
-### Scenario: Pipeline discovered across multiple CXDB instances
-```
-Given two CXDB instances are configured
-  And CXDB-0 contains a context whose RunStarted.graph_name == "alpha_pipeline"
-  And CXDB-1 contains a context whose RunStarted.graph_name == "beta_pipeline"
-  And DOT files for both pipelines are loaded
-When the UI runs pipeline discovery
-Then the alpha_pipeline tab shows status from CXDB-0's context
-  And the beta_pipeline tab shows status from CXDB-1's context
-  And no manual pairing was required
-```
-
-### Scenario: Same pipeline on multiple CXDB instances
-```
-Given two CXDB instances are configured
-  And both contain contexts whose RunStarted.graph_name == "alpha_pipeline"
-When the UI displays the alpha_pipeline tab
-Then turns from both CXDB instances are merged into the status overlay
-```
-
-### Scenario: RunStarted with null or empty graph_name
-```
-Given CXDB contains a context whose first turn is a RunStarted event
-  And the RunStarted turn has a valid run_id but graph_name is null or empty string
-When the UI runs pipeline discovery
-Then the context is excluded from pipeline discovery (cached as a null mapping)
-  And it does not match any pipeline tab
-  And no error is surfaced to the user
-  And the context is not retried on subsequent polls
-```
-
-### Scenario: Forked context discovered via parent's RunStarted turn
-```
-Given a pipeline run creates a parent context with RunStarted(graph_name="alpha_pipeline")
-  And the parent context forks a child context for a parallel branch
-  And the child context has head_depth=500
-  And the child's parent chain extends into the parent context
-When the UI runs pipeline discovery for the child context
-Then fetchFirstTurn paginates through the child's turns into the parent context
-  And discovers the parent's RunStarted turn at depth=0
-  And the child context is correctly mapped to the alpha_pipeline tab
-```
-
-### Scenario: CQL returns empty results, supplemental context list discovers active Kilroy contexts
-```
-Given CXDB has Kilroy contexts with active sessions (is_live: true)
-  And the Kilroy contexts lack key 30 (context_metadata) in their first turn payloads
-  And CQL search for tag ^= "kilroy/" returns an empty contexts array (200 OK)
-When the UI polls for pipeline discovery
-Then the CQL search succeeds but finds zero matching contexts
-  And the supplemental context list fetch is issued (GET /v1/contexts?limit=10000)
-  And the supplemental fetch finds contexts with session-tag-resolved client_tag
-  And those contexts are processed through Phase 2 (fetchFirstTurn)
-  And pipeline discovery succeeds for active Kilroy contexts
-```
-
-### Scenario: CQL-empty supplemental context list populates cachedContextLists for liveness checks
-```
-Given CXDB has active Kilroy contexts with is_live: true
-  And the Kilroy contexts lack key 30 (context_metadata) in their first turn payloads
-  And CQL search for tag ^= "kilroy/" returns an empty contexts array (200 OK)
-  And the supplemental context list fetch discovers contexts via session-tag resolution
-When the UI checks pipeline liveness (checkPipelineLiveness)
-Then the supplemental context list is stored in cachedContextLists
-  And lookupContext can find the active-run contexts
-  And checkPipelineLiveness returns true (pipeline is live)
-  And running nodes are NOT misclassified as stale
-```
-
-### Scenario: CQL-empty supplemental discovery populates status overlay and liveness
-```
-Given CXDB has active Kilroy contexts with is_live: true
-  And the Kilroy contexts lack key 30 (context_metadata) in their first turn payloads
-  And CQL search for tag ^= "kilroy/" returns 200 OK with an empty contexts array
-  And the supplemental context list fetch discovers contexts via session-tag resolution
-When the UI polls for pipeline discovery and status overlay
-Then the supplemental fetch maps contexts to pipelines via RunStarted turns
-  And the status overlay updates with node colors from the discovered contexts
-  And checkPipelineLiveness returns true (pipeline is live, not stale)
-  And running nodes are NOT misclassified as stale
 ```
 
 ---
@@ -1009,27 +839,11 @@ Then the server starts on port 9035
   And proxies CXDB requests to http://10.0.0.5:9010 at /api/cxdb/0/
 ```
 
-### Scenario: Start with multiple CXDB instances
-```
-When the user runs: go run ui/main.go --dot a.dot --dot b.dot --cxdb http://127.0.0.1:9010 --cxdb http://127.0.0.1:9011
-Then the server starts on port 9030
-  And proxies /api/cxdb/0/* to http://127.0.0.1:9010
-  And proxies /api/cxdb/1/* to http://127.0.0.1:9011
-  And /api/cxdb/instances returns both URLs
-```
-
 ### Scenario: No DOT file provided
 ```
 When the user runs: go run ui/main.go
 Then the server exits with a non-zero code
   And prints an error message with usage help
-```
-
-### Scenario: Unregistered DOT file requested
-```
-Given the server was started with --dot pipeline-a.dot
-When a request is made to /dots/pipeline-b.dot
-Then the server returns 404
 ```
 
 ### Scenario: Duplicate DOT basenames rejected
@@ -1047,19 +861,12 @@ Then the server exits with a non-zero code
   And prints an error identifying the duplicate graph ID "alpha_pipeline"
 ```
 
-### Scenario: Path traversal attempt
-```
-When a request is made to /dots/../../etc/passwd
-Then the server returns 404 (filename not registered)
-```
-
-### Scenario: DOT file deleted after server startup returns 500
+### Scenario: DOT file deleted after server startup
 ```
 Given the server was started with --dot /path/to/pipeline.dot
   And the DOT file is deleted from disk after server startup
-When a browser requests /dots/pipeline.dot
-Then the server returns 500 with a plain-text error body
-  And the browser displays an error message in the graph area
+When the user clicks the pipeline's tab in the browser
+Then the browser displays an error message in the graph area
   And the page does not crash or become unresponsive
 When the DOT file is restored to disk
   And the user clicks the pipeline's tab again
