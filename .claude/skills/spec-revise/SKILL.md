@@ -23,6 +23,8 @@ Read the holdout scenarios for reference:
 
 List ALL files in `specification/critiques/` and find the highest version N that has critique file(s) **without** corresponding acknowledgement file(s).
 
+**Note:** Older critiques may have been archived to `specification/critiques-archive/`. If you need to review earlier versions for continuity context (e.g., reading version N-1 acknowledgements), check there if the files are not present in `specification/critiques/`.
+
 Critique files match these patterns:
 - `vN.md` (legacy single-author format)
 - `vN-<author>.md` (multi-author format)

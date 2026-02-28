@@ -63,6 +63,8 @@ If the `specification/critiques/` directory does not exist yet, create it and us
 
 Read ALL critique files from version N (both legacy `vN.md` and multi-author `vN-<author>.md` files). Also read any acknowledgement files for version N (`vN-acknowledgement.md` or `vN-<author>-acknowledgement.md`).
 
+**Note:** Older critiques may have been archived. If you need to reference versions that do not appear in `specification/critiques/`, check `specification/critiques-archive/` — it contains the same filename patterns but for earlier versions.
+
 Use this context to:
 - **Avoid re-raising** issues that were already addressed
 - **Follow up** on issues that were rejected if you believe they are still relevant
