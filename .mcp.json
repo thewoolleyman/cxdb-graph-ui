@@ -4,6 +4,10 @@
       "type": "sse",
       "url": "http://localhost:27495/mcp/sse",
       "approvedTools": true
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest", "--headless"]
     }
   }
 }
