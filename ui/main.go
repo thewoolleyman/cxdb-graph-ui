@@ -724,8 +724,22 @@ func parseEdges(src string) ([]edge, error) {
 			continue
 		}
 
-		// Not an edge - skip to end of statement
-		pos = skipToStatementEnd(stripped, pos)
+		// Not an edge - handle various non-edge statement endings.
+		// We must NOT call skipToStatementEnd here because it would skip
+		// past '}' and consume the entire graph body (e.g., when reading
+		// "digraph" followed by "pipeline" before the opening "{").
+		if pos < n {
+			c := stripped[pos]
+			if c == '{' || c == '}' || c == ';' {
+				pos++
+			} else if c == '[' {
+				// Skip a node attribute block
+				_, newPos2, _ := parseAttrList(stripped, pos)
+				pos = newPos2
+			}
+			// Otherwise (another token follows, e.g. "pipeline" after "digraph"):
+			// just continue — the outer loop will pick up the next token.
+		}
 	}
 
 	return edges, nil

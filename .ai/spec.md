@@ -1,6 +1,6 @@
 # CXDB Graph UI — Combined Specification
 Source: specification/cxdb-graph-ui-spec.md
-Date: 2026-02-26
+Date: 2026-02-28
 
 # CXDB Graph UI Specification
 
@@ -21,6 +21,7 @@ A local web dashboard that renders Attractor pipeline DOT files as interactive S
 9. [Invariants](#9-invariants)
 10. [Non-Goals](#10-non-goals)
 11. [Definition of Done](#11-definition-of-done)
+12. [Testing Requirements](#12-testing-requirements)
 
 ---
 
@@ -1549,6 +1550,31 @@ When all contexts for the active pipeline's active run have `is_live == false` a
 
 15. **Content is displayed verbatim with whitespace preserved.** Prompt text, tool commands, and CXDB output are shown as-is (with HTML escaping for XSS prevention) in containers styled with `white-space: pre-wrap`. This preserves newlines, indentation, and runs of whitespace. The UI does not summarize or reformat.
 
+   **API Contract**
+
+16. **`/edges` expands chain syntax.** A DOT edge chain `a -> b -> c [label="x"]` is expanded into two independent edges: `(a, b, "x")` and `(b, c, "x")`. No direct edge from `a` to `c` is emitted. Each segment inherits the label from the chain's attribute block. This invariant is verified at the API layer (Go test or curl), not via the UI.
+
+17. **`/edges` strips port suffixes.** Port syntax (`node_id:port` or `node_id:port:compass`) in edge endpoints is stripped: `a:out -> b:in` produces edge `{source: "a", target: "b", label: null}`. This invariant is verified at the API layer.
+
+18. **Parse errors produce 400 with a JSON error body.** An unterminated block comment (`/*` without matching `*/`) or an unterminated string literal (`"` without a closing `"`) in a DOT file causes both `/dots/{name}/nodes` and `/dots/{name}/edges` to return HTTP 400 with a JSON body of the form `{"error": "DOT parse error: ..."}`. This invariant is verified at the API layer.
+
+19. **Comments in DOT source are stripped before parsing; comments inside quoted strings are preserved.** A URL such as `http://example.com` inside a quoted attribute value is not treated as a line comment. This invariant is verified at the API layer.
+
+   **Client-Side Logic**
+
+20. **Discovery state machine behavior is verified by JavaScript unit tests, not by UI tests.** The following client-side behaviors require direct JS-level testing (mocking CXDB API responses and inspecting internal state) and cannot be reliably verified through Playwright DOM inspection alone:
+    - `fetchFirstTurn` pagination and `MAX_PAGES` cap
+    - `knownMappings` caching and null-entry semantics
+    - `determineActiveRuns` ULID-based run selection
+    - Gap recovery (`lastSeenTurnId` cursor, `MAX_GAP_PAGES` bound)
+    - Error loop detection scoped per context
+    - `cqlSupported` flag lifecycle (set, reset on reconnect, fallback path)
+    - `NULL_TAG_BATCH_SIZE` batch limiting
+    - Supplemental context list dedup merge
+    - `cachedContextLists` population for liveness checks
+
+    This invariant establishes the testing layer boundary: these behaviors belong in a JS unit test suite that imports the discovery module directly, not in the Playwright UI test skill.
+
 ---
 
 ## 10. Non-Goals
@@ -1631,3 +1657,68 @@ When all contexts for the active pipeline's active run have `is_live == false` a
 - [ ] `/dots/` only serves files registered via `--dot` (no path traversal)
 - [ ] All user-sourced content in the detail panel is HTML-escaped
 - [ ] Pipeline tab labels and CXDB indicator text are HTML-escaped (text-only rendering)
+
+---
+
+## 12. Testing Requirements
+
+The implementation requires three distinct testing layers. All three layers must pass before the implementation is considered complete.
+
+### 12.1 Go Unit Tests — Server Layer
+
+**Coverage target: 100% line and branch coverage** for all Go code in `ui/`.
+
+**Tooling:**
+```bash
+go test -cover -coverprofile=coverage.out ./...
+go tool cover -func=coverage.out
+```
+
+**Scope:** All server handlers (`handleRoot`, `handleDots`, `handleAPIDots`, `handleAPICXDB`), DOT parsing functions (`parseNodes`, `parseEdges`, `extractGraphID`, `stripComments`, `parseAttrList`, `parseDotToken`, `parseAttrValue`), startup validation (duplicate basenames, duplicate graph IDs, anonymous graphs, missing `--dot`), and the CXDB proxy logic.
+
+**Must run without** a live CXDB instance or browser. The test suite belongs in `ui/main_test.go` using `package main` so unexported parsing functions are directly testable.
+
+**Enforcement:** The `script/smoke-test-suite-fast` script runs `go test ./...` and must pass before any commit is landed. Once the Go codebase has a test suite, coverage enforcement is added to the fast suite.
+
+### 12.2 JavaScript Unit Tests — Client Logic Layer
+
+**Coverage target: 100% line and branch coverage** for all JavaScript in `ui/index.html`.
+
+**Pre-requisite:** JavaScript logic must be extracted from inline `<script>` tags into importable ES modules before this layer can be implemented. The inline-script constraint of the "No build toolchain" principle (Section 1.2) applies to the deployed artifact, not to the development and test workflow — the source can be modular ES modules that are inlined (or concatenated) as part of a simple build step.
+
+**Tooling:** Vitest with V8 coverage provider:
+```bash
+vitest run --coverage --coverage.provider=v8 --coverage.100
+```
+
+**Scope:** The behaviors listed in Invariant 20 (Section 9) must each have unit tests that inject mock CXDB API responses and assert on internal state transitions. This is the only practical way to verify these behaviors — Playwright DOM inspection cannot observe intermediate state such as which endpoint was called, how many times, or what was cached.
+
+**Must run without** a live server, browser, or CXDB instance.
+
+### 12.3 Playwright UI Tests — Integration Layer
+
+**Scope:** Visual rendering, DOM structure, user interactions, network error handling, and CXDB status overlay (with mock CXDB via Playwright request routing).
+
+**What Playwright tests:** SVG rendered from DOT, tab labels match graph IDs, node colors match expected status, detail panel content, HTML escaping (no XSS), DOT file changes picked up on tab switch, CXDB unreachable states.
+
+**What Playwright does NOT test:** Internal JS state machine steps, API JSON format details (edge chain structure, port stripping, parse error body shape), server startup behavior (exit codes, stderr messages). These are covered by Sections 12.1 and 12.2 respectively.
+
+**Mock CXDB:** Status overlay scenarios use Playwright's request routing (`page.route`) to intercept `/api/cxdb/*` requests and return fixture JSON responses without a live CXDB instance. Fixture responses are stored in `.claude/skills/run-holdout-scenarios/fixtures/mock-cxdb/`.
+
+**Server startup scenarios** (no `--dot` flag, duplicate basenames, duplicate graph IDs, anonymous graph) are tested via Bash subprocess in the same skill: run the binary, capture exit code and stderr, assert on expected values.
+
+### 12.4 Testing Layer Boundaries
+
+The following table maps scenario categories to their required testing layer:
+
+| Scenario Category | Testing Layer |
+|---|---|
+| DOT Rendering — visual (SVG shapes, tab labels, HTML escaping) | Playwright (12.3) |
+| DOT Rendering — API contract (edge chain JSON, port stripping, parse error bodies) | Go tests (12.1) |
+| CXDB Status Overlay (node colors, pulsing, stale detection) | Playwright + mock CXDB (12.3) |
+| Pipeline Discovery state machine (ULID selection, gap recovery, CQL flag, etc.) | JS unit tests (12.2) |
+| Detail Panel — visual (panel opens, content rendered) | Playwright (12.3) |
+| Detail Panel — CXDB turn format (StageStarted/Finished/Failed output strings) | JS unit tests (12.2) |
+| CXDB Connection Handling (unreachable → message, partial connectivity indicator) | Playwright + mock CXDB (12.3) |
+| Server startup validation (exit code, error messages) | Bash subprocess (12.3 skill) |
+| Server API format (`/api/dots`, `/api/cxdb/instances`, `/dots/{name}` 404) | Go tests (12.1) |
