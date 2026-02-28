@@ -1,3 +1,6 @@
+# tmp dir
+tmp
+
 # Environment variables (secrets — never commit)
 .env
 
@@ -16,6 +19,7 @@
 
 # Playwright MCP artifacts
 .playwright-mcp/
+/*.png
 
 # Go binary output
 /cxdb-graph-ui
