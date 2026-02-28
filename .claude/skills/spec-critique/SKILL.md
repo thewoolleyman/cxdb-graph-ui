@@ -7,22 +7,29 @@ allowed-tools: Read, Write, Glob, Bash(ls:*), Bash(pwd:*), Bash(date:*)
 
 You are critiquing the CXDB Graph UI specification.
 
-## Step 1: Determine Author Name
+## Arguments
 
-The critique filename includes an author identifier. Determine the author name:
+Parse `$ARGUMENTS` for named `KEY=VALUE` parameters. Ignore non-parameter text (it is passed through as additional critique direction — see below).
 
-- If the user provided an author name via `$ARGUMENTS` (look for `--author <name>` or `author=<name>`), use that value.
-- Otherwise, default to the LLM model name as a single lowercase word with no spaces:
-  - Claude Opus → `opus`
-  - Claude Sonnet → `sonnet`
-  - Claude Haiku → `haiku`
-  - Gemini → `gemini`
-  - GPT-4o → `gpt4o`
-  - o3 → `o3`
-  - Codex → `codex`
-  - For any other model, use a short lowercase slug of the model name (no spaces, no special characters).
+| Parameter | Values | Default |
+|-----------|--------|---------|
+| `AUTHOR` | Filename-safe lowercase slug | LLM model slug (see below) |
+| `ARTIFACTS_DIR` | Path string | _(none)_ |
 
-The author name must be safe for filenames: lowercase letters and numbers only, no spaces or special characters.
+**`AUTHOR`:** Author identifier used in the critique filename. Must be lowercase letters and numbers only (no spaces or special characters). If not provided, derive from the LLM model name:
+
+| Model | Slug |
+|-------|------|
+| Claude Opus | `opus` |
+| Claude Sonnet | `sonnet` |
+| Claude Haiku | `haiku` |
+| Gemini | `gemini` |
+| GPT-4o | `gpt4o` |
+| o3 | `o3` |
+| Codex | `codex` |
+| Any other | Short lowercase slug (no spaces, no special characters) |
+
+**`ARTIFACTS_DIR`:** Path to a pre-existing directory of supporting files for this critique (e.g., screenshots and a `holdout-scenario-failures.md` written by the `verify:run-holdout-scenarios` skill). If provided, read all files in that directory and reference relevant ones by name in the critique body to support specific issues. If not provided, also check whether a directory named `v{VERSION}-{AUTHOR}-artifacts/` already exists alongside the critique file being written — if so, treat it as the artifacts directory automatically.
 
 ## Step 2: Read the Specification
 

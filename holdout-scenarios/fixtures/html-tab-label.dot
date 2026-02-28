@@ -1,0 +1,10 @@
+digraph "<b>Pipeline</b>" {
+  rankdir=LR;
+
+  start [shape=Mdiamond];
+  process [shape=box, label="process", prompt="Process the data."];
+  exit [shape=Msquare];
+
+  start -> process;
+  process -> exit;
+}

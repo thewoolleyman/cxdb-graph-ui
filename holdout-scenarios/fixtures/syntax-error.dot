@@ -1,0 +1,6 @@
+digraph broken_pipeline {
+  this is definitely invalid dot syntax!!!
+  missing -> valid -> semicolons
+  nodes without proper -> declarations
+  >>><<<
+  also missing closing brace

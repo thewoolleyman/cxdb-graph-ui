@@ -1,0 +1,10 @@
+digraph html_pipeline {
+  rankdir=LR;
+
+  start [shape=Mdiamond, label="start"];
+  xss_node [shape=box, label="xss_test", prompt="<script>alert('xss')</script> and <b>bold</b>"];
+  exit [shape=Msquare, label="exit"];
+
+  start -> xss_node;
+  xss_node -> exit;
+}

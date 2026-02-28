@@ -1,0 +1,12 @@
+digraph beta_pipeline {
+  rankdir=LR;
+
+  start [shape=Mdiamond];
+  process [shape=box, label="process", prompt="Process the data."];
+  verify [shape=parallelogram, label="verify", tool_command="make verify"];
+  exit [shape=Msquare];
+
+  start -> process;
+  process -> verify;
+  verify -> exit;
+}

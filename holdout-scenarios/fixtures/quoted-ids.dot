@@ -1,0 +1,6 @@
+digraph "my \"quoted\" pipeline" {
+  "review step" [shape=box, prompt="Review the implementation"];
+  done [shape=Msquare];
+
+  "review step" -> done [label="pass"];
+}

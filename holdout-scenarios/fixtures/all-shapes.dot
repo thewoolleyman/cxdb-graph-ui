@@ -1,0 +1,27 @@
+digraph all_shapes {
+  rankdir=TB;
+
+  node_start_diamond [shape=Mdiamond, label="start"];
+  node_start_circle [shape=circle, label="start2"];
+  node_llm_task [shape=box, label="implement", prompt="Implement the feature"];
+  node_conditional [shape=diamond, label="check_quality"];
+  node_tool_gate [shape=parallelogram, label="run_tests", tool_command="make test"];
+  node_human_gate [shape=hexagon, label="review_gate", question="Approve?"];
+  node_parallel [shape=component, label="parallel_work"];
+  node_fan_in [shape=tripleoctagon, label="fan_in"];
+  node_stack_loop [shape=house, label="stack_mgr"];
+  node_exit_square [shape=Msquare, label="done"];
+  node_exit_doublecircle [shape=doublecircle, label="done2"];
+
+  node_start_diamond -> node_llm_task;
+  node_llm_task -> node_conditional;
+  node_conditional -> node_tool_gate [label="pass"];
+  node_conditional -> node_llm_task [label="retry"];
+  node_tool_gate -> node_human_gate;
+  node_human_gate -> node_parallel [label="approve"];
+  node_human_gate -> node_exit_square [label="reject"];
+  node_parallel -> node_fan_in;
+  node_fan_in -> node_stack_loop;
+  node_stack_loop -> node_exit_doublecircle;
+  node_start_circle -> node_exit_square;
+}
