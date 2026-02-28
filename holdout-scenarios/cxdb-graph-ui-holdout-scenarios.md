@@ -161,6 +161,18 @@ When a second DOT file also declares: digraph "my \"quoted\" pipeline" {
 Then the server rejects the second DOT file at startup with a duplicate graph ID error
 ```
 
+### Scenario: Msgpack CDN failure does not block DOT rendering or tab creation
+```
+Given the msgpack CDN URL is unreachable or returns an error
+  And the Graphviz WASM CDN is reachable
+When a user opens the dashboard URL in a browser
+Then the pipeline graph still renders as an SVG (DOT rendering works)
+  And pipeline tabs are created and functional
+  And the connection indicator renders
+  And CXDB pipeline discovery (decodeFirstTurn) fails gracefully
+  And no JavaScript errors prevent the page from initializing
+```
+
 ### Scenario: Quoted node IDs render and interact correctly
 ```
 Given a DOT file defines a node: "review step" [shape=box, prompt="Review the implementation"]
