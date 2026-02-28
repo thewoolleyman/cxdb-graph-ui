@@ -42,6 +42,24 @@ Use it automatically.
 env -u CLAUDECODE direnv exec "$PWD" ../kilroy/kilroy attractor status --logs-root ~/.local/state/kilroy/attractor/runs/<run_id>
 ```
 
+Also extract the git worktree path and branch name from the run's `worktree` directory:
+
+```bash
+# Worktree path (the worktree directory inside the run)
+WORKTREE_PATH=~/.local/state/kilroy/attractor/runs/<run_id>/worktree
+
+# Branch name
+git -C "$WORKTREE_PATH" branch --show-current 2>/dev/null
+```
+
+Include both values in the status output table alongside the other fields (run_id, state, etc.).
+
+Also include a convenient one-liner to cd into the worktree (it's already on the correct branch since Kilroy creates it via `git worktree add`):
+
+```
+cd ~/.local/state/kilroy/attractor/runs/<run_id>/worktree
+```
+
 Report the status and then ask the user what they want to do:
 
 - **Resume** — if the run was interrupted or is paused:

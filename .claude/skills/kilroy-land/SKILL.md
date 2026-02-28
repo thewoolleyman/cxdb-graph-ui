@@ -128,11 +128,27 @@ script/smoke-test-suite-full
 
 If the smoke tests fail, stop and report. Do NOT push. The user can inspect failures and decide what to do. The squashed changes are already committed on the local branch, so no work is lost.
 
-## Step 8: Push
+## Step 8: Holdout scenario verification (optional)
 
 Ask the user:
 
-> "Smoke tests passed. Push to origin?"
+> "Would you like to run holdout scenario verification before pushing?"
+
+If the user says yes, invoke the `verify:run-holdout-scenarios` skill, and report the result.
+
+If there were failures, the report should contain a summary and also the path to the critique versioned file which was created by the spec:critique skill from the verification.
+
+If the holdout scenario verification fails, stop and report. Do NOT push. The user can inspect failures and decide what to do. The squashed changes are already committed on the local branch, so no work is lost.
+
+## Step 9: Push
+
+Ask the user:
+
+> "Smoke tests and holdout scenario verification passed. Push to origin?"
+
+If holdout scenarios were skipped, adjust the prompt accordingly:
+
+> "Smoke tests passed (holdout scenarios skipped). Push to origin?"
 
 If the user agrees:
 
@@ -140,7 +156,7 @@ If the user agrees:
 git push
 ```
 
-## Step 9: Clean up
+## Step 10: Clean up
 
 After a successful push, clean up the worktree and run branch:
 
@@ -158,4 +174,5 @@ At the end, report:
 - The single squash commit hash
 - How many pipeline nodes ran vs. how many produced file changes
 - Smoke test result
+- Holdout scenario verification result (or skipped)
 - Whether changes were pushed
