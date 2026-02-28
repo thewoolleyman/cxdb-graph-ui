@@ -23,12 +23,24 @@ Any free text in `$ARGUMENTS` that does not match a named parameter is treated a
 
 If no custom instructions are provided, run all batches in order.
 
+## Allowed activities
+
+IMPORTANT: the only allowed tasks for this skill are as follows:
+
+1. Running the verification for the holdout scenarios
+2. If there are failures, creating the critique via the spec:critique skill
+3. Reporting status to the user
+
+## Disallowed activities
+
+**NEVER attempt to fix any problem/bugs that you discover by yourself. You may ONLY create critiques and report about them** 
+
 ## Scope
 
-72 total scenarios split into two execution modes:
+Scenarios split into two execution modes:
 
-- **UI scenarios (65)** — Playwright MCP browser automation, with a browser-injectable mock for CXDB API responses
-- **Server CLI scenarios (6)** — Shell commands that verify startup behavior
+- **UI scenarios** — Playwright MCP browser automation, with a browser-injectable mock for CXDB API responses
+- **Server CLI scenarios** — Shell commands that verify startup behavior
 
 Scenarios not covered here (deferred due to mocking complexity):
 - Gap recovery / MAX_GAP_PAGES pagination (require stateful per-poll turn-cursor tracking)
