@@ -240,6 +240,7 @@ The spec is the source of truth. The code is disposable. Revise and re-run.
 
 ## References
 
+- [The Software Factory: A Practitioner's Guide](docs/reference/software-factory-practitioners-guide-v01.md) — comprehensive reference for spec-driven development methodology, covering the Attractor pattern, holdout scenario validation, interactive/non-interactive shift work, specification evolution, and SOA boundary coordination. This repo is an implementation of the patterns described in the guide.
 - [Kilroy repo](https://github.com/danshapiro/kilroy) (we run a [fork](https://github.com/thewoolleyman/kilroy) with upstream PRs pending)
 - [StrongDM Software Factory](https://factory.strongdm.ai)
 - [Attractor spec](https://factory.strongdm.ai/products/attractor)

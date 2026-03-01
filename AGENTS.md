@@ -89,6 +89,7 @@ Reference documentation for the project. **Keep these in sync when skills, workf
 | File | What it covers |
 |---|---|
 | `docs/software-factory.md` | **Primary guide.** Architecture overview (Attractor, Kilroy, CXDB), what parts of Kilroy we use, skill reference, pipeline configuration, validation tiers, manual instructions. Update this when skills change or Kilroy usage evolves. |
+| `docs/reference/software-factory-practitioners-guide-v01.md` | **Methodology reference.** The Software Factory practitioner's guide: spec-driven development patterns, holdout scenario validation, the Attractor pattern, interactive/non-interactive shift work, specification evolution, and SOA boundary coordination. This repo implements the patterns described here. Consult for methodology questions — why we use holdout scenarios, how specs should be structured, what the factory loop looks like. |
 | `docs/cxdb-console-guide.md` | CXDB web console usage: dashboard layout, turn-by-turn inspection, keyboard shortcuts, interpreting agent activity. |
 
 ---
