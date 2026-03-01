@@ -25,24 +25,23 @@ The result: the pipeline has no gate that answers the question "does the app act
 
 ## Recommended Fix
 
-Add a new testing layer to Section 12 — **Browser Integration Tests** — with the following properties:
+Add a new testing layer to Section 12 — **Browser Smoke Tests** — with the following properties:
 
-1. **Tooling:** `chromedp` (pure Go, headless Chrome via DevTools Protocol). This keeps the test within `go test` and requires no Node.js or external test runner.
+1. **Tooling:** Playwright MCP browser automation, driven by an LLM agent as a pipeline stage. No new test files, no `chromedp`, no Node.js Playwright runner. The pipeline's LLM agent uses the already-configured Playwright MCP server to navigate a real browser and verify rendering.
 
-2. **Build tag isolation:** Tests use `//go:build browser` so that `go test ./...` (the fast unit test suite) is unaffected. Browser tests run via `go test -tags browser -count=1 -timeout 120s ./ui/...`.
+2. **Pipeline integration:** A dedicated LLM-driven pipeline stage (`verify_browser`) runs after `verify_tests` and before `review_final`. The stage starts the server with fixture DOT files, opens the page in a Playwright MCP browser, and asserts that rendering works. On failure, the pipeline loops back to `implement` for the LLM to fix the issue.
 
-3. **In-process server:** Tests start the real Go server on a random port (`:0` or `httptest.NewServer`), eliminating external process management.
-
-4. **Minimum required assertions:**
+3. **Minimum required assertions:**
    - The page loads without JavaScript errors that block module execution
    - Graphviz WASM initializes (the "Loading Graphviz..." message disappears)
    - An SVG element is present in the DOM containing expected node IDs from the fixture DOT file
    - Pipeline tabs render with correct graph IDs
    - Clicking a node opens the detail panel
+   - No CDN 404s or uncaught exceptions in the browser console
 
-5. **Pipeline integration:** A dedicated pipeline gate (e.g., `verify_browser`) runs the browser test command after `verify_tests`. This keeps the fast unit test loop clean while ensuring browser rendering is verified before `review_final`.
+4. **CDN dependency validation:** Because the tests load the actual `index.html` with its CDN imports in a real browser, any broken CDN URL will cause the module to fail to load, which will cause the SVG assertion to fail. This directly prevents the class of bug seen in v58.
 
-6. **CDN dependency validation:** Because the tests load the actual `index.html` with its CDN imports, any broken CDN URL will cause the module to fail to load, which will cause the SVG assertion to timeout and fail. This directly prevents the class of bug seen in v58.
+5. **No new code dependencies:** Unlike `chromedp` (which requires adding a Go dependency) or Playwright TypeScript tests (which require Node.js), this approach uses infrastructure already available to the pipeline — the Playwright MCP server configured for Claude Code.
 
 ## Section 12.4 Update
 
