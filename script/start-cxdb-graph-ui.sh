@@ -6,11 +6,7 @@ UI_DIR="${REPO_ROOT}/ui"
 BINARY="${UI_DIR}/cxdb-graph-ui"
 PORT="${PORT:-9030}"
 
-if [ ! -x "${BINARY}" ]; then
-  echo "Error: binary not found at ${BINARY}" >&2
-  echo "Run script/build.sh first." >&2
-  exit 1
-fi
+"${REPO_ROOT}/script/build.sh"
 
 echo "==> Starting server on port ${PORT}..."
 DOT_FLAGS=()
