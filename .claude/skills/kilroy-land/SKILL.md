@@ -49,47 +49,37 @@ git stash push -m "kilroy-land: stash before landing run <run_id>"
 
 If the user declines, stop.
 
-## Step 5: Reset to the run's base SHA
+## Step 5: Rebase if HEAD has moved
 
-Check what the current HEAD is:
-
-```bash
-git rev-parse HEAD
-```
-
-If HEAD does not match `base_sha`, reset to it:
+Check whether the local branch has moved forward since the pipeline forked:
 
 ```bash
-git checkout <base_sha> --detach
+current_sha=$(git rev-parse HEAD)
 ```
 
-Then re-attach to the original branch at that point. Determine the branch name first:
+If `current_sha` equals `base_sha`, no rebase is needed — skip to Step 6.
+
+If `current_sha` does NOT equal `base_sha` (HEAD has moved forward), rebase the run branch onto the current HEAD so the pipeline's changes land on top of any new commits:
 
 ```bash
-git branch --show-current
+git rebase --onto HEAD <base_sha> <run_branch>
 ```
 
-If on a named branch (e.g. `main`), reset it:
+This replays only the commits between `base_sha` and the tip of `<run_branch>` onto the current HEAD.
 
-```bash
-git checkout <branch_name> && git reset --hard <base_sha>
-```
+If the rebase encounters conflicts, stop and report them to the user. Do NOT force or skip — the user must resolve conflicts manually. The run branch is untouched in the worktree so no work is lost.
 
-**Important:** Before resetting, confirm with the user if HEAD has moved forward from `base_sha`:
-
-> "The repo HEAD (<current_sha>) has moved past the run's base commit (<base_sha>). Landing requires resetting to the base commit. Commits after <base_sha> will be lost. Proceed?"
-
-If the user declines, stop.
+If the rebase succeeds, update `base_sha` to `current_sha` for the commit message context (so the summary accurately reflects what happened), and note that a rebase was performed for the final report.
 
 ## Step 6: Squash-merge the run branch
 
-Squash-merge the run branch into the current branch. This collapses the entire pipeline run into a single commit, avoiding the clutter of empty per-node checkpoint commits on `main`:
+Squash-merge the (possibly rebased) run branch into the current branch. This collapses the entire pipeline run into a single commit, avoiding the clutter of empty per-node checkpoint commits on `main`:
 
 ```bash
 git merge --squash <run_branch>
 ```
 
-If the merge fails, something is wrong — the run branch should be a direct descendant of `base_sha`. Stop and report the error.
+If the merge fails, stop and report the error.
 
 After the squash, build a summary of which pipeline nodes produced file changes. Inspect the run branch commits between `base_sha` and the tip of `<run_branch>`:
 
@@ -171,6 +161,7 @@ Report that the run has been landed and cleaned up.
 
 At the end, report:
 - Run ID that was landed
+- Whether a rebase was performed (and from which SHA onto which SHA)
 - The single squash commit hash
 - How many pipeline nodes ran vs. how many produced file changes
 - Smoke test result
