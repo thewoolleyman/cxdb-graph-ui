@@ -163,7 +163,7 @@ No migration: DOT is already your compiled artifact. The question becomes whethe
 
 **Example mapping (YAML DSL).**
 ```yaml
-# pipeline-config/pipeline-config.yaml
+# factory/pipeline-config.yaml
 output_dot: pipeline.dot
 graph_goal: "Implement feature with checks and review"
 model_stylesheet: |
@@ -901,7 +901,7 @@ Implement:
 
 Minimal example set for the recommended hybrid:
 
-`pipeline-config/pipeline-config.yaml` (IR + metadata)
+`factory/pipeline-config.yaml` (IR + metadata)
 ```yaml
 output_dot: pipeline.dot
 graph_goal: "Implement feature with checks and review"
@@ -942,12 +942,12 @@ edges:
   - { from: human_assist, to: implement }
 ```
 
-`pipeline-config/prompts/implement.md` (prompt file)
+`factory/prompts/implement.md` (prompt file)
 ```md
 Implement the requested change. Ensure tests pass and documentation is updated.
 ```
 
-`pipeline-config/prompts/human_assist.md`
+`factory/prompts/human_assist.md`
 ```md
 You are blocked. Ask a human for clarification and write down the decision.
 ```
@@ -956,7 +956,7 @@ Generated `pipeline.dot` target must conform to Attractor’s DOT subset and nod
 
 Optional topology input if you adopt smcat:
 
-`pipeline-config/workflow.smcat`
+`factory/workflow.smcat`
 ```smcat
 initial, implement, code_check, review_gate, human_assist, final;
 

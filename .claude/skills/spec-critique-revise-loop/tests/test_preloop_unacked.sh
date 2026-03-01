@@ -13,7 +13,7 @@ set -euo pipefail
 #   3. Multiple unacknowledged critiques → revise runs once for all, then loop
 #   4. Pre-existing critiques that are already acknowledged → not re-processed
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
 LOOP_SH="$SCRIPT_DIR/loop.sh"
 
 TMPDIR_TEST=$(mktemp -d)
@@ -24,7 +24,7 @@ trap 'rm -rf "$TMPDIR_TEST"' EXIT
 MOCK_PROJ="$TMPDIR_TEST/project"
 mkdir -p "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts"
 mkdir -p "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/config"
-mkdir -p "$MOCK_PROJ/specification/critiques"
+mkdir -p "$MOCK_PROJ/specification-critiques"
 
 cp "$SCRIPT_DIR/loop.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
@@ -58,7 +58,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-CRITIQUES_DIR="specification/critiques"
+CRITIQUES_DIR="specification-critiques"
 INVOCATION_LOG="${MOCK_INVOCATION_LOG:-/tmp/mock_invocations.log}"
 COUNTER_FILE="${MOCK_COUNTER_FILE:-/tmp/mock_preloop_counter}"
 
@@ -215,7 +215,7 @@ echo "--- Test 1: No unacknowledged critiques ---"
 # Clean state
 rm -f "$INVOCATION_LOG" "$COUNTER_FILE"
 touch "$INVOCATION_LOG"
-rm -f "$MOCK_PROJ/specification/critiques/"* 2>/dev/null || true
+rm -f "$MOCK_PROJ/specification-critiques/"* 2>/dev/null || true
 
 set +e
 output1=$(cd "$MOCK_PROJ" && bash .claude/skills/spec-critique-revise-loop/scripts/loop.sh \
@@ -244,10 +244,10 @@ echo "--- Test 2: One unacknowledged critique ---"
 # Clean state
 rm -f "$INVOCATION_LOG" "$COUNTER_FILE"
 touch "$INVOCATION_LOG"
-rm -f "$MOCK_PROJ/specification/critiques/"* 2>/dev/null || true
+rm -f "$MOCK_PROJ/specification-critiques/"* 2>/dev/null || true
 
 # Plant one unacknowledged critique
-cat > "$MOCK_PROJ/specification/critiques/v1-previous.md" <<'EOF'
+cat > "$MOCK_PROJ/specification-critiques/v1-previous.md" <<'EOF'
 # Critique v1 (previous session)
 
 **Critic:** test
@@ -288,7 +288,7 @@ assert_eq "test2: loop revise ran once (on convergence)" "1" "$loop_revise_count
 
 # Acknowledgement file created for the pre-existing critique
 assert_file_exists "test2: ack created for v1-previous" \
-  "$MOCK_PROJ/specification/critiques/v1-previous-acknowledgement.md"
+  "$MOCK_PROJ/specification-critiques/v1-previous-acknowledgement.md"
 
 echo ""
 
@@ -301,10 +301,10 @@ echo "--- Test 3: Multiple unacknowledged critiques ---"
 # Clean state
 rm -f "$INVOCATION_LOG" "$COUNTER_FILE"
 touch "$INVOCATION_LOG"
-rm -f "$MOCK_PROJ/specification/critiques/"* 2>/dev/null || true
+rm -f "$MOCK_PROJ/specification-critiques/"* 2>/dev/null || true
 
 # Plant two unacknowledged critiques
-cat > "$MOCK_PROJ/specification/critiques/v3-alpha.md" <<'EOF'
+cat > "$MOCK_PROJ/specification-critiques/v3-alpha.md" <<'EOF'
 # Critique v3
 
 **Critic:** alpha
@@ -321,7 +321,7 @@ Alpha issue.
 Fix alpha.
 EOF
 
-cat > "$MOCK_PROJ/specification/critiques/v3-beta.md" <<'EOF'
+cat > "$MOCK_PROJ/specification-critiques/v3-beta.md" <<'EOF'
 # Critique v3
 
 **Critic:** beta
@@ -356,9 +356,9 @@ assert_eq "test3: loop revise ran once (on convergence)" "1" "$loop_revise_count
 
 # Both ack files created
 assert_file_exists "test3: ack created for v3-alpha" \
-  "$MOCK_PROJ/specification/critiques/v3-alpha-acknowledgement.md"
+  "$MOCK_PROJ/specification-critiques/v3-alpha-acknowledgement.md"
 assert_file_exists "test3: ack created for v3-beta" \
-  "$MOCK_PROJ/specification/critiques/v3-beta-acknowledgement.md"
+  "$MOCK_PROJ/specification-critiques/v3-beta-acknowledgement.md"
 
 echo ""
 
@@ -371,10 +371,10 @@ echo "--- Test 4: Already-acknowledged critiques skipped ---"
 # Clean state
 rm -f "$INVOCATION_LOG" "$COUNTER_FILE"
 touch "$INVOCATION_LOG"
-rm -f "$MOCK_PROJ/specification/critiques/"* 2>/dev/null || true
+rm -f "$MOCK_PROJ/specification-critiques/"* 2>/dev/null || true
 
 # Plant one acknowledged critique (both files exist)
-cat > "$MOCK_PROJ/specification/critiques/v5-done.md" <<'EOF'
+cat > "$MOCK_PROJ/specification-critiques/v5-done.md" <<'EOF'
 # Critique v5
 
 **Critic:** done
@@ -384,7 +384,7 @@ cat > "$MOCK_PROJ/specification/critiques/v5-done.md" <<'EOF'
 
 No issues.
 EOF
-cat > "$MOCK_PROJ/specification/critiques/v5-done-acknowledgement.md" <<'EOF'
+cat > "$MOCK_PROJ/specification-critiques/v5-done-acknowledgement.md" <<'EOF'
 # Acknowledgement for v5-done
 
 All done.
@@ -417,10 +417,10 @@ echo "--- Test 5: Pre-loop revise output appears before loop ---"
 # Clean state
 rm -f "$INVOCATION_LOG" "$COUNTER_FILE"
 touch "$INVOCATION_LOG"
-rm -f "$MOCK_PROJ/specification/critiques/"* 2>/dev/null || true
+rm -f "$MOCK_PROJ/specification-critiques/"* 2>/dev/null || true
 
 # Plant one unacknowledged critique
-cat > "$MOCK_PROJ/specification/critiques/v7-prior.md" <<'EOF'
+cat > "$MOCK_PROJ/specification-critiques/v7-prior.md" <<'EOF'
 # Critique v7 (prior)
 
 **Critic:** test

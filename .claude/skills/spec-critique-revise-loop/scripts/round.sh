@@ -62,7 +62,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # scripts/ → spec-critique-revise-loop/ → skills/ → .claude/ → project root
 PROJ_DIR="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
-CRITIQUES_DIR="$PROJ_DIR/specification/critiques"
+CRITIQUES_DIR="$PROJ_DIR/specification-critiques"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CRITIC_CONFIG="$SKILL_DIR/config/critic-commands.conf"
 

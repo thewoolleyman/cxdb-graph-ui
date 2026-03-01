@@ -8,7 +8,7 @@ set -euo pipefail
 #   4. No elapsed time when loop_start file is missing
 #   5. Non-timeout exit reasons don't print timeout messages
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
 REPORT="$SCRIPT_DIR/report.sh"
 
 TMPDIR_TEST=$(mktemp -d)

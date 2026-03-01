@@ -21,12 +21,12 @@ based on whether a config YAML exists.
 
 ### Default mode: Deterministic compilation (config YAML exists)
 
-When `pipeline-config/pipeline-config.yaml` exists, the pipeline is compiled
+When `factory/pipeline-config.yaml` exists, the pipeline is compiled
 deterministically from the YAML config and prompt files. No LLM is
 involved — the same input always produces byte-identical output.
 
 ```
-pipeline-config/pipeline-config.yaml + pipeline-config/*.md
+factory/pipeline-config.yaml + factory/prompts/*.md
         │
         ▼
   compile_dot.rb ──► DOT file (byte-identical every run)
@@ -64,7 +64,7 @@ This is the "bootstrap" path for new pipelines.
   patch_dot.rb ──► patched DOT
         │
         ▼
-  extract_prompts.rb ──► pipeline-config/*.md
+  extract_prompts.rb ──► factory/prompts/*.md
         │
         ▼
   verify_dot.rb + kilroy attractor validate
@@ -89,18 +89,20 @@ To fix this, either create the config YAML or delete the DOT file.
 ## Prompt files
 
 Box node prompts and hexagon questions are stored as separate markdown
-files alongside the YAML config in `pipeline-config/<node_id>.md`.
+files alongside the YAML config in `factory/prompts/<node_id>.md`.
 This keeps the YAML config manageable (prompts are typically 30-100 lines
 each) and allows prompts to be edited independently.
 
 ```
-pipeline-config/
+factory/
 ├── pipeline-config.yaml
-├── implement.md
-├── review.md
-├── postmortem.md
-├── human_gate.md
-└── ...
+├── prompts/
+│   ├── implement.md
+│   ├── review.md
+│   ├── postmortem.md
+│   ├── human_gate.md
+│   └── ...
+└── run.yaml
 ```
 
 The `expand_spec` node is special — its prompt lives in the YAML config
@@ -109,7 +111,7 @@ one-liner.
 
 ## Config file reference
 
-The config file lives at `pipeline-config/pipeline-config.yaml`.
+The config file lives at `factory/pipeline-config.yaml`.
 
 ### Fields
 
@@ -178,7 +180,7 @@ Each gate is a map with:
 |---|---|---|
 | `Mdiamond` | Start node | Always `id: start` |
 | `Msquare` | Exit node | Always `id: exit` |
-| `box` | LLM work node | Prompt loaded from `pipeline-config/<id>.md` |
+| `box` | LLM work node | Prompt loaded from `factory/prompts/<id>.md` |
 | `diamond` | Check/routing node | Routes on `outcome=success`, `outcome=fail`, and a bare default |
 | `parallelogram` | Verification gate | Carries `tool_command` and optional `timeout` |
 | `hexagon` | Human gate | Blocks for operator input when retries are exhausted |
@@ -187,14 +189,14 @@ Each gate is a map with:
 
 ### Always edit in YAML + prompt files, not in DOT
 
-The YAML config and prompt files in `pipeline-config/` are the
+The YAML config and prompt files in `factory/` are the
 source of truth. Never hand-edit the DOT file — your changes will be
 overwritten on the next generation run.
 
 ### Common edits
 
 **Changing a node's prompt:** Edit the markdown file at
-`pipeline-config/<node_id>.md`. Then regenerate.
+`factory/prompts/<node_id>.md`. Then regenerate.
 
 **Adding a new verification gate:**
 
@@ -269,15 +271,15 @@ All scripts are in `script/` and invoked with `ruby <script>`:
 ```bash
 # Compile the pipeline deterministically
 ruby .claude/skills/kilroy-generate-pipeline/script/compile_dot.rb \
-  pipeline-config/pipeline-config.yaml pipeline.dot
+  factory/pipeline-config.yaml pipeline.dot
 
 # Extract prompts from an existing DOT into markdown files
 ruby .claude/skills/kilroy-generate-pipeline/script/extract_prompts.rb \
-  pipeline-config/pipeline-config.yaml pipeline.dot
+  factory/pipeline-config.yaml pipeline.dot
 
 # Verify a DOT file
 ruby .claude/skills/kilroy-generate-pipeline/script/verify_dot.rb \
-  pipeline-config/pipeline-config.yaml pipeline.dot
+  factory/pipeline-config.yaml pipeline.dot
 ```
 
 ## Tests

@@ -108,7 +108,7 @@ class StepTracker
       case failed_step
       when :compile
         lines << "  - compile_dot.rb failed. Check that:"
-        lines << "    - All prompt files exist in pipeline-config/"
+        lines << "    - All prompt files exist in factory/prompts/"
         lines << "    - YAML config has valid nodes and edges"
         lines << "  - Run manually: ruby #{SCRIPT_DIR}/compile_dot.rb pipeline-config.yaml"
       when :render
@@ -322,7 +322,7 @@ def run_one(target, force:, buffered: false)
   output_lines = []
   log = ->(msg) { buffered ? output_lines << msg : puts(msg) }
 
-  yaml_file = REPO_ROOT.join("pipeline-config", "pipeline-config.yaml").to_s
+  yaml_file = REPO_ROOT.join("factory", "pipeline-config.yaml").to_s
   doc = File.exist?(yaml_file) ? YAML.safe_load(File.read(yaml_file), permitted_classes: [Symbol]) : nil
   output_dot = doc ? doc["output_dot"] : "pipeline.dot"
   dot_file = REPO_ROOT.join(output_dot).to_s

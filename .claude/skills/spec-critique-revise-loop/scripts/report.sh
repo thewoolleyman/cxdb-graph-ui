@@ -72,12 +72,12 @@ echo ""
 echo "Files created:"
 if [ -f "$state_dir/critique_files" ]; then
   while IFS= read -r f; do
-    [ -n "$f" ] && echo "  specification/critiques/$f"
+    [ -n "$f" ] && echo "  specification-critiques/$f"
   done < "$state_dir/critique_files"
 fi
 if [ -f "$state_dir/ack_files" ]; then
   while IFS= read -r f; do
-    [ -n "$f" ] && echo "  specification/critiques/$f"
+    [ -n "$f" ] && echo "  specification-critiques/$f"
   done < "$state_dir/ack_files"
 fi
 echo "============================================"

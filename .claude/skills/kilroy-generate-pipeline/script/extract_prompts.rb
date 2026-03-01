@@ -4,10 +4,10 @@
 # Extract prompt and question text from a DOT file into per-node markdown files.
 #
 # For each shape=box node with a prompt attribute, writes:
-#   <yaml_dir>/<node_id>.md
+#   <yaml_dir>/prompts/<node_id>.md
 #
 # For each shape=hexagon node with a question attribute, writes:
-#   <yaml_dir>/<node_id>.md
+#   <yaml_dir>/prompts/<node_id>.md
 #
 # Skips the expand_spec node (its prompt lives in the YAML config).
 #
@@ -34,7 +34,7 @@ end
 
 # Resolve output directory relative to the YAML file location.
 yaml_dir = Pathname.new(yaml_path).expand_path.dirname
-prompts_dir = yaml_dir
+prompts_dir = yaml_dir.join("prompts")
 FileUtils.mkdir_p(prompts_dir)
 
 # Unescape DOT string values.

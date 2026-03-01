@@ -10,7 +10,7 @@ set -euo pipefail
 #   4. Comments and blank lines are skipped correctly
 #   5. Edge cases: mixed formats, extra whitespace
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REAL_CONFIG="$SKILL_DIR/config/critic-commands.conf"
 

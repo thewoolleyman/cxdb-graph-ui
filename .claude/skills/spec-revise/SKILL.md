@@ -11,7 +11,7 @@ You are revising the CXDB Graph UI specification based on critique feedback.
 
 Read the specification file:
 
-- `specification/cxdb-graph-ui-spec.md`
+- `specification/intent/cxdb-graph-ui-spec.md`
 
 ## Step 2: Read the Holdout Scenarios
 
@@ -21,9 +21,9 @@ Read the holdout scenarios for reference:
 
 ## Step 3: Find Unacknowledged Critiques
 
-List ALL files in `specification/critiques/` and find the highest version N that has critique file(s) **without** corresponding acknowledgement file(s).
+List ALL files in `specification-critiques/` and find the highest version N that has critique file(s) **without** corresponding acknowledgement file(s).
 
-**Note:** Older critiques may have been archived to `specification/critiques-archive/`. If you need to review earlier versions for continuity context (e.g., reading version N-1 acknowledgements), check there if the files are not present in `specification/critiques/`.
+**Note:** Older critiques may have been archived to `specification-critiques-archive/`. If you need to review earlier versions for continuity context (e.g., reading version N-1 acknowledgements), check there if the files are not present in `specification-critiques/`.
 
 Critique files match these patterns:
 - `vN.md` (legacy single-author format)
@@ -51,7 +51,7 @@ $ARGUMENTS
 Process ALL unacknowledged critique files for version N together in a single revision pass. For each issue across all critique files:
 
 1. Evaluate whether the feedback is valid and should be incorporated
-2. If valid, edit `specification/cxdb-graph-ui-spec.md` **in place** — this is a living document, not versioned
+2. If valid, edit `specification/intent/cxdb-graph-ui-spec.md` **in place** — this is a living document, not versioned
 3. Keep edits focused and surgical — don't rewrite sections that aren't affected by the critique
 4. When multiple critics raise the same issue, address it once and reference it in all acknowledgements
 
@@ -63,12 +63,12 @@ Write a **separate** acknowledgement file for **each** unacknowledged critique f
 
 For a critique file named `vN-<author>.md`, write the acknowledgement to:
 ```
-specification/critiques/vN-<author>-acknowledgement.md
+specification-critiques/vN-<author>-acknowledgement.md
 ```
 
 For a legacy critique file named `vN.md`, write the acknowledgement to:
 ```
-specification/critiques/vN-acknowledgement.md
+specification-critiques/vN-acknowledgement.md
 ```
 
 Use this format for each acknowledgement:
@@ -85,7 +85,7 @@ Use this format for each acknowledgement:
 {Description of what changed and where, OR reasoning for why it was not addressed}
 
 Changes:
-- `specification/cxdb-graph-ui-spec.md`: {what changed}
+- `specification/intent/cxdb-graph-ui-spec.md`: {what changed}
 
 ## Issue #2: ...
 

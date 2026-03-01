@@ -9,7 +9,7 @@ set -euo pipefail
 #   3. State persistence between rounds via state dir
 #   4. Report generation from state dir
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
 
 TMPDIR_TEST=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_TEST"' EXIT
@@ -19,7 +19,7 @@ trap 'rm -rf "$TMPDIR_TEST"' EXIT
 MOCK_PROJ="$TMPDIR_TEST/project"
 mkdir -p "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts"
 mkdir -p "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/config"
-mkdir -p "$MOCK_PROJ/specification/critiques"
+mkdir -p "$MOCK_PROJ/specification-critiques"
 
 cp "$SCRIPT_DIR/round.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
@@ -45,7 +45,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-CRITIQUES_DIR="specification/critiques"
+CRITIQUES_DIR="specification-critiques"
 COUNTER_FILE="${MOCK_COUNTER_FILE:-/tmp/mock_counter}"
 
 if [[ "$prompt" == /spec:critique* ]]; then
@@ -232,12 +232,12 @@ assert_matches "round 2 still runs revise for acknowledgements" \
   "Step E \(round 2 of 3, elapsed [0-9]+:[0-9]{2}\): Running /spec:revise" "$output2"
 
 # Verify acknowledgement file was written for the converged critique
-ack_file2=$(ls "$MOCK_PROJ/specification/critiques/"*-test-acknowledgement.md 2>/dev/null | sort | tail -1 || true)
-if [ -n "$ack_file2" ] && [ "$(ls "$MOCK_PROJ/specification/critiques/"*-test-acknowledgement.md 2>/dev/null | wc -l | tr -d ' ')" -eq 2 ]; then
+ack_file2=$(ls "$MOCK_PROJ/specification-critiques/"*-test-acknowledgement.md 2>/dev/null | sort | tail -1 || true)
+if [ -n "$ack_file2" ] && [ "$(ls "$MOCK_PROJ/specification-critiques/"*-test-acknowledgement.md 2>/dev/null | wc -l | tr -d ' ')" -eq 2 ]; then
   echo "  PASS: acknowledgement written for converged round (2 total)"
   pass=$((pass + 1))
 else
-  ack_total=$(ls "$MOCK_PROJ/specification/critiques/"*-test-acknowledgement.md 2>/dev/null | wc -l | tr -d ' ')
+  ack_total=$(ls "$MOCK_PROJ/specification-critiques/"*-test-acknowledgement.md 2>/dev/null | wc -l | tr -d ' ')
   echo "  FAIL: expected 2 acknowledgement files (one per round), got $ack_total"
   fail=$((fail + 1))
 fi
@@ -267,7 +267,7 @@ assert_contains "exit criteria" "Exit criteria:     no_major_issues_found" "$rep
 echo ""
 echo "Test 5: Files listed in report"
 
-assert_contains "critique file in report" "specification/critiques/" "$report_output"
+assert_contains "critique file in report" "specification-critiques/" "$report_output"
 
 # --- Summary ---
 

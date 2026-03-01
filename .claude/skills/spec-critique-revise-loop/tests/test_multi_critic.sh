@@ -10,7 +10,7 @@ set -euo pipefail
 #   4. One critic fails → continues with the successful one
 #   5. Parallel execution (PIDs differ)
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
 
 TMPDIR_TEST=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_TEST"' EXIT
@@ -20,7 +20,7 @@ trap 'rm -rf "$TMPDIR_TEST"' EXIT
 MOCK_PROJ="$TMPDIR_TEST/project"
 mkdir -p "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts"
 mkdir -p "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/config"
-mkdir -p "$MOCK_PROJ/specification/critiques"
+mkdir -p "$MOCK_PROJ/specification-critiques"
 
 cp "$SCRIPT_DIR/round.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
@@ -35,7 +35,7 @@ chmod +x "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"*.sh
 MOCK_CRITIC_A="$TMPDIR_TEST/mock_critic_a"
 cat > "$MOCK_CRITIC_A" <<'SCRIPT'
 #!/usr/bin/env bash
-CRITIQUES_DIR="specification/critiques"
+CRITIQUES_DIR="specification-critiques"
 COUNTER_FILE="${MOCK_COUNTER_A:-/tmp/mock_counter_a}"
 
 round=0
@@ -82,7 +82,7 @@ chmod +x "$MOCK_CRITIC_A"
 MOCK_CRITIC_B="$TMPDIR_TEST/mock_critic_b"
 cat > "$MOCK_CRITIC_B" <<'SCRIPT'
 #!/usr/bin/env bash
-CRITIQUES_DIR="specification/critiques"
+CRITIQUES_DIR="specification-critiques"
 COUNTER_FILE="${MOCK_COUNTER_B:-/tmp/mock_counter_b}"
 
 round=0
@@ -139,7 +139,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-CRITIQUES_DIR="specification/critiques"
+CRITIQUES_DIR="specification-critiques"
 
 if [[ "$prompt" == /spec:revise* ]]; then
   for f in "$CRITIQUES_DIR"/v*-*.md; do
@@ -239,8 +239,8 @@ assert_contains "alpha critic output" "Alpha critic" "$output1"
 assert_contains "beta critic output" "Beta critic" "$output1"
 assert_contains "2 critique files found" "New critique files (2)" "$output1"
 # Check that both alpha and beta critique files exist (version may vary due to race)
-alpha_count=$(ls "$MOCK_PROJ/specification/critiques/"*-alpha.md 2>/dev/null | wc -l | tr -d ' ')
-beta_count=$(ls "$MOCK_PROJ/specification/critiques/"*-beta.md 2>/dev/null | wc -l | tr -d ' ')
+alpha_count=$(ls "$MOCK_PROJ/specification-critiques/"*-alpha.md 2>/dev/null | wc -l | tr -d ' ')
+beta_count=$(ls "$MOCK_PROJ/specification-critiques/"*-beta.md 2>/dev/null | wc -l | tr -d ' ')
 if [ "$alpha_count" -ge 1 ]; then
   echo "  PASS: alpha critique file exists"
   pass=$((pass + 1))
@@ -303,7 +303,7 @@ echo "Test 4: One critic has major issues, one converged → continue"
 MOCK_CRITIC_MAJOR="$TMPDIR_TEST/mock_critic_major"
 cat > "$MOCK_CRITIC_MAJOR" <<'SCRIPT'
 #!/usr/bin/env bash
-CRITIQUES_DIR="specification/critiques"
+CRITIQUES_DIR="specification-critiques"
 max_v=0
 for f in "$CRITIQUES_DIR"/*.md; do
   [ -f "$f" ] || continue
@@ -326,7 +326,7 @@ chmod +x "$MOCK_CRITIC_MAJOR"
 MOCK_CRITIC_MINOR="$TMPDIR_TEST/mock_critic_minor"
 cat > "$MOCK_CRITIC_MINOR" <<'SCRIPT'
 #!/usr/bin/env bash
-CRITIQUES_DIR="specification/critiques"
+CRITIQUES_DIR="specification-critiques"
 max_v=0
 for f in "$CRITIQUES_DIR"/*.md; do
   [ -f "$f" ] || continue
@@ -350,7 +350,7 @@ chmod +x "$MOCK_CRITIC_MINOR"
 MOCK_PROJ2="$TMPDIR_TEST/project2"
 mkdir -p "$MOCK_PROJ2/.claude/skills/spec-critique-revise-loop/scripts"
 mkdir -p "$MOCK_PROJ2/.claude/skills/spec-critique-revise-loop/config"
-mkdir -p "$MOCK_PROJ2/specification/critiques"
+mkdir -p "$MOCK_PROJ2/specification-critiques"
 cp "$SCRIPT_DIR/round.sh" "$MOCK_PROJ2/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ2/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/round_summary.sh" "$MOCK_PROJ2/.claude/skills/spec-critique-revise-loop/scripts/"
@@ -393,7 +393,7 @@ chmod +x "$MOCK_CRITIC_FAIL"
 MOCK_PROJ3="$TMPDIR_TEST/project3"
 mkdir -p "$MOCK_PROJ3/.claude/skills/spec-critique-revise-loop/scripts"
 mkdir -p "$MOCK_PROJ3/.claude/skills/spec-critique-revise-loop/config"
-mkdir -p "$MOCK_PROJ3/specification/critiques"
+mkdir -p "$MOCK_PROJ3/specification-critiques"
 cp "$SCRIPT_DIR/round.sh" "$MOCK_PROJ3/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ3/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/round_summary.sh" "$MOCK_PROJ3/.claude/skills/spec-critique-revise-loop/scripts/"
@@ -429,7 +429,7 @@ echo "Test 6: All critics fail → error exit"
 MOCK_PROJ4="$TMPDIR_TEST/project4"
 mkdir -p "$MOCK_PROJ4/.claude/skills/spec-critique-revise-loop/scripts"
 mkdir -p "$MOCK_PROJ4/.claude/skills/spec-critique-revise-loop/config"
-mkdir -p "$MOCK_PROJ4/specification/critiques"
+mkdir -p "$MOCK_PROJ4/specification-critiques"
 cp "$SCRIPT_DIR/round.sh" "$MOCK_PROJ4/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ4/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/round_summary.sh" "$MOCK_PROJ4/.claude/skills/spec-critique-revise-loop/scripts/"

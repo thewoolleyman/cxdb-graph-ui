@@ -9,7 +9,7 @@ set -euo pipefail
 #
 # This validates the full loop flow without hitting the real Claude API.
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
 LOOP_SH="$SCRIPT_DIR/loop.sh"
 
 # Create a temp project directory that mirrors the real structure
@@ -19,7 +19,7 @@ trap 'rm -rf "$TMPDIR_TEST"' EXIT
 MOCK_PROJ="$TMPDIR_TEST/project"
 mkdir -p "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts"
 mkdir -p "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/config"
-mkdir -p "$MOCK_PROJ/specification/critiques"
+mkdir -p "$MOCK_PROJ/specification-critiques"
 
 # Copy the real scripts into the mock project
 cp "$SCRIPT_DIR/loop.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
@@ -55,7 +55,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-CRITIQUES_DIR="specification/critiques"
+CRITIQUES_DIR="specification-critiques"
 COUNTER_FILE="/tmp/mock_claude_round_counter"
 
 if [[ "$prompt" == /spec:critique* ]]; then
@@ -309,10 +309,10 @@ fi
 # Verify files were created
 echo ""
 echo "Files in critiques dir:"
-ls -la "$MOCK_PROJ/specification/critiques/"
+ls -la "$MOCK_PROJ/specification-critiques/"
 
-critique_count=$(ls "$MOCK_PROJ/specification/critiques/"/*-test.md 2>/dev/null | grep -cv acknowledgement || echo 0)
-ack_count=$(ls "$MOCK_PROJ/specification/critiques/"/*acknowledgement.md 2>/dev/null | wc -l | tr -d ' ')
+critique_count=$(ls "$MOCK_PROJ/specification-critiques/"/*-test.md 2>/dev/null | grep -cv acknowledgement || echo 0)
+ack_count=$(ls "$MOCK_PROJ/specification-critiques/"/*acknowledgement.md 2>/dev/null | wc -l | tr -d ' ')
 
 if [ "$critique_count" -eq 2 ]; then
   echo "  PASS: 2 critique files created"

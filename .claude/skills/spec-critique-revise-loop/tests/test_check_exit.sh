@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Unit tests for check_exit.sh
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
 CHECK_EXIT="$SCRIPT_DIR/check_exit.sh"
 TMPDIR_TEST=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_TEST"' EXIT

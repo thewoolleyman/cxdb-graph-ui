@@ -10,7 +10,7 @@ set -euo pipefail
 #   4. non-bash critic without critique_prompt → "/spec:critique" only
 #   5. Both critic types in the same config get different expansions
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
 
 TMPDIR_TEST=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_TEST"' EXIT
@@ -20,7 +20,7 @@ trap 'rm -rf "$TMPDIR_TEST"' EXIT
 MOCK_PROJ="$TMPDIR_TEST/project"
 mkdir -p "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts"
 mkdir -p "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/config"
-mkdir -p "$MOCK_PROJ/specification/critiques"
+mkdir -p "$MOCK_PROJ/specification-critiques"
 
 cp "$SCRIPT_DIR/round.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
@@ -67,7 +67,7 @@ _make_critic() {
   local script_path="$1" capture_file="$2" critique_name="$3"
   cat > "$script_path" <<EOF
 #!/usr/bin/env bash
-CRITIQUES_DIR="specification/critiques"
+CRITIQUES_DIR="specification-critiques"
 mkdir -p "\$CRITIQUES_DIR"
 # Record received args to capture file
 echo "\$*" >> "$capture_file"
@@ -146,7 +146,7 @@ echo "Test 2: non-bash critic gets '/spec:critique ...' expansion"
 CAPTURE2="$TMPDIR_TEST/capture2.txt"
 SCRIPT2="$TMPDIR_TEST/critic2.sh"
 _make_critic "$SCRIPT2" "$CAPTURE2" "raw2"
-rm -f "$MOCK_PROJ/specification/critiques/"*.md 2>/dev/null || true
+rm -f "$MOCK_PROJ/specification-critiques/"*.md 2>/dev/null || true
 
 cat > "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/config/critic-commands.conf" <<EOF
 $SCRIPT2 {CRITIQUE_PROMPT}
@@ -174,7 +174,7 @@ echo "Test 3: bash critic with no --critique-prompt gets empty expansion"
 CAPTURE3="$TMPDIR_TEST/capture3.txt"
 SCRIPT3="$TMPDIR_TEST/critic3.sh"
 _make_critic "$SCRIPT3" "$CAPTURE3" "bash3"
-rm -f "$MOCK_PROJ/specification/critiques/"*.md 2>/dev/null || true
+rm -f "$MOCK_PROJ/specification-critiques/"*.md 2>/dev/null || true
 
 cat > "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/config/critic-commands.conf" <<EOF
 bash $SCRIPT3 {CRITIQUE_PROMPT}
@@ -202,7 +202,7 @@ echo "Test 4: non-bash critic with no --critique-prompt gets '/spec:critique' on
 CAPTURE4="$TMPDIR_TEST/capture4.txt"
 SCRIPT4="$TMPDIR_TEST/critic4.sh"
 _make_critic "$SCRIPT4" "$CAPTURE4" "raw4"
-rm -f "$MOCK_PROJ/specification/critiques/"*.md 2>/dev/null || true
+rm -f "$MOCK_PROJ/specification-critiques/"*.md 2>/dev/null || true
 
 cat > "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/config/critic-commands.conf" <<EOF
 $SCRIPT4 {CRITIQUE_PROMPT}
@@ -233,7 +233,7 @@ SCRIPT5_BASH="$TMPDIR_TEST/critic5_bash.sh"
 SCRIPT5_RAW="$TMPDIR_TEST/critic5_raw.sh"
 _make_critic "$SCRIPT5_BASH" "$CAPTURE5_BASH" "bash5"
 _make_critic "$SCRIPT5_RAW" "$CAPTURE5_RAW" "raw5"
-rm -f "$MOCK_PROJ/specification/critiques/"*.md 2>/dev/null || true
+rm -f "$MOCK_PROJ/specification-critiques/"*.md 2>/dev/null || true
 
 cat > "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/config/critic-commands.conf" <<EOF
 bash $SCRIPT5_BASH {CRITIQUE_PROMPT}

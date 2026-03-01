@@ -457,12 +457,12 @@ If any FAIL results exist, invoke the `spec:critique` skill to produce a critiqu
 
 ### Step 1: Determine the next critique version
 
-List `specification/critiques/` and find the highest existing version N using the same filename-pattern logic as the critique skill (`vN-<author>.md`, `vN-acknowledgement.md`, etc.). The artifacts and critique will use version N+1.
+List `specification-critiques/` and find the highest existing version N using the same filename-pattern logic as the critique skill (`vN-<author>.md`, `vN-acknowledgement.md`, etc.). The artifacts and critique will use version N+1.
 
 The author is always `failed-holdout-scenarios`. This makes the artifacts path deterministic:
 
 ```
-ARTIFACTS_DIR="specification/critiques/v{N+1}-failed-holdout-scenarios-artifacts"
+ARTIFACTS_DIR="specification-critiques/v{N+1}-failed-holdout-scenarios-artifacts"
 ```
 
 ### Step 2: Copy screenshots to the artifacts directory
@@ -481,7 +481,7 @@ Use the actual screenshot paths as reported by the Playwright MCP tool during th
 Write a detailed description of every FAIL result to:
 
 ```
-specification/critiques/v{N+1}-failed-holdout-scenarios-artifacts/holdout-scenario-failures.md
+specification-critiques/v{N+1}-failed-holdout-scenarios-artifacts/holdout-scenario-failures.md
 ```
 
 Include for each failure:
@@ -498,4 +498,4 @@ Invoke the `spec:critique` skill with the fixed author, the artifacts directory,
 /spec:critique AUTHOR=failed-holdout-scenarios ARTIFACTS_DIR={ARTIFACTS_DIR} "Read holdout-scenario-failures.md and all other files in the ARTIFACTS_DIR. For each failure documented there, examine the referenced screenshots and suggest concrete changes to the specification or the implementation contract that would make the observed behavior correct."
 ```
 
-The critique skill will write to `specification/critiques/v{N+1}-failed-holdout-scenarios.md`.
+The critique skill will write to `specification-critiques/v{N+1}-failed-holdout-scenarios.md`.

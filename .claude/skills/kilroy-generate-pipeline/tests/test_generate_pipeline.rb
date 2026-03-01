@@ -75,13 +75,15 @@ class TestGeneratePipeline < Minitest::Test
         "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }"
       }
 
-      config_dir = File.join(dir, "pipeline-config")
+      config_dir = File.join(dir, "factory")
       FileUtils.mkdir_p(config_dir)
       yaml_path = File.join(config_dir, "pipeline-config.yaml")
       File.write(yaml_path, YAML.dump(config))
 
-      # Create prompt file alongside the YAML
-      File.write(File.join(config_dir, "work.md"), "Do the work.\n")
+      # Create prompt file in prompts/ subdirectory
+      prompts_dir = File.join(config_dir, "prompts")
+      FileUtils.mkdir_p(prompts_dir)
+      File.write(File.join(prompts_dir, "work.md"), "Do the work.\n")
 
       # Run — compile should succeed, verify/validate may fail (no kilroy binary)
       out = `REPO_ROOT=#{dir} KILROY_BIN=/nonexistent ruby #{SCRIPT} . 2>&1`

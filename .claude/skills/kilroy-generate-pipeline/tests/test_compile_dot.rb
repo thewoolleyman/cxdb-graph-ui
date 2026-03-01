@@ -25,7 +25,8 @@ class TestCompileDot < Minitest::Test
   end
 
   def write_prompt(target, node_id, content)
-    dir = @tmpdir
+    dir = File.join(@tmpdir, "prompts")
+    FileUtils.mkdir_p(dir)
     path = File.join(dir, "#{node_id}.md")
     File.write(path, content)
     path

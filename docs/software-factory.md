@@ -116,18 +116,20 @@ All skills are defined in `.claude/skills/` and invoked as slash commands.
 Pipeline config is a version-controlled YAML + markdown file set:
 
 ```
-pipeline-config/
+factory/
 ├── pipeline-config.yaml        # nodes, edges, gates, stylesheet
-├── implement.md                # prompt for implement node
-├── review.md                   # prompt for review nodes
-└── ...                         # one .md per node with a prompt
+├── prompts/
+│   ├── implement.md            # prompt for implement node
+│   ├── review.md               # prompt for review nodes
+│   └── ...                     # one .md per node with a prompt
+└── run.yaml                    # Kilroy run configuration
 ```
 
 The compiled DOT file (`pipeline.dot`) at the repo root is a **generated artifact**. Never edit it directly — update the YAML/prompt sources and recompile with `/kilroy:generate-pipeline`.
 
 ### Run Config
 
-The run config (`run.yaml`) configures Kilroy execution: target repo path, CXDB endpoints, LLM provider, git settings, and setup commands that run in the worktree before the pipeline starts.
+The run config (`factory/run.yaml`) configures Kilroy execution: target repo path, CXDB endpoints, LLM provider, git settings, and setup commands that run in the worktree before the pipeline starts.
 
 ## How Kilroy Validates Work (With Holdout Scenarios)
 
@@ -135,7 +137,7 @@ Our setup adds a true holdout layer on top of Kilroy's built-in validation.
 
 **How the holdout works:**
 
-The pipeline receives the specification file (`specification/cxdb-graph-ui-spec.md`). The behavioral scenarios in `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` are never copied to the worktree. The implementing agent must produce correct behavior from the specification alone.
+The pipeline receives the specification file (`specification/intent/cxdb-graph-ui-spec.md`). The behavioral scenarios in `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` are never copied to the worktree. The implementing agent must produce correct behavior from the specification alone.
 
 **Kilroy's three validation tiers:**
 
@@ -151,10 +153,13 @@ The specification is curated and source-controlled, not generated:
 
 ```
 specification/
-└── cxdb-graph-ui-spec.md      # Complete architectural specification
+└── intent/
+    └── cxdb-graph-ui-spec.md  # Complete architectural specification
 
 holdout-scenarios/
 └── cxdb-graph-ui-holdout-scenarios.md   # Behavioral scenarios (holdout)
+
+specification-critiques/                 # Iterative critique/acknowledgement history
 ```
 
 The spec file is the single source of truth. The holdout scenarios are withheld from the implementing agent and used for validation.
@@ -194,7 +199,7 @@ This runs `compile_dot.rb` → `verify_dot.rb` → `kilroy attractor validate`. 
 ```bash
 env -u CLAUDECODE direnv exec . ../kilroy/kilroy attractor run \
   --graph pipeline.dot \
-  --config run.yaml
+  --config factory/run.yaml
 ```
 
 The `env -u CLAUDECODE` prefix unsets the nested-session guard variable (Kilroy invokes `claude` internally). The `direnv exec` ensures environment variables from `.env` are loaded.
@@ -234,7 +239,7 @@ Each Kilroy run commits only to its own worktree branch. Use `/kilroy:land` to s
 
 ## When to Stop and Revise the Spec
 
-If the pipeline loops through postmortem with the same failure pattern, the spec is usually the problem — not the agent. Stop the run, look at the worktree's spec file, identify what's underspecified, and revise `specification/cxdb-graph-ui-spec.md`.
+If the pipeline loops through postmortem with the same failure pattern, the spec is usually the problem — not the agent. Stop the run, look at the worktree's spec file, identify what's underspecified, and revise `specification/intent/cxdb-graph-ui-spec.md`.
 
 The spec is the source of truth. The code is disposable. Revise and re-run.
 

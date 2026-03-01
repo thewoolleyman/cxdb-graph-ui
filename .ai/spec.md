@@ -1,5 +1,5 @@
 # CXDB Graph UI — Combined Specification
-Source: specification/cxdb-graph-ui-spec.md
+Source: specification/intent/cxdb-graph-ui-spec.md
 Date: 2026-02-28
 
 # CXDB Graph UI Specification

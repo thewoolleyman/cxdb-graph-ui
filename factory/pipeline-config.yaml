@@ -3,7 +3,7 @@ repo_path: .
 output_dot: pipeline.dot
 
 graph_id: cxdb_graph_ui_pipeline
-graph_goal: "a Go HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per the specification at specification/cxdb-graph-ui-spec.md"
+graph_goal: "a Go HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per the specification at specification/intent/cxdb-graph-ui-spec.md"
 topology: no-fanout
 default_max_retry: 3
 retry_target: implement
@@ -157,7 +157,7 @@ edges:
     label: "Abort"
 
 goal: |
-  Implement the CXDB Graph UI per the specification at `specification/cxdb-graph-ui-spec.md`.
+  Implement the CXDB Graph UI per the specification at `specification/intent/cxdb-graph-ui-spec.md`.
 
   The deliverables are two files in `ui/`:
   - `ui/main.go` — Go HTTP server (standard library only, no external deps)
@@ -208,12 +208,12 @@ required_gates:
     timeout: "120s"
 
 expand_spec_prompt: |
-  Read the specification file at `specification/cxdb-graph-ui-spec.md`.
+  Read the specification file at `specification/intent/cxdb-graph-ui-spec.md`.
 
   Copy its content verbatim into `.ai/spec.md`, prepending a header:
   ```
   # CXDB Graph UI — Combined Specification
-  Source: specification/cxdb-graph-ui-spec.md
+  Source: specification/intent/cxdb-graph-ui-spec.md
   Date: <today's date>
   ```
 

@@ -52,7 +52,7 @@ class TestExtractPrompts < Minitest::Test
     assert_equal 0, $?.exitstatus
     assert_includes out, "Extracted prompt"
 
-    prompt_file = File.join(@tmpdir, "implement.md")
+    prompt_file = File.join(@tmpdir, "prompts", "implement.md")
     assert File.exist?(prompt_file), "Expected #{prompt_file} to exist"
 
     content = File.read(prompt_file)
@@ -78,7 +78,7 @@ class TestExtractPrompts < Minitest::Test
     assert_equal 0, $?.exitstatus
     assert_includes out, "Extracted question"
 
-    question_file = File.join(@tmpdir, "human_gate.md")
+    question_file = File.join(@tmpdir, "prompts", "human_gate.md")
     assert File.exist?(question_file), "Expected #{question_file} to exist"
 
     content = File.read(question_file)
@@ -102,10 +102,10 @@ class TestExtractPrompts < Minitest::Test
 
     `ruby #{SCRIPT} #{yaml} #{dot} 2>&1`
 
-    expand_file = File.join(@tmpdir, "expand_spec.md")
+    expand_file = File.join(@tmpdir, "prompts", "expand_spec.md")
     refute File.exist?(expand_file), "expand_spec.md should NOT be created"
 
-    implement_file = File.join(@tmpdir, "implement.md")
+    implement_file = File.join(@tmpdir, "prompts", "implement.md")
     assert File.exist?(implement_file), "implement.md should be created"
   end
 
@@ -124,7 +124,7 @@ class TestExtractPrompts < Minitest::Test
 
     `ruby #{SCRIPT} #{yaml} #{dot} 2>&1`
 
-    content = File.read(File.join(@tmpdir, "review.md"))
+    content = File.read(File.join(@tmpdir, "prompts", "review.md"))
     assert_includes content, 'syntax = "proto3";'
     assert_includes content, "package gitlab.bench.v1;"
   end
@@ -152,7 +152,7 @@ class TestExtractPrompts < Minitest::Test
     assert_equal 0, $?.exitstatus
     assert_includes out, "extracted 4 prompt(s)"
 
-    prompts_dir = @tmpdir
+    prompts_dir = File.join(@tmpdir, "prompts")
     assert File.exist?(File.join(prompts_dir, "implement.md"))
     assert File.exist?(File.join(prompts_dir, "review.md"))
     assert File.exist?(File.join(prompts_dir, "postmortem.md"))
@@ -177,7 +177,7 @@ class TestExtractPrompts < Minitest::Test
     DOT
 
     `ruby #{SCRIPT} #{yaml} #{dot} 2>&1`
-    content = File.read(File.join(@tmpdir, "implement.md"))
+    content = File.read(File.join(@tmpdir, "prompts", "implement.md"))
     assert content.end_with?("\n"), "Prompt file should end with newline"
   end
 

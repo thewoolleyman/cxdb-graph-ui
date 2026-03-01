@@ -19,7 +19,7 @@ set -euo pipefail
 #   4. Lines from round 1 precede lines from round 2 (round ordering)
 #   5. Output is streaming (not all bunched at the end)
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
 
 TMPDIR_TEST=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_TEST"' EXIT
@@ -29,7 +29,7 @@ trap 'rm -rf "$TMPDIR_TEST"' EXIT
 MOCK_PROJ="$TMPDIR_TEST/project"
 mkdir -p "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts"
 mkdir -p "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/config"
-mkdir -p "$MOCK_PROJ/specification/critiques"
+mkdir -p "$MOCK_PROJ/specification-critiques"
 
 cp "$SCRIPT_DIR/loop.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
 cp "$SCRIPT_DIR/check_exit.sh" "$MOCK_PROJ/.claude/skills/spec-critique-revise-loop/scripts/"
@@ -57,7 +57,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-CRITIQUES_DIR="specification/critiques"
+CRITIQUES_DIR="specification-critiques"
 COUNTER_FILE="${MOCK_COUNTER_FILE:-/tmp/mock_counter}"
 
 if [[ "$prompt" == /spec:critique* ]]; then

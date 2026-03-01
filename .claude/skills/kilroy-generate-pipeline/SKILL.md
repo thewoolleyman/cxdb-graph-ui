@@ -16,16 +16,16 @@ YAML exists.
 
 ### Default mode: Deterministic compilation
 
-When `pipeline-config/pipeline-config.yaml` exists (with `nodes` and `edges`),
+When `factory/pipeline-config.yaml` exists (with `nodes` and `edges`),
 the pipeline is compiled deterministically. No LLM is involved.
 
 ```
- pipeline-config/
+ factory/
  +----------------------------+  +-------------------+
- | pipeline-config.yaml       |  | implement.md      |
- | graph_id, graph_goal       |  | review.md         |
- | nodes (id, shape, class)   |  | postmortem.md     |
- | edges (from, to, condition)|  | human_gate.md     |
+ | pipeline-config.yaml       |  | prompts/           |
+ | graph_id, graph_goal       |  |   implement.md     |
+ | nodes (id, shape, class)   |  |   postmortem.md    |
+ | edges (from, to, condition)|  |   human_gate.md    |
  | required_gates             |  | ...               |
  | expand_spec_prompt         |  +-------------------+
  | model_stylesheet           |          |
@@ -84,7 +84,7 @@ exists without a config YAML, the script refuses to continue.
   patch_dot.rb ──► patched DOT
         │
         ▼
-  extract_prompts.rb ──► pipeline-config/*.md
+  extract_prompts.rb ──► factory/prompts/*.md
         │
         ▼
   verify_dot.rb + kilroy attractor validate
@@ -151,7 +151,7 @@ Check that:
 ## Run the pipeline generation
 
 Execute the generation script. The target for this repo uses the config at
-`pipeline-config/pipeline-config.yaml` and outputs `pipeline.dot`:
+`factory/pipeline-config.yaml` and outputs `pipeline.dot`:
 
 ```bash
 env -u CLAUDECODE direnv exec "$PWD" ruby \
@@ -159,7 +159,7 @@ env -u CLAUDECODE direnv exec "$PWD" ruby \
 ```
 
 The `.` target means "this repo" — the script resolves it to find
-`pipeline-config/pipeline-config.yaml` and output `pipeline.dot`.
+`factory/pipeline-config.yaml` and output `pipeline.dot`.
 
 To force recompilation (ignores checksum cache):
 

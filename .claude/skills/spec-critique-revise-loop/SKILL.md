@@ -58,10 +58,10 @@ Print the number of critics found.
 
 ### Step 4: Process unacknowledged critiques
 
-Before starting the loop, check for critique files in `specification/critiques/` that have no corresponding `*-acknowledgement.md` file. These are critiques from a previous interrupted run that were never processed.
+Before starting the loop, check for critique files in `specification-critiques/` that have no corresponding `*-acknowledgement.md` file. These are critiques from a previous interrupted run that were never processed.
 
 ```bash
-ls specification/critiques/ 2>/dev/null | sort
+ls specification-critiques/ 2>/dev/null | sort
 ```
 
 For each `v*-*.md` file (excluding `*acknowledgement*`) that has no matching `*-acknowledgement.md`:
@@ -116,7 +116,7 @@ date +%s > "$STATE_DIR/round_start"
 #### Step 5b: Snapshot critiques directory
 
 ```bash
-ls specification/critiques/ 2>/dev/null | sort
+ls specification-critiques/ 2>/dev/null | sort
 ```
 
 Save this listing for comparison after critics run.
@@ -151,7 +151,7 @@ Print a brief summary of each critic's result.
 #### Step 5d: Find new critique files
 
 ```bash
-ls specification/critiques/ 2>/dev/null | sort
+ls specification-critiques/ 2>/dev/null | sort
 ```
 
 Compare with the snapshot from Step 5b using `comm -13` to find new files. Filter out `*acknowledgement*` files — those are from revise, not critique.
@@ -166,7 +166,7 @@ For each new critique file, run:
 
 ```bash
 bash .claude/skills/spec-critique-revise-loop/scripts/check_exit.sh \
-  "specification/critiques/<file>" \
+  "specification-critiques/<file>" \
   "{LOOP_EXIT_CRITERIA}" \
   "$STATE_DIR/prev_issues"
 ```

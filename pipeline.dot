@@ -1,7 +1,7 @@
 digraph cxdb_graph_ui_pipeline {
   graph [
     config_sha256="0ad7af3bff58f2ebeb57d58829fa0aad9985dc7e39ed9800042101fe47af25a6",
-    goal="a Go HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per the specification at specification/cxdb-graph-ui-spec.md",
+    goal="a Go HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per the specification at specification/intent/cxdb-graph-ui-spec.md",
     rankdir=LR,
     default_max_retry=3,
     retry_target="implement",
@@ -15,12 +15,12 @@ digraph cxdb_graph_ui_pipeline {
 
   start [shape=Mdiamond]
   exit [shape=Msquare]
-  expand_spec [shape=box, prompt="Read the specification file at `specification/cxdb-graph-ui-spec.md`.
+  expand_spec [shape=box, prompt="Read the specification file at `specification/intent/cxdb-graph-ui-spec.md`.
 
 Copy its content verbatim into `.ai/spec.md`, prepending a header:
 ```
 # CXDB Graph UI — Combined Specification
-Source: specification/cxdb-graph-ui-spec.md
+Source: specification/intent/cxdb-graph-ui-spec.md
 Date: <today's date>
 ```
 

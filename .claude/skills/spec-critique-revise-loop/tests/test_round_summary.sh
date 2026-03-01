@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Unit tests for round_summary.sh
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
 ROUND_SUMMARY="$SCRIPT_DIR/round_summary.sh"
 TMPDIR_TEST=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_TEST"' EXIT
@@ -61,7 +61,7 @@ cat > "$TMPDIR_TEST/ack_standard.md" <<'EOF'
 Fixed the error handling in the spec.
 
 Changes:
-- `specification/cxdb-graph-ui-spec.md`: Added error handling section
+- `specification/intent/cxdb-graph-ui-spec.md`: Added error handling section
 
 ## Issue #2: Incomplete API docs
 
@@ -76,7 +76,7 @@ Out of scope for this revision.
 Added SSE documentation.
 
 Changes:
-- `specification/cxdb-graph-ui-spec.md`: Section 10
+- `specification/intent/cxdb-graph-ui-spec.md`: Section 10
 
 ## Issue #4: Active sessions fields
 
@@ -91,7 +91,7 @@ Added some fields but not all.
 Rewrote discovery algorithm.
 
 Changes:
-- `specification/cxdb-graph-ui-spec.md`: Section 5.5
+- `specification/intent/cxdb-graph-ui-spec.md`: Section 5.5
 EOF
 
 output=$("$ROUND_SUMMARY" "$TMPDIR_TEST/ack_standard.md")
@@ -173,7 +173,7 @@ fi
 # --- Test 5: Verify against real repo ack file ---
 echo ""
 echo "Test 5: Real v4-opus-acknowledgement.md"
-real_ack="$SCRIPT_DIR/../../../specification/critiques/v4-opus-acknowledgement.md"
+real_ack="$SCRIPT_DIR/../../../../specification-critiques/v4-opus-acknowledgement.md"
 if [ -f "$real_ack" ]; then
   output=$("$ROUND_SUMMARY" "$real_ack")
   echo "$output"

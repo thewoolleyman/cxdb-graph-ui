@@ -38,7 +38,7 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # scripts/ → spec-critique-revise-loop/ → skills/ → .claude/ → project root
 PROJ_DIR="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
-CRITIQUES_DIR="$PROJ_DIR/specification/critiques"
+CRITIQUES_DIR="$PROJ_DIR/specification-critiques"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CRITIC_CONFIG="$SKILL_DIR/config/critic-commands.conf"
 
@@ -464,9 +464,9 @@ echo "  Skipped:       $cumulative_skipped"
 echo ""
 echo "Files created:"
 for f in "${critique_files_created[@]+"${critique_files_created[@]}"}"; do
-  echo "  specification/critiques/$f"
+  echo "  specification-critiques/$f"
 done
 for f in "${ack_files_created[@]+"${ack_files_created[@]}"}"; do
-  echo "  specification/critiques/$f"
+  echo "  specification-critiques/$f"
 done
 echo "============================================"

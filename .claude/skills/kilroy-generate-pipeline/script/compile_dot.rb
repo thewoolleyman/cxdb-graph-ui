@@ -46,9 +46,9 @@ def build_gate_lookup(doc)
   lookup
 end
 
-# Resolve a prompt file for a node. Convention: <yaml_dir>/<node_id>.md
+# Resolve a prompt file for a node. Convention: <yaml_dir>/prompts/<node_id>.md
 def resolve_prompt_file(yaml_dir, target, node_id)
-  yaml_dir.join("#{node_id}.md")
+  yaml_dir.join("prompts", "#{node_id}.md")
 end
 
 # Read a prompt file, stripping trailing whitespace but preserving internal formatting.

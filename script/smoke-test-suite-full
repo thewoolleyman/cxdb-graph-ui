@@ -28,6 +28,12 @@ else
   echo
 fi
 
+# Skill tests: kilroy-generate-pipeline (Ruby/Minitest)
+run_step "kilroy-generate-pipeline tests" bash "${REPO_ROOT}/.claude/skills/kilroy-generate-pipeline/tests/run_tests.sh"
+
+# Skill tests: spec-critique-revise-loop (bash unit tests)
+run_step "spec-critique-revise-loop tests" bash "${REPO_ROOT}/.claude/skills/spec-critique-revise-loop/tests/run_tests.sh"
+
 if [ "$failed" -ne 0 ]; then
   echo "Some steps failed."
   exit 1

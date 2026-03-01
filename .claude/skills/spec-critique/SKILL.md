@@ -35,7 +35,7 @@ Parse `$ARGUMENTS` for named `KEY=VALUE` parameters. Ignore non-parameter text (
 
 Read the specification file:
 
-- `specification/cxdb-graph-ui-spec.md`
+- `specification/intent/cxdb-graph-ui-spec.md`
 
 ## Step 3: Read the Holdout Scenarios
 
@@ -45,7 +45,7 @@ Read the holdout scenarios for reference:
 
 ## Step 4: Determine Critique Version
 
-List the files in `specification/critiques/` and find the highest existing version number N.
+List the files in `specification-critiques/` and find the highest existing version number N.
 
 Version numbers are extracted from filenames matching patterns:
 - `vN.md` (legacy single-author format)
@@ -57,13 +57,13 @@ Your critique will be version **N+1**.
 
 **Important:** Multiple authors can write critiques for the same version. If you find that version N+1 already has critique files from other authors (e.g., `v{N+1}-gemini.md` exists), then use N+1 as your version too — you are adding your critique alongside theirs. Only increment past N+1 if N+1 already has an acknowledgement file.
 
-If the `specification/critiques/` directory does not exist yet, create it and use version 1.
+If the `specification-critiques/` directory does not exist yet, create it and use version 1.
 
 ## Step 5: Read Previous Critique Context
 
 Read ALL critique files from version N (both legacy `vN.md` and multi-author `vN-<author>.md` files). Also read any acknowledgement files for version N (`vN-acknowledgement.md` or `vN-<author>-acknowledgement.md`).
 
-**Note:** Older critiques may have been archived. If you need to reference versions that do not appear in `specification/critiques/`, check `specification/critiques-archive/` — it contains the same filename patterns but for earlier versions.
+**Note:** Older critiques may have been archived. If you need to reference versions that do not appear in `specification-critiques/`, check `specification-critiques-archive/` — it contains the same filename patterns but for earlier versions.
 
 Use this context to:
 - **Avoid re-raising** issues that were already addressed
@@ -91,7 +91,7 @@ Review for:
 Write your critique to:
 
 ```
-specification/critiques/v{VERSION}-{AUTHOR}.md
+specification-critiques/v{VERSION}-{AUTHOR}.md
 ```
 
 Use this format:
