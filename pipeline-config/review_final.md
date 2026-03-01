@@ -6,7 +6,7 @@ Perform a final semantic review of the CXDB Graph UI implementation to ensure it
 
 ## Context
 
-All deterministic gates (fmt, vet, build, tests) have passed. This is the final semantic fidelity check before marking the pipeline complete.
+All deterministic gates (fmt, vet, build, tests, browser) have passed. This is the final semantic fidelity check before marking the pipeline complete.
 
 ## Files to Read
 
@@ -14,6 +14,7 @@ All deterministic gates (fmt, vet, build, tests) have passed. This is the final 
 - `ui/main.go` — Go server implementation
 - `ui/index.html` — Browser SPA implementation
 - `ui/go.mod` — Module file
+- `.ai/verify_browser.md` — Browser verification results (from previous stage)
 
 ## Files to Write
 
@@ -38,7 +39,13 @@ All deterministic gates (fmt, vet, build, tests) have passed. This is the final 
    - **AC-11**: CXDB proxy strips `/api/cxdb/{index}` prefix and forwards remainder
    - **AC-12**: `/api/dots` returns filenames in `--dot` flag order
 
-3. Check browser SPA (spec Sections 4–8):
+3. Check browser verification passed (previous stage):
+   - **AC-22**: `.ai/verify_browser.md` exists and reports all checks passed
+   - **AC-23**: Graphviz WASM loaded successfully (no stuck "Loading Graphviz...")
+   - **AC-24**: SVG rendered with expected nodes, tabs showed correct graph IDs, node click opened detail panel
+   - **AC-25**: No blocking JavaScript errors (CDN 404s, uncaught exceptions)
+
+4. Check browser SPA (spec Sections 4–8):
    - **AC-13**: CDN URLs pinned to exact versions (esm.sh for wasm-graphviz, jsDelivr for msgpack)
    - **AC-14**: DOT rendered to SVG via `Graphviz.load()` + `gv.layout(dot, "svg", "dot")`
    - **AC-15**: Pipeline tabs from `/api/dots`, labeled with graph ID (fallback: filename)
@@ -49,12 +56,12 @@ All deterministic gates (fmt, vet, build, tests) have passed. This is the final 
    - **AC-20**: Detail panel shows node attributes on click; user content via textContent/escaped HTML
    - **AC-21**: Graceful degradation when CXDB unreachable (graph still renders)
 
-4. Write `.ai/review_final.md` with:
-   - Section for each major component (server routes, DOT parsing, browser rendering, status overlay, detail panel)
+5. Write `.ai/review_final.md` with:
+   - Section for each major component (server routes, DOT parsing, browser integration tests, browser rendering, status overlay, detail panel)
    - Pass/fail for each AC above
    - List any gaps with specific AC identifiers
 
-5. If ANY acceptance criteria fail, set `failure_signature` to comma-separated sorted list of failed AC IDs (e.g. "AC-3,AC-7")
+6. If ANY acceptance criteria fail, set `failure_signature` to comma-separated sorted list of failed AC IDs (e.g. "AC-3,AC-7")
 
 ## Acceptance Checks
 

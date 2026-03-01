@@ -1,6 +1,6 @@
 digraph cxdb_graph_ui_pipeline {
   graph [
-    config_sha256="ccca261329f62580361632ea4f4be009588b3bf187a86d4adfe7a5cf2989a5ba",
+    config_sha256="0ad7af3bff58f2ebeb57d58829fa0aad9985dc7e39ed9800042101fe47af25a6",
     goal="a Go HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per the specification at specification/cxdb-graph-ui-spec.md",
     rankdir=LR,
     default_max_retry=3,
@@ -178,6 +178,106 @@ Do not write nested `status.json` files after `cd`."]
   check_build [shape=diamond]
   verify_tests [shape=parallelogram, tool_command="mise exec -- sh -c 'cd ui && go test ./...'", timeout="120s"]
   check_tests [shape=diamond]
+  verify_browser [shape=box, class="verify", prompt="# Browser Rendering Verification
+
+## Task
+
+Verify that the CXDB Graph UI application actually loads and renders in a real browser. This is a smoke test that catches broken CDN URLs, WASM initialization failures, and any JavaScript errors that prevent the page from functioning.
+
+## Context
+
+All deterministic gates (fmt, vet, build, tests) have passed. This stage uses the Playwright MCP browser tools to start the server, load the page, and verify that the core rendering pipeline works end-to-end.
+
+## Prerequisites
+
+You have access to Playwright MCP browser tools: `browser_navigate`, `browser_snapshot`, `browser_take_screenshot`, `browser_evaluate`, `browser_click`, `browser_wait_for`, `browser_console_messages`.
+
+## What to Do
+
+### Step 1: Start the server
+
+Build and start the server in the background with the fixture DOT files shipped in `holdout-scenarios/fixtures/`:
+
+```bash
+REPO=$(pwd)
+go build -o /tmp/cxdb-graph-ui-verify ./ui/
+/tmp/cxdb-graph-ui-verify \\
+  --dot \"$REPO/holdout-scenarios/fixtures/simple-pipeline.dot\" \\
+  --dot \"$REPO/holdout-scenarios/fixtures/multi-tab-b.dot\" &
+sleep 2
+```
+
+Verify the server is responding:
+```bash
+curl -sf http://127.0.0.1:9030/ > /dev/null
+```
+
+### Step 2: Navigate and wait for rendering
+
+1. Navigate to `http://127.0.0.1:9030`
+2. Wait up to 30 seconds for the \"Loading Graphviz...\" message to disappear
+3. If \"Loading Graphviz...\" is still shown after 30 seconds, this is a **FAIL** — the WASM or a CDN dependency is broken
+
+### Step 3: Verify SVG rendering
+
+Use `browser_evaluate` to check:
+
+```javascript
+// SVG element exists and contains nodes
+const svg = document.querySelector('svg');
+const hasNodes = svg && svg.querySelectorAll('[id]').length > 0;
+```
+
+**FAIL** if no SVG is present or it contains no node elements.
+
+### Step 4: Verify pipeline tabs
+
+Use `browser_evaluate` or `browser_snapshot` to check:
+
+- At least two tabs are visible (we started with two DOT files)
+- The first tab label is \"simple_pipeline\" (graph ID, not filename)
+- The second tab label is \"beta_pipeline\"
+
+**FAIL** if tabs are missing or labels are wrong.
+
+### Step 5: Verify node click opens detail panel
+
+1. Click on a node in the SVG (e.g., the \"implement\" node)
+2. Verify the detail panel opens and shows node information (Node ID, Type)
+
+**FAIL** if clicking a node does not open a detail panel.
+
+### Step 6: Check for JavaScript errors
+
+Use `browser_console_messages` with level \"error\" to check for JavaScript errors. CDN 404s, module load failures, and uncaught exceptions will appear here.
+
+- A 404 on `/favicon.ico` is acceptable (ignore it)
+- A 404 or error on any CDN dependency (msgpack, graphviz WASM) is a **FAIL**
+- Any uncaught JavaScript error is a **FAIL**
+
+### Step 7: Clean up
+
+Kill the server process:
+```bash
+pkill -f cxdb-graph-ui-verify 2>/dev/null || true
+```
+
+### Step 8: Report results
+
+Write a summary of pass/fail for each check to `.ai/verify_browser.md`.
+
+## Status Contract
+
+Write status JSON to `$KILROY_STAGE_STATUS_PATH` (absolute path). If unavailable, use `$KILROY_STAGE_STATUS_FALLBACK_PATH`.
+
+Success (all checks pass): `{\"status\":\"success\"}`
+Failure: `{\"status\":\"fail\",\"failure_reason\":\"browser_rendering_broken\",\"failure_signature\":\"<comma-separated-failed-checks>\",\"details\":\"<specific failures>\",\"failure_class\":\"deterministic\"}`
+
+Failure signatures use these check names: `graphviz_load`, `svg_render`, `tabs`, `node_click`, `js_errors`.
+
+Example: `{\"status\":\"fail\",\"failure_reason\":\"browser_rendering_broken\",\"failure_signature\":\"graphviz_load,svg_render\",\"details\":\"Page stuck on Loading Graphviz after 30s. Console shows 404 on msgpack CDN URL.\",\"failure_class\":\"deterministic\"}`
+
+Do not write nested `status.json` files after `cd`."]
   review_final [shape=box, class="verify", goal_gate=true, prompt="# Final Review
 
 ## Task
@@ -186,7 +286,7 @@ Perform a final semantic review of the CXDB Graph UI implementation to ensure it
 
 ## Context
 
-All deterministic gates (fmt, vet, build, tests) have passed. This is the final semantic fidelity check before marking the pipeline complete.
+All deterministic gates (fmt, vet, build, tests, browser) have passed. This is the final semantic fidelity check before marking the pipeline complete.
 
 ## Files to Read
 
@@ -194,6 +294,7 @@ All deterministic gates (fmt, vet, build, tests) have passed. This is the final 
 - `ui/main.go` — Go server implementation
 - `ui/index.html` — Browser SPA implementation
 - `ui/go.mod` — Module file
+- `.ai/verify_browser.md` — Browser verification results (from previous stage)
 
 ## Files to Write
 
@@ -218,7 +319,13 @@ All deterministic gates (fmt, vet, build, tests) have passed. This is the final 
    - **AC-11**: CXDB proxy strips `/api/cxdb/{index}` prefix and forwards remainder
    - **AC-12**: `/api/dots` returns filenames in `--dot` flag order
 
-3. Check browser SPA (spec Sections 4–8):
+3. Check browser verification passed (previous stage):
+   - **AC-22**: `.ai/verify_browser.md` exists and reports all checks passed
+   - **AC-23**: Graphviz WASM loaded successfully (no stuck \"Loading Graphviz...\")
+   - **AC-24**: SVG rendered with expected nodes, tabs showed correct graph IDs, node click opened detail panel
+   - **AC-25**: No blocking JavaScript errors (CDN 404s, uncaught exceptions)
+
+4. Check browser SPA (spec Sections 4–8):
    - **AC-13**: CDN URLs pinned to exact versions (esm.sh for wasm-graphviz, jsDelivr for msgpack)
    - **AC-14**: DOT rendered to SVG via `Graphviz.load()` + `gv.layout(dot, \"svg\", \"dot\")`
    - **AC-15**: Pipeline tabs from `/api/dots`, labeled with graph ID (fallback: filename)
@@ -229,12 +336,12 @@ All deterministic gates (fmt, vet, build, tests) have passed. This is the final 
    - **AC-20**: Detail panel shows node attributes on click; user content via textContent/escaped HTML
    - **AC-21**: Graceful degradation when CXDB unreachable (graph still renders)
 
-4. Write `.ai/review_final.md` with:
-   - Section for each major component (server routes, DOT parsing, browser rendering, status overlay, detail panel)
+5. Write `.ai/review_final.md` with:
+   - Section for each major component (server routes, DOT parsing, browser integration tests, browser rendering, status overlay, detail panel)
    - Pass/fail for each AC above
    - List any gaps with specific AC identifiers
 
-5. If ANY acceptance criteria fail, set `failure_signature` to comma-separated sorted list of failed AC IDs (e.g. \"AC-3,AC-7\")
+6. If ANY acceptance criteria fail, set `failure_signature` to comma-separated sorted list of failed AC IDs (e.g. \"AC-3,AC-7\")
 
 ## Acceptance Checks
 
@@ -349,9 +456,13 @@ Options:
   check_build -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
   check_build -> postmortem
   verify_tests -> check_tests
-  check_tests -> review_final [condition="outcome = success"]
+  check_tests -> verify_browser [condition="outcome = success"]
   check_tests -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
   check_tests -> postmortem
+  verify_browser -> review_final [condition="outcome = success"]
+  verify_browser -> implement [condition="outcome = fail && context.failure_class = transient_infra", loop_restart=true]
+  verify_browser -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
+  verify_browser -> postmortem
   review_final -> exit [condition="outcome = success"]
   review_final -> postmortem [condition="outcome = fail"]
   review_final -> postmortem

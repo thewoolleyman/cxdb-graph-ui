@@ -41,6 +41,9 @@ nodes:
     shape: parallelogram
   - id: check_tests
     shape: diamond
+  - id: verify_browser
+    shape: box
+    class: verify
   - id: review_final
     shape: box
     class: verify
@@ -117,12 +120,24 @@ edges:
   - from: verify_tests
     to: check_tests
   - from: check_tests
-    to: review_final
+    to: verify_browser
     condition: "outcome = success"
   - from: check_tests
     to: postmortem
     condition: "outcome = fail && context.failure_class != transient_infra"
   - from: check_tests
+    to: postmortem
+  - from: verify_browser
+    to: review_final
+    condition: "outcome = success"
+  - from: verify_browser
+    to: implement
+    condition: "outcome = fail && context.failure_class = transient_infra"
+    loop_restart: true
+  - from: verify_browser
+    to: postmortem
+    condition: "outcome = fail && context.failure_class != transient_infra"
+  - from: verify_browser
     to: postmortem
   - from: review_final
     to: exit
