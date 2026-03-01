@@ -1662,6 +1662,13 @@ When all contexts for the active pipeline's active run have `is_live == false` a
 - [ ] DOT file changes are picked up on tab switch (no server restart needed)
 - [ ] DOT syntax errors display an error message instead of crashing
 
+### Testing
+
+- [ ] Browser integration tests pass (`go test -tags browser -count=1 -timeout 120s ./ui/...`)
+- [ ] Application loads in headless Chrome without blocking JS errors
+- [ ] Graphviz WASM initializes and SVG renders with expected node IDs
+- [ ] Pipeline tabs render and node click opens detail panel
+
 ### Security
 
 - [ ] `/dots/` only serves files registered via `--dot` (no path traversal)
@@ -1672,7 +1679,7 @@ When all contexts for the active pipeline's active run have `is_live == false` a
 
 ## 12. Testing Requirements
 
-The implementation requires three distinct testing layers. All three layers must pass before the implementation is considered complete.
+The implementation requires four distinct testing layers. All four layers must pass before the implementation is considered complete.
 
 ### 12.1 Go Unit Tests — Server Layer
 
@@ -1705,7 +1712,34 @@ vitest run --coverage --coverage.provider=v8 --coverage.100
 
 **Must run without** a live server, browser, or CXDB instance.
 
-### 12.3 Playwright UI Tests — Integration Layer
+### 12.3 Browser Integration Tests — Smoke Layer
+
+**Purpose:** Verify that the assembled application actually loads and renders in a real browser. This layer catches CDN failures, WASM initialization errors, and module-level import breakages that unit tests cannot detect.
+
+**Tooling:** `chromedp` (pure Go, headless Chrome via DevTools Protocol). Tests live within the Go test suite and require no Node.js or external test runner.
+
+```bash
+go test -tags browser -count=1 -timeout 120s ./ui/...
+```
+
+**Build tag isolation:** Tests use `//go:build browser` so that the fast unit test suite (`go test ./...`) is unaffected. Browser tests run only when explicitly invoked with `-tags browser`.
+
+**In-process server:** Tests start the real Go server on a random port (`:0` or `httptest.NewServer`), eliminating external process management. A fixture DOT file is used as the `--dot` input.
+
+**Minimum required assertions:**
+- The page loads without JavaScript errors that block module execution
+- Graphviz WASM initializes (the "Loading Graphviz..." message disappears)
+- An SVG element is present in the DOM containing expected node IDs from the fixture DOT file
+- Pipeline tabs render with correct graph IDs
+- Clicking a node opens the detail panel
+
+**CDN dependency validation:** Because the tests load the actual `index.html` with its CDN imports, any broken CDN URL causes the module to fail to load, which causes the SVG assertion to timeout and fail. This directly prevents the class of bug seen in v58 (broken msgpack CDN URL).
+
+**Pipeline integration:** A dedicated pipeline gate (e.g., `verify_browser`) runs the browser test command after `verify_tests`. This keeps the fast unit test loop clean while ensuring browser rendering is verified before `review_final`.
+
+**Enforcement:** The `script/smoke-test-suite-slow` script (or equivalent) runs `go test -tags browser -count=1 -timeout 120s ./ui/...` and must pass before a pipeline run is considered successful.
+
+### 12.4 Playwright UI Tests — Integration Layer
 
 **Scope:** Visual rendering, DOM structure, user interactions, network error handling, and CXDB status overlay (with mock CXDB via Playwright request routing).
 
@@ -1717,18 +1751,19 @@ vitest run --coverage --coverage.provider=v8 --coverage.100
 
 **Server startup scenarios** (no `--dot` flag, duplicate basenames, duplicate graph IDs, anonymous graph) are tested via Bash subprocess in the same skill: run the binary, capture exit code and stderr, assert on expected values.
 
-### 12.4 Testing Layer Boundaries
+### 12.5 Testing Layer Boundaries
 
 The following table maps scenario categories to their required testing layer:
 
 | Scenario Category | Testing Layer |
 |---|---|
-| DOT Rendering — visual (SVG shapes, tab labels, HTML escaping) | Playwright (12.3) |
+| DOT Rendering — visual (SVG shapes, tab labels, HTML escaping) | Playwright (12.4) |
 | DOT Rendering — API contract (edge chain JSON, port stripping, parse error bodies) | Go tests (12.1) |
-| CXDB Status Overlay (node colors, pulsing, stale detection) | Playwright + mock CXDB (12.3) |
+| Application loads and renders (CDN deps, WASM init, SVG output) | Browser integration (12.3) |
+| CXDB Status Overlay (node colors, pulsing, stale detection) | Playwright + mock CXDB (12.4) |
 | Pipeline Discovery state machine (ULID selection, gap recovery, CQL flag, etc.) | JS unit tests (12.2) |
-| Detail Panel — visual (panel opens, content rendered) | Playwright (12.3) |
+| Detail Panel — visual (panel opens, content rendered) | Playwright (12.4) |
 | Detail Panel — CXDB turn format (StageStarted/Finished/Failed output strings) | JS unit tests (12.2) |
-| CXDB Connection Handling (unreachable → message, partial connectivity indicator) | Playwright + mock CXDB (12.3) |
-| Server startup validation (exit code, error messages) | Bash subprocess (12.3 skill) |
+| CXDB Connection Handling (unreachable → message, partial connectivity indicator) | Playwright + mock CXDB (12.4) |
+| Server startup validation (exit code, error messages) | Bash subprocess (12.4 skill) |
 | Server API format (`/api/dots`, `/api/cxdb/instances`, `/dots/{name}` 404) | Go tests (12.1) |
