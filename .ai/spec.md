@@ -273,24 +273,38 @@ const svg = gv.layout(dotString, "svg", "dot");
 
 The UI calls `gv.layout(dotString, "svg", "dot")` with the raw DOT file content fetched from `/dots/{name}`. The resulting SVG is injected into the main content area.
 
-If the CDN is unreachable, the WASM module fails to load and the graph area displays an error message. The rest of the UI (tabs, connection indicator) still renders.
+If the Graphviz CDN is unreachable, the WASM module fails to load and the graph area displays an error message. The rest of the UI (tabs, connection indicator) still renders — this requires that CDN dependencies are loaded with import isolation (see Section 4.1.1) so that a failure in one dependency does not prevent the module from executing.
 
 ### 4.1.1 Browser Dependencies
 
-The browser loads two CDN dependencies. Both are ES modules imported via `<script type="module">` in `index.html`:
+The browser loads two CDN dependencies. Both are ES modules used in `index.html`:
+
+**Import isolation.** To uphold the graceful degradation principle (Section 1.2), CDN dependencies must not share a single top-level `import` scope where one failure prevents all JavaScript from executing. The msgpack decoder — used only for CXDB pipeline discovery (`decodeFirstTurn`, Section 5.5) — must be loaded via dynamic `import()` with error handling, not as a top-level `import` statement. This ensures that if the msgpack CDN is unreachable or returns an error, DOT rendering, tab creation, and the connection indicator still function. The Graphviz WASM dependency may remain a top-level import since DOT rendering is the UI's primary function and cannot proceed without it. The recommended pattern for msgpack is a lazy singleton loaded on first use:
+
+```javascript
+let msgpackModule = null;
+async function getMsgpack() {
+    if (!msgpackModule) {
+        msgpackModule = await import("https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-beta2/dist.es5+esm/index.mjs");
+    }
+    return msgpackModule;
+}
+```
+
+If the dynamic `import()` fails, `decodeFirstTurn` returns `null` for the affected context, and pipeline discovery falls back to retrying on the next poll cycle. DOT rendering and the rest of the UI are unaffected.
 
 1. **Graphviz WASM** — `@hpcc-js/wasm-graphviz` at pinned version via esm.sh (documented above in Section 4.1). Used for DOT-to-SVG rendering.
 
 2. **Msgpack decoder** — `@msgpack/msgpack` at a pinned CDN URL:
 
 ```
-https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-beta2/dist.es5+esm/mod.min.mjs
+https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-beta2/dist.es5+esm/index.mjs
 ```
 
-The expected import and usage pattern is:
+The expected usage pattern is via the `getMsgpack()` lazy loader (see "Import isolation" above):
 
 ```javascript
-import { decode } from "https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-beta2/dist.es5+esm/mod.min.mjs";
+const { decode } = await getMsgpack();
 const payload = decode(uint8ArrayBytes);
 ```
 
