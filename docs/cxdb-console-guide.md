@@ -72,7 +72,7 @@ When you click a turn, the right panel shows:
 
 | Field | What it tells you |
 |-------|-------------------|
-| `node_id` | Which pipeline stage the agent is executing (`expand_spec`, `check_toolchain`, `implement`, etc.) |
+| `node_id` | Which pipeline stage the agent is executing (`implement`, `check_implement`, `check_toolchain`, etc.) |
 | `branch_key` | Which parallel branch (`dod_a`, `dod_b`, etc.) |
 | `previous_node` / `completed_nodes` | Pipeline progress so far |
 | `text` | The actual prompt or instructions the agent received |
@@ -120,7 +120,7 @@ You can `cd` into this directory to inspect the working state directly, or open 
 Kilroy pipelines are defined as DAGs (directed acyclic graphs). A typical pipeline flows through nodes like:
 
 ```
-start → check_toolchain → expand_spec → dod_fanout (parallel branches) → ...
+start → implement → check_implement → dod_fanout (parallel branches) → ...
 ```
 
 When the pipeline reaches a fanout node, it spawns multiple parallel contexts — each appears as a separate entry in the CXDB sidebar. The `model_stylesheet` in the context metadata defines which Claude model each node class uses (e.g., Opus for `.hard` tasks, Sonnet for others).

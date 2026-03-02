@@ -34,7 +34,7 @@ This project uses Kilroy to run an AI-powered implementation pipeline against th
 
 - **Single pipeline file:** `pipeline.dot` at the repo root (generated artifact — never edit directly).
 - **Single run config:** `factory/run.yaml`.
-- **Spec file:** `specification/intent/cxdb-graph-ui-spec.md` is the source of truth for what agents implement.
+- **Spec files:** All files under `specification/intent/` are the source of truth for what agents implement (see `specification/intent/README.md` for the index).
 - **Holdout scenarios:** `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` are behavioral test scenarios withheld from agents.
 - **Pipeline config:** `factory/pipeline-config.yaml` + per-node prompt markdown files in `factory/prompts/` define the pipeline structure.
 - **If a pipeline generates bad structure:** revise the spec file, then re-run `/kilroy:generate-pipeline`.

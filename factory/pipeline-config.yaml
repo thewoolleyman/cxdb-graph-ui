@@ -3,7 +3,7 @@ repo_path: .
 output_dot: pipeline.dot
 
 graph_id: cxdb_graph_ui_pipeline
-graph_goal: "a Go HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per the specification at specification/intent/cxdb-graph-ui-spec.md"
+graph_goal: "a Go HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per all files under specification/ (intent, contracts, and constraints)"
 topology: no-fanout
 default_max_retry: 3
 retry_target: implement
@@ -14,10 +14,6 @@ nodes:
     shape: Mdiamond
   - id: exit
     shape: Msquare
-  - id: expand_spec
-    shape: box
-  - id: check_expand_spec
-    shape: diamond
   - id: implement
     shape: box
     class: hard
@@ -56,21 +52,7 @@ nodes:
 
 edges:
   - from: start
-    to: expand_spec
-  - from: expand_spec
-    to: check_expand_spec
-  - from: check_expand_spec
     to: implement
-    condition: "outcome = success"
-  - from: check_expand_spec
-    to: expand_spec
-    condition: "outcome = fail && context.failure_class = transient_infra"
-    loop_restart: true
-  - from: check_expand_spec
-    to: postmortem
-    condition: "outcome = fail && context.failure_class != transient_infra"
-  - from: check_expand_spec
-    to: postmortem
   - from: implement
     to: check_implement
   - from: check_implement
@@ -157,7 +139,7 @@ edges:
     label: "Abort"
 
 goal: |
-  Implement the CXDB Graph UI per the specification at `specification/intent/cxdb-graph-ui-spec.md`.
+  Implement the CXDB Graph UI per the specification at `specification/` (intent, contracts, and constraints).
 
   The deliverables are two files in `ui/`:
   - `ui/main.go` — Go HTTP server (standard library only, no external deps)
@@ -206,19 +188,6 @@ required_gates:
   - id: verify_tests
     tool_command: "mise exec -- sh -c 'cd ui && go test ./...'"
     timeout: "120s"
-
-expand_spec_prompt: |
-  Read the specification file at `specification/intent/cxdb-graph-ui-spec.md`.
-
-  Copy its content verbatim into `.ai/spec.md`, prepending a header:
-  ```
-  # CXDB Graph UI — Combined Specification
-  Source: specification/intent/cxdb-graph-ui-spec.md
-  Date: <today's date>
-  ```
-
-  Write status to $KILROY_STAGE_STATUS_PATH with schema {"status":"success"}.
-  If $KILROY_STAGE_STATUS_PATH is unavailable, write to $KILROY_STAGE_STATUS_FALLBACK_PATH.
 
 model_stylesheet: |
   * { llm_model: claude-sonnet-4-6; llm_provider: anthropic; max_tokens: 65536; }

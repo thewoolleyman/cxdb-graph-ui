@@ -8,7 +8,7 @@ require "yaml"
 class TestVerifyDot < Minitest::Test
   SCRIPT = File.join(__dir__, "../script", "verify_dot.rb")
 
-  def make_dot(gates:, expand_spec_prompt: "Read the spec.", stylesheet: "* { llm_model: claude-sonnet-4-6; }")
+  def make_dot(gates:, stylesheet: "* { llm_model: claude-sonnet-4-6; }")
     gate_nodes = gates.map do |g|
       <<~NODE
         #{g["id"]} [
@@ -30,15 +30,12 @@ class TestVerifyDot < Minitest::Test
         start [shape=Mdiamond]
         exit [shape=Msquare]
 
-        expand_spec [
-          shape=box,
-          prompt="#{expand_spec_prompt}"
-        ]
+        implement [shape=box, prompt="Do the work."]
 
         #{gate_nodes}
 
-        start -> expand_spec
-        expand_spec -> exit
+        start -> implement
+        implement -> exit
       }
     DOT
   end
@@ -70,7 +67,6 @@ class TestVerifyDot < Minitest::Test
     ]
     config = {
       "required_gates" => gates,
-      "expand_spec_prompt" => "Read the spec.",
       "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }"
     }
     dot = make_dot(gates: gates)
@@ -90,7 +86,7 @@ class TestVerifyDot < Minitest::Test
         {"id" => "verify_build", "tool_command" => "cargo build"},
         {"id" => "missing_gate", "tool_command" => "echo hi"}
       ],
-      "expand_spec_prompt" => "Read the spec.",
+
       "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }"
     }
     gates = [{"id" => "verify_build", "tool_command" => "cargo build"}]
@@ -109,7 +105,7 @@ class TestVerifyDot < Minitest::Test
       "required_gates" => [
         {"id" => "verify_build", "tool_command" => "cargo build --release"}
       ],
-      "expand_spec_prompt" => "Read the spec.",
+
       "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }"
     }
     gates = [{"id" => "verify_build", "tool_command" => "cargo build --debug"}]
@@ -125,7 +121,6 @@ class TestVerifyDot < Minitest::Test
   def test_fail_on_stylesheet_mismatch
     config = {
       "required_gates" => [],
-      "expand_spec_prompt" => "Read the spec.",
       "model_stylesheet" => "* { llm_model: claude-opus-4-6; }"
     }
     dot = make_dot(gates: [], stylesheet: "* { llm_model: claude-sonnet-4-6; }")
@@ -137,27 +132,12 @@ class TestVerifyDot < Minitest::Test
     end
   end
 
-  def test_fail_on_expand_spec_mismatch
-    config = {
-      "required_gates" => [],
-      "expand_spec_prompt" => "Read all the specs.",
-      "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }"
-    }
-    dot = make_dot(gates: [], expand_spec_prompt: "Read only some specs.")
-
-    with_files(config, dot) do |yaml_path, dot_path|
-      out, status = run_script(yaml_path, dot_path)
-      assert_equal 1, status
-      assert_includes out, "MISMATCH expand_spec"
-    end
-  end
-
   def test_whitespace_normalized_comparison
     config = {
       "required_gates" => [
         {"id" => "verify_build", "tool_command" => "cargo  build   --release"}
       ],
-      "expand_spec_prompt" => "Read the spec.",
+
       "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }"
     }
     # DOT has different whitespace but same tokens
@@ -179,7 +159,6 @@ class TestVerifyDot < Minitest::Test
   def test_fail_on_graph_id_mismatch
     config = {
       "required_gates" => [],
-      "expand_spec_prompt" => "Read the spec.",
       "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }",
       "graph_id" => "expected_pipeline"
     }
@@ -202,12 +181,11 @@ class TestVerifyDot < Minitest::Test
         ]
         start [shape=Mdiamond]
         exit [shape=Msquare]
-        expand_spec [shape=box, prompt="Read the spec."]
+        implement [shape=box, prompt="Do the work."]
       }
     DOT
     config = {
       "required_gates" => [],
-      "expand_spec_prompt" => "Read the spec.",
       "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }",
       "retry_target" => "implement"
     }
@@ -221,7 +199,6 @@ class TestVerifyDot < Minitest::Test
   def test_fail_on_missing_node_from_inventory
     config = {
       "required_gates" => [],
-      "expand_spec_prompt" => "Read the spec.",
       "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }",
       "nodes" => [
         {"id" => "start", "shape" => "Mdiamond"},
@@ -239,7 +216,6 @@ class TestVerifyDot < Minitest::Test
   def test_fail_on_shape_mismatch
     config = {
       "required_gates" => [],
-      "expand_spec_prompt" => "Read the spec.",
       "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }",
       "nodes" => [
         {"id" => "start", "shape" => "box"}
@@ -263,18 +239,17 @@ class TestVerifyDot < Minitest::Test
         ]
         start [shape=Mdiamond]
         exit [shape=Msquare]
-        expand_spec [shape=box, prompt="Read the spec."]
+        implement [shape=box, prompt="Do the work."]
         rogue_node [shape=box, prompt="I should not be here."]
       }
     DOT
     config = {
       "required_gates" => [],
-      "expand_spec_prompt" => "Read the spec.",
       "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }",
       "nodes" => [
         {"id" => "start", "shape" => "Mdiamond"},
         {"id" => "exit", "shape" => "Msquare"},
-        {"id" => "expand_spec", "shape" => "box"}
+        {"id" => "implement", "shape" => "box"}
       ]
     }
     with_files(config, dot_with_extra) do |yaml_path, dot_path|
@@ -296,7 +271,6 @@ class TestVerifyDot < Minitest::Test
         ]
         start [shape=Mdiamond]
         exit [shape=Msquare]
-        expand_spec [shape=box, prompt="Read the spec."]
         implement [shape=box, class="hard"]
         check_impl [shape=diamond]
         human_gate [shape=hexagon]
@@ -304,7 +278,6 @@ class TestVerifyDot < Minitest::Test
     DOT
     config = {
       "required_gates" => [],
-      "expand_spec_prompt" => "Read the spec.",
       "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }",
       "graph_id" => "my_pipeline",
       "retry_target" => "implement",
@@ -312,7 +285,6 @@ class TestVerifyDot < Minitest::Test
       "nodes" => [
         {"id" => "start", "shape" => "Mdiamond"},
         {"id" => "exit", "shape" => "Msquare"},
-        {"id" => "expand_spec", "shape" => "box"},
         {"id" => "implement", "shape" => "box"},
         {"id" => "check_impl", "shape" => "diamond"},
         {"id" => "human_gate", "shape" => "hexagon"}
@@ -324,7 +296,7 @@ class TestVerifyDot < Minitest::Test
       assert_includes out, "PASS"
       assert_includes out, "graph_id: my_pipeline"
       assert_includes out, "retry_target: implement"
-      assert_includes out, "6 nodes verified"
+      assert_includes out, "5 nodes verified"
     end
   end
 
@@ -333,12 +305,10 @@ class TestVerifyDot < Minitest::Test
       digraph test {
         graph [goal="test", model_stylesheet="* { llm_model: claude-sonnet-4-6; }"]
         start [shape=Mdiamond]
-        expand_spec [shape=box, prompt="Read the spec."]
         work [shape=box, prompt="Do stuff."]
         check [shape=diamond]
         exit [shape=Msquare]
-        start -> expand_spec
-        expand_spec -> work
+        start -> work
         work -> check
         check -> exit [condition="outcome = success"]
         check -> work [condition="outcome = fail", loop_restart=true]
@@ -347,11 +317,9 @@ class TestVerifyDot < Minitest::Test
     DOT
     config = {
       "required_gates" => [],
-      "expand_spec_prompt" => "Read the spec.",
       "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }",
       "edges" => [
-        {"from" => "start", "to" => "expand_spec"},
-        {"from" => "expand_spec", "to" => "work"},
+        {"from" => "start", "to" => "work"},
         {"from" => "work", "to" => "check"},
         {"from" => "check", "to" => "exit", "condition" => "outcome = success"},
         {"from" => "check", "to" => "work", "condition" => "outcome = fail", "loop_restart" => true},
@@ -362,7 +330,7 @@ class TestVerifyDot < Minitest::Test
       out, status = run_script(yaml_path, dot_path)
       assert_equal 0, status
       assert_includes out, "PASS"
-      assert_includes out, "6 edges verified"
+      assert_includes out, "5 edges verified"
     end
   end
 
@@ -378,7 +346,6 @@ class TestVerifyDot < Minitest::Test
     DOT
     config = {
       "required_gates" => [],
-      "expand_spec_prompt" => "Read the spec.",
       "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }",
       "edges" => [
         {"from" => "start", "to" => "work"},
@@ -405,7 +372,6 @@ class TestVerifyDot < Minitest::Test
     DOT
     config = {
       "required_gates" => [],
-      "expand_spec_prompt" => "Read the spec.",
       "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; }",
       "edges" => [
         {"from" => "check", "to" => "exit", "condition" => "outcome = success"},

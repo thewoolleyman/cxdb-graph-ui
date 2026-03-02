@@ -165,42 +165,6 @@ class TestCompileDot < Minitest::Test
     assert_includes dot, "config_sha256=\"#{expected_sha}\""
   end
 
-  def test_expand_spec_uses_yaml_prompt
-    yaml = <<~YAML
-      target: mytest
-      repo_path: .
-      output_dot: pipeline-test.dot
-      graph_id: test_pipeline
-      graph_goal: "Test"
-      nodes:
-        - id: start
-          shape: Mdiamond
-        - id: expand_spec
-          shape: box
-          class: hard
-        - id: exit
-          shape: Msquare
-      edges:
-        - from: start
-          to: expand_spec
-        - from: expand_spec
-          to: exit
-      expand_spec_prompt: |
-        Read the spec files and consolidate.
-      model_stylesheet: |
-        * { llm_model: claude-sonnet-4-6; }
-    YAML
-
-    yaml_path = write_yaml(yaml)
-    out_path = File.join(@tmpdir, "output.dot")
-
-    `ruby #{SCRIPT} #{yaml_path} #{out_path} 2>&1`
-    assert_equal 0, $?.exitstatus
-
-    dot = File.read(out_path)
-    assert_includes dot, 'prompt="Read the spec files and consolidate."'
-  end
-
   def test_missing_prompt_file_exits_1
     yaml_path = write_yaml(minimal_yaml)
     # Don't create any prompt files

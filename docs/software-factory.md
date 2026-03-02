@@ -137,7 +137,7 @@ Our setup adds a true holdout layer on top of Kilroy's built-in validation.
 
 **How the holdout works:**
 
-The pipeline receives the specification file (`specification/intent/cxdb-graph-ui-spec.md`). The `holdout-scenarios/` directory is excluded from the factory worktree via git sparse checkout (configured in `factory/run.yaml` setup commands). The implementing agent must produce correct behavior from the specification alone.
+The pipeline receives the specification files (all files under `specification/intent/`). The `holdout-scenarios/` directory is excluded from the factory worktree via git sparse checkout (configured in `factory/run.yaml` setup commands). The implementing agent must produce correct behavior from the specification alone.
 
 **Kilroy's three validation tiers:**
 
@@ -154,7 +154,14 @@ The specification is curated and source-controlled, not generated:
 ```
 specification/
 └── intent/
-    └── cxdb-graph-ui-spec.md  # Complete architectural specification
+    ├── README.md              # Index and specification structure
+    ├── overview.md            # §1-2: Problem statement, design principles, architecture
+    ├── server.md              # §3: Server properties and cross-references
+    ├── dot-rendering.md       # §4: Graphviz WASM, SVG IDs, tabs, init sequence
+    ├── cxdb-integration.md    # §5: Pipeline discovery, context mapping, caching
+    ├── status-overlay.md      # §6: Polling, node status map, CSS classes
+    ├── detail-panel.md        # §7: DOT attributes, CXDB activity, shape mapping
+    └── ui-layout.md           # §8: Layout, connection indicator, interaction
 
 holdout-scenarios/
 └── cxdb-graph-ui-holdout-scenarios.md   # Behavioral scenarios (holdout)
@@ -239,7 +246,7 @@ Each Kilroy run commits only to its own worktree branch. Use `/kilroy:land` to s
 
 ## When to Stop and Revise the Spec
 
-If the pipeline loops through postmortem with the same failure pattern, the spec is usually the problem — not the agent. Stop the run, look at the worktree's spec file, identify what's underspecified, and revise `specification/intent/cxdb-graph-ui-spec.md`.
+If the pipeline loops through postmortem with the same failure pattern, the spec is usually the problem — not the agent. Stop the run, look at the worktree's spec files, identify what's underspecified, and revise the appropriate file under `specification/intent/`.
 
 The spec is the source of truth. The code is disposable. Revise and re-run.
 

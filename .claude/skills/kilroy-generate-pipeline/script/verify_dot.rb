@@ -2,7 +2,7 @@
 # frozen_string_literal: true
 
 # Verify a DOT file matches the values defined in a YAML config file.
-# Checks: gate node existence + tool_command, expand_spec prompt, model_stylesheet.
+# Checks: gate node existence + tool_command, model_stylesheet.
 # Usage: ruby verify_dot.rb <yaml-file> <dot-file>
 
 require "yaml"
@@ -78,20 +78,6 @@ end
       MISMATCH tool_command for "#{id}":
         YAML:   #{normalize(gate["tool_command"])}
         DOT:    #{normalize(actual)}
-    MSG
-  end
-end
-
-# Verify expand_spec prompt
-if doc["expand_spec_prompt"]
-  actual = extract_node_attr(dot, "expand_spec", "prompt")
-  if actual.nil?
-    errors << "MISSING: expand_spec node has no prompt attribute"
-  elsif normalize(actual) != normalize(doc["expand_spec_prompt"])
-    errors << <<~MSG.strip
-      MISMATCH expand_spec prompt:
-        YAML:   #{normalize(doc["expand_spec_prompt"])[0, 120]}...
-        DOT:    #{normalize(actual)[0, 120]}...
     MSG
   end
 end
@@ -225,7 +211,6 @@ if errors.empty?
   gate_ids = (doc["required_gates"] || []).map { |g| g["id"] }.join(", ")
   puts "PASS: #{dot_path} matches #{yaml_path}"
   puts "  Gates verified: #{gate_ids}"
-  puts "  expand_spec prompt: OK"
   puts "  model_stylesheet: OK"
   puts "  graph_id: #{doc["graph_id"] || "n/a"}"
   puts "  retry_target: #{doc["retry_target"] || "n/a"}"

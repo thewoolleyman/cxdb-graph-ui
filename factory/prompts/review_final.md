@@ -2,7 +2,7 @@
 
 ## Task
 
-Perform a final semantic review of the CXDB Graph UI implementation to ensure it meets all acceptance criteria from `.ai/spec.md`.
+Perform a final semantic review of the CXDB Graph UI implementation to ensure it meets all acceptance criteria from the specification.
 
 ## Context
 
@@ -10,7 +10,12 @@ All deterministic gates (fmt, vet, build, tests, browser) have passed. This is t
 
 ## Files to Read
 
-- `.ai/spec.md` — Complete specification and acceptance criteria
+**Read the full specification:**
+- All files under `specification/intent/` — Overview, architecture, server, DOT rendering, CXDB integration, status overlay, detail panel, UI layout
+- All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements
+- All files under `specification/contracts/` — Server API (downstream) and CXDB API (upstream)
+
+**Read the implementation:**
 - `ui/main.go` — Go server implementation
 - `ui/index.html` — Browser SPA implementation
 - `ui/go.mod` — Module file

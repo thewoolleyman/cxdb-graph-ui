@@ -59,7 +59,7 @@ The `pipeline.dot` file at the repo root is compiled output. **NEVER edit it dir
 
 | Path | Purpose |
 |---|---|
-| `specification/intent/cxdb-graph-ui-spec.md` | **The specification.** Complete architectural spec covering server, DOT rendering, CXDB integration, status overlay, detail panel, UI layout, invariants, non-goals, and definition of done. |
+| `specification/intent/` | **The intent specification.** Split across per-section files (overview, server, DOT rendering, CXDB integration, status overlay, detail panel, UI layout). See `specification/intent/README.md` for the index. |
 | `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` | Behavioral test scenarios (Given/When/Then) covering DOT rendering, CXDB status overlay, pipeline discovery, detail panel, connection handling, and server operations. |
 | `specification-critiques/` | Iterative critique/acknowledgement pairs used during spec refinement. |
 

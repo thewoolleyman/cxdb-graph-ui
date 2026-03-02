@@ -141,7 +141,7 @@ Assert: SVG is present in the main content area with nodes and edges visible. Ta
 Assert: Two tabs visible. Click second tab. Graph changes. Second tab is visually active.
 
 ### DOT file with long prompt text
-Click the `implement` node (its prompt is >500 chars). Assert: node renders normally in SVG and detail panel shows the prompt text when clicked.
+Click the `fix_fmt` node (its prompt is >500 chars). Assert: node renders normally in SVG and detail panel shows the prompt text when clicked.
 
 ### Tab shows graph ID from DOT declaration
 Assert: The first tab shows "simple_pipeline" (not "simple-pipeline.dot"). The second tab shows "beta_pipeline".
@@ -286,17 +286,17 @@ For each scenario below: call `setScenario(name)`, wait 4 seconds (one poll cycl
 
 | Holdout Scenario | Mock Scenario | Key Assertions |
 |---|---|---|
-| Pipeline actively running — nodes colored by status | `pipeline_running` | expand_spec=green, implement=blue, others=gray |
-| Agent stuck in error loop (per-context scoping) | `error_loop` | implement=red |
-| Error loop detection does not span contexts | `parallel_branches` (no per-context error) | implement=blue (not red) |
+| Pipeline actively running — nodes colored by status | `pipeline_running` | implement=green, fix_fmt=blue, others=gray |
+| Agent stuck in error loop (per-context scoping) | `error_loop` | fix_fmt=red |
+| Error loop detection does not span contexts | `parallel_branches` (no per-context error) | fix_fmt=blue (not red) |
 | Pipeline completed successfully | `pipeline_complete` | all traversed nodes=green |
-| Pipeline stalled after agent crash | `pipeline_stalled` | implement=orange, top bar shows stall message |
+| Pipeline stalled after agent crash | `pipeline_stalled` | fix_fmt=orange, top bar shows stall message |
 | No active pipeline run | `no_pipeline` | all nodes=gray |
-| Multiple contexts for same pipeline (parallel branches) | `parallel_branches` | implement=blue, check_fmt=blue |
-| StageFailed with will_retry=true leaves node in running state | `stage_failed_retry` | implement=blue |
-| StageFailed retry sequence resolves to complete when retry succeeds | `pipeline_complete` (include retry in turns if needed) | implement=green |
-| StageFinished with status=fail colors node as error | `stage_finished_fail` | implement=red |
-| RunFailed marks specified node as error | `run_failed` | implement=red |
+| Multiple contexts for same pipeline (parallel branches) | `parallel_branches` | fix_fmt=blue, check_fmt=blue |
+| StageFailed with will_retry=true leaves node in running state | `stage_failed_retry` | fix_fmt=blue |
+| StageFailed retry sequence resolves to complete when retry succeeds | `pipeline_complete` (include retry in turns if needed) | fix_fmt=green |
+| StageFinished with status=fail colors node as error | `stage_finished_fail` | fix_fmt=red |
+| RunFailed marks specified node as error | `run_failed` | fix_fmt=red |
 | Second run of same pipeline while first run data exists | `second_run` | B's nodes shown, A's complete nodes NOT shown |
 | Conditional node with custom routing outcome shows as complete | `conditional_custom` (use all-shapes server) | node_conditional=green |
 
@@ -314,17 +314,17 @@ Navigate. Inject mock-cxdb.js.
 
 | Holdout Scenario | Mock Scenario | Actions and Assertions |
 |---|---|---|
-| Click a node to see details | `pipeline_running` | Click implement → panel shows Node ID, Type "LLM Task", prompt, CXDB turns |
+| Click a node to see details | `pipeline_running` | Click fix_fmt → panel shows Node ID, Type "LLM Task", prompt, CXDB turns |
 | Click a tool gate node | `pipeline_running` | Click check_fmt → Type "Tool Gate", tool_command shown |
 | Click a human gate node | `no_pipeline` | Click review_gate → Type "Human Gate", question, choices "approve"/"reject" |
-| Detail panel for early-completed node outside poll window | `pipeline_running` | Click expand_spec → panel shows DOT attributes |
+| Detail panel for early-completed node outside poll window | `pipeline_running` | Click implement → panel shows DOT attributes |
 | Close detail panel | `no_pipeline` | Open panel, then click outside or close button → panel closes |
 | Human gate interview turns render in CXDB Activity section | `human_gate_interview` | Click review_gate → InterviewStarted shows "Approve the implementation? [SingleSelect]", InterviewCompleted shows "YES (waited 45s)" |
 | InterviewTimeout turn renders with error highlight | `interview_timeout` | Click review_gate → InterviewTimeout shows question text, Error column highlighted "timeout" |
-| StageStarted turn renders handler_type | `stage_started_types` | Click implement → "Stage started: codergen"; click check_fmt → "Stage started: tool" |
-| StageFinished with suggested_next_ids renders Next line | `stage_finished_next` | Click expand_spec → "Stage finished: pass — pass\nNext: implement, check_fmt" |
-| StageFinished with empty suggested_next_ids omits Next line | `pipeline_complete` | Click expand_spec → "Stage finished: pass — pass" (no Next line) |
-| Prompt turn Show more expansion is capped at 8,000 characters | `prompt_long` | Click implement → find Prompt turn row → click "Show more" → expanded content ≤ 8,000 chars with truncation disclosure |
+| StageStarted turn renders handler_type | `stage_started_types` | Click fix_fmt → "Stage started: codergen"; click check_fmt → "Stage started: tool" |
+| StageFinished with suggested_next_ids renders Next line | `stage_finished_next` | Click implement → "Stage finished: pass — pass\nNext: fix_fmt, check_fmt" |
+| StageFinished with empty suggested_next_ids omits Next line | `pipeline_complete` | Click implement → "Stage finished: pass — pass" (no Next line) |
+| Prompt turn Show more expansion is capped at 8,000 characters | `prompt_long` | Click fix_fmt → find Prompt turn row → click "Show more" → expanded content ≤ 8,000 chars with truncation disclosure |
 
 ---
 

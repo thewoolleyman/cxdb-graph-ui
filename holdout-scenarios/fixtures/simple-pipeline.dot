@@ -2,16 +2,16 @@ digraph simple_pipeline {
   rankdir=TB;
 
   start [shape=Mdiamond, label="start"];
-  expand_spec [shape=box, label="expand_spec", prompt="Expand the specification into detailed technical requirements."];
-  implement [shape=box, label="implement", prompt="Write the implementation code based on the expanded specification. Consider all edge cases carefully. Handle error conditions. Write unit tests. Ensure the code is idiomatic and follows project conventions. Document all public interfaces. Review for security vulnerabilities such as injection attacks, XSS, and improper input validation. Refactor as needed. The implementation must pass all existing tests and introduce no regressions. Verify that all acceptance criteria in the specification are met by the implementation. Update any documentation that references the changed behavior."];
+  implement [shape=box, label="implement", prompt="Implement the feature according to the expanded specification. Consider all edge cases carefully. Handle error conditions. Write unit tests. Ensure the code is idiomatic and follows project conventions. Document all public interfaces. Review for security vulnerabilities such as injection attacks, XSS, and improper input validation. Refactor as needed. The implementation must pass all existing tests and introduce no regressions. Verify that all acceptance criteria in the specification are met by the implementation. Update any documentation that references the changed behavior."];
+  fix_fmt [shape=box, label="fix_fmt", prompt="Write the implementation code based on the expanded specification. Consider all edge cases carefully. Handle error conditions. Write unit tests. Ensure the code is idiomatic and follows project conventions. Document all public interfaces. Review for security vulnerabilities such as injection attacks, XSS, and improper input validation. Refactor as needed. The implementation must pass all existing tests and introduce no regressions. Verify that all acceptance criteria in the specification are met by the implementation. Update any documentation that references the changed behavior."];
   check_fmt [shape=parallelogram, label="check_fmt", tool_command="make fmt-check"];
   review_gate [shape=hexagon, label="review_gate", question="Approve the implementation?"];
   done [shape=Msquare, label="done"];
   rejected [shape=Msquare, label="rejected"];
 
-  start -> expand_spec;
-  expand_spec -> implement;
-  implement -> check_fmt;
+  start -> implement;
+  implement -> fix_fmt;
+  fix_fmt -> check_fmt;
   check_fmt -> review_gate;
   review_gate -> done [label="approve"];
   review_gate -> rejected [label="reject"];

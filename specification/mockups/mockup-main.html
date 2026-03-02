@@ -200,17 +200,17 @@
       <div class="pipeline-graph" style="height: 780px;">
         <!-- Edge SVG layer -->
         <svg class="edge-svg" viewBox="0 0 700 780" preserveAspectRatio="xMidYMid meet">
-          <!-- start -> expand_spec -->
+          <!-- start -> implement -->
           <line x1="350" y1="45" x2="350" y2="90"/>
           <polygon points="350,90 346,82 354,82"/>
-          <!-- expand_spec -> check_expand -->
+          <!-- implement -> check_implement -->
           <line x1="350" y1="134" x2="350" y2="170"/>
           <polygon points="350,170 346,162 354,162"/>
-          <!-- check_expand -> implement (fail) -->
+          <!-- check_implement -> fix_fmt (fail) -->
           <path d="M 310 200 Q 250 230 280 265" />
           <polygon points="280,265 276,257 284,257"/>
           <text x="235" y="235">fail</text>
-          <!-- check_expand -> verify (pass) -->
+          <!-- check_implement -> verify (pass) -->
           <path d="M 390 200 Q 450 230 420 265"/>
           <polygon points="420,265 416,257 424,257"/>
           <text x="445" y="235">pass</text>
@@ -245,19 +245,19 @@
           <span>Start</span>
         </div>
 
-        <!-- expand_spec (box, LLM Task) -->
+        <!-- implement (box, LLM Task) -->
         <div class="node node-box status-complete" style="left: 280px; top: 90px;">
-          expand_spec
+          implement
         </div>
 
-        <!-- check_expand (diamond, Conditional) -->
+        <!-- check_implement (diamond, Conditional) -->
         <div class="node node-diamond status-complete" style="left: 300px; top: 165px;">
           <span>check</span>
         </div>
 
-        <!-- implement (box, LLM Task) - RUNNING with pulse -->
+        <!-- fix_fmt (box, LLM Task) - RUNNING with pulse -->
         <div class="node node-box status-running" style="left: 210px; top: 265px; border-width: 3px; box-shadow: 0 0 12px rgba(66,165,245,0.4);">
-          implement
+          fix_fmt
         </div>
 
         <!-- check_fmt (parallelogram, Tool Gate) -->
@@ -296,7 +296,7 @@
     <div class="detail-panel">
       <div class="panel-header">
         <div>
-          <h2>implement</h2>
+          <h2>fix_fmt</h2>
           <div style="display:flex; gap:6px; margin-top:6px;">
             <span class="badge badge-running">Running</span>
             <span class="badge badge-llm">LLM Task</span>
@@ -309,7 +309,7 @@
         <h3>DOT Attributes</h3>
         <div class="panel-field">
           <span class="label">Node ID</span>
-          <span class="value">implement</span>
+          <span class="value">fix_fmt</span>
         </div>
         <div class="panel-field">
           <span class="label">Type</span>

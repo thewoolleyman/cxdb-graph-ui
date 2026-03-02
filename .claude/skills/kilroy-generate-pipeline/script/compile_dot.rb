@@ -114,11 +114,7 @@ nodes.each do |node|
     attrs << "goal_gate=true" if node["goal_gate"]
 
     # Load prompt
-    if id == "expand_spec" && doc["expand_spec_prompt"]
-      prompt_text = doc["expand_spec_prompt"].strip
-    else
-      prompt_text = read_prompt(yaml_dir, target, id)
-    end
+    prompt_text = read_prompt(yaml_dir, target, id)
 
     escaped_prompt = dot_escape(prompt_text)
     attrs << "prompt=\"#{escaped_prompt}\""

@@ -86,29 +86,6 @@ class TestExtractPrompts < Minitest::Test
     assert_includes content, "/kilroy:status"
   end
 
-  def test_skips_expand_spec
-    yaml = write_yaml(<<~YAML)
-      target: mytest
-      repo_path: .
-      output_dot: pipeline-test.dot
-    YAML
-
-    dot = write_dot(<<~'DOT')
-      digraph test_pipeline {
-        expand_spec [shape=box, prompt="Read the spec files."]
-        implement [shape=box, prompt="Do the thing."]
-      }
-    DOT
-
-    `ruby #{SCRIPT} #{yaml} #{dot} 2>&1`
-
-    expand_file = File.join(@tmpdir, "prompts", "expand_spec.md")
-    refute File.exist?(expand_file), "expand_spec.md should NOT be created"
-
-    implement_file = File.join(@tmpdir, "prompts", "implement.md")
-    assert File.exist?(implement_file), "implement.md should be created"
-  end
-
   def test_handles_multiline_prompt_with_escaped_quotes
     yaml = write_yaml(<<~YAML)
       target: mytest

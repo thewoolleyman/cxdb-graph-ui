@@ -2,7 +2,7 @@
 # frozen_string_literal: true
 
 # Patch a DOT file in-place using values from a YAML config file.
-# Patches: tool_command on gate nodes, expand_spec prompt, model_stylesheet.
+# Patches: tool_command on gate nodes, model_stylesheet.
 # Usage: ruby patch_dot.rb <yaml-file> <dot-file>
 
 require "yaml"
@@ -60,19 +60,6 @@ end
     else
       warn "WARNING: Could not inject timeout for #{gate["id"]}"
     end
-  end
-end
-
-# Patch expand_spec prompt
-if doc["expand_spec_prompt"]
-  re = /(expand_spec\s*\[[^\]]*?prompt\s*=\s*")((?:[^"\\]|\\.)*?)(")/m
-  if dot.match?(re)
-    escaped = dot_escape(doc["expand_spec_prompt"].strip)
-    dot.sub!(re, "\\1#{escaped}\\3")
-    patch_count += 1
-    warn "Patched expand_spec prompt"
-  else
-    warn "WARNING: expand_spec prompt not found"
   end
 end
 

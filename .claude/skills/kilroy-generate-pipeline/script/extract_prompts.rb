@@ -9,8 +9,6 @@
 # For each shape=hexagon node with a question attribute, writes:
 #   <yaml_dir>/prompts/<node_id>.md
 #
-# Skips the expand_spec node (its prompt lives in the YAML config).
-#
 # Usage: ruby extract_prompts.rb <yaml-file> <dot-file>
 
 require "yaml"
@@ -121,9 +119,6 @@ extracted = 0
 nodes.each do |node_id, shape|
   case shape
   when "box"
-    # Skip expand_spec — its prompt lives in the YAML config
-    next if node_id == "expand_spec"
-
     prompt = extract_node_attr(dot, node_id, "prompt")
     if prompt
       file_path = prompts_dir.join("#{node_id}.md")

@@ -4,7 +4,7 @@ You are revising the CXDB Graph UI specification based on critique feedback.
 
 Read the specification file:
 
-- `specification/intent/cxdb-graph-ui-spec.md`
+- All files under `specification/intent/` (see `specification/intent/README.md` for index)
 
 ## Step 2: Read the Holdout Scenarios
 
@@ -42,11 +42,11 @@ $ARGUMENTS
 Process ALL unacknowledged critique files for version N together in a single revision pass. For each issue across all critique files:
 
 1. Evaluate whether the feedback is valid and should be incorporated
-2. If valid, edit `specification/intent/cxdb-graph-ui-spec.md` **in place** — this is a living document, not versioned
+2. If valid, edit the appropriate file under `specification/intent/` **in place** — these are living documents, not versioned
 3. Keep edits focused and surgical — don't rewrite sections that aren't affected by the critique
 4. When multiple critics raise the same issue, address it once and reference it in all acknowledgements
 
-**Important:** The spec file is the single source of truth. Edit it directly rather than creating new versions.
+**Important:** The spec files under `specification/intent/` are the single source of truth. Edit them directly rather than creating new versions.
 
 ## Step 5: Write Acknowledgement Files
 
@@ -76,7 +76,7 @@ Use this format for each acknowledgement:
 {Description of what changed and where, OR reasoning for why it was not addressed}
 
 Changes:
-- `specification/intent/cxdb-graph-ui-spec.md`: {what changed}
+- All files under `specification/intent/` (see `specification/intent/README.md` for index): {what changed}
 
 ## Issue #2: ...
 

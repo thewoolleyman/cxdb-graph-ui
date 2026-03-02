@@ -1,5 +1,5 @@
 # CXDB Graph UI — Combined Specification
-Source: specification/cxdb-graph-ui-spec.md
+Source: specification/intent/ (see README.md for index)
 Date: 2026-03-01
 
 # CXDB Graph UI Specification
@@ -331,9 +331,9 @@ Graphviz SVG output wraps each node in a predictable structure:
 
 ```xml
 <g id="node1" class="node">
-  <title>expand_spec</title>
+  <title>implement</title>
   <polygon points="..." fill="..." stroke="..."/>
-  <text>expand_spec</text>
+  <text>implement</text>
 </g>
 ```
 
@@ -360,7 +360,7 @@ Edges follow a similar structure:
 
 ```xml
 <g id="edge1" class="edge">
-  <title>expand_spec&#45;&gt;check_expand_spec</title>
+  <title>implement&#45;&gt;check_implement</title>
   <path d="..."/>
 </g>
 ```

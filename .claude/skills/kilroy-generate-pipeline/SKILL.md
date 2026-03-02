@@ -27,8 +27,8 @@ the pipeline is compiled deterministically. No LLM is involved.
  | nodes (id, shape, class)   |  |   postmortem.md    |
  | edges (from, to, condition)|  |   human_gate.md    |
  | required_gates             |  | ...               |
- | expand_spec_prompt         |  +-------------------+
- | model_stylesheet           |          |
+ | model_stylesheet           |  +-------------------+
+ |                            |          |
  +----------------------------+          |
               |                          |
               +----------+---------------+

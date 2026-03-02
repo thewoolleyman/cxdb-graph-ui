@@ -21,7 +21,7 @@ The author name must be safe for filenames: lowercase letters and numbers only, 
 
 Read the specification file:
 
-- `specification/intent/cxdb-graph-ui-spec.md`
+- All files under `specification/intent/` (see `specification/intent/README.md` for index)
 
 ## Step 3: Read the Holdout Scenarios
 

@@ -10,7 +10,7 @@
  *
  * Available scenarios:
  *   no_pipeline           — CXDB running, no contexts match; all nodes gray
- *   pipeline_running      — expand_spec complete (green), implement running (blue)
+ *   pipeline_running      — implement complete (green), fix_fmt running (blue)
  *   pipeline_complete     — all nodes complete (green)
  *   error_loop            — implement has 3 consecutive ToolResult errors → red
  *   pipeline_stalled      — implement was running, now is_live=false → orange
@@ -179,16 +179,16 @@
       },
 
       // ── pipeline_running ─────────────────────────────────────────────────────
-      // expand_spec: complete (green); implement: running (blue)
+      // implement: complete (green); fix_fmt: running (blue)
       pipeline_running: {
         contexts: { 0: [ctx('42', RUN_1)] },
         turns: {
           '42': [
             // Returned newest-first by CXDB (order=desc)
             T.toolCall('shell', 'grep -r TODO src/'),
+            T.stageStarted('fix_fmt', 'codergen'),
+            T.stageFinished('implement', 'pass', 'pass', ['fix_fmt']),
             T.stageStarted('implement', 'codergen'),
-            T.stageFinished('expand_spec', 'pass', 'pass', ['implement']),
-            T.stageStarted('expand_spec', 'codergen'),
             T.runStarted('simple_pipeline', RUN_1),
           ],
         },
@@ -205,17 +205,17 @@
             T.stageStarted('review_gate', 'human_gate'),
             T.stageFinished('check_fmt', 'pass', 'pass', ['review_gate']),
             T.stageStarted('check_fmt', 'tool'),
-            T.stageFinished('implement', 'pass', 'pass', ['check_fmt']),
+            T.stageFinished('fix_fmt', 'pass', 'pass', ['check_fmt']),
+            T.stageStarted('fix_fmt', 'codergen'),
+            T.stageFinished('implement', 'pass', 'pass', ['fix_fmt']),
             T.stageStarted('implement', 'codergen'),
-            T.stageFinished('expand_spec', 'pass', 'pass', ['implement']),
-            T.stageStarted('expand_spec', 'codergen'),
             T.runStarted('simple_pipeline', RUN_1),
           ],
         },
       },
 
       // ── error_loop ───────────────────────────────────────────────────────────
-      // implement: 3 consecutive ToolResult errors → red
+      // fix_fmt: 3 consecutive ToolResult errors → red
       error_loop: {
         contexts: { 0: [ctx('42', RUN_1)] },
         turns: {
@@ -226,24 +226,24 @@
             T.toolCall('shell', 'sudo rm -rf /'),
             T.toolResult('shell', 'Error: file not found', true),
             T.toolCall('shell', 'cat missing.txt'),
+            T.stageStarted('fix_fmt', 'codergen'),
+            T.stageFinished('implement', 'pass', 'pass', ['fix_fmt']),
             T.stageStarted('implement', 'codergen'),
-            T.stageFinished('expand_spec', 'pass', 'pass', ['implement']),
-            T.stageStarted('expand_spec', 'codergen'),
             T.runStarted('simple_pipeline', RUN_1),
           ],
         },
       },
 
       // ── pipeline_stalled ─────────────────────────────────────────────────────
-      // implement was running; all contexts now is_live=false → orange
+      // fix_fmt was running; all contexts now is_live=false → orange
       pipeline_stalled: {
         contexts: { 0: [ctx('42', RUN_1, false)] }, // is_live: false
         turns: {
           '42': [
             T.toolCall('shell', 'make build'),
+            T.stageStarted('fix_fmt', 'codergen'),
+            T.stageFinished('implement', 'pass', 'pass', ['fix_fmt']),
             T.stageStarted('implement', 'codergen'),
-            T.stageFinished('expand_spec', 'pass', 'pass', ['implement']),
-            T.stageStarted('expand_spec', 'codergen'),
             T.runStarted('simple_pipeline', RUN_1),
           ],
         },
@@ -255,9 +255,9 @@
         contexts: { 0: [ctx('42', RUN_1), ctx('43', RUN_1)] },
         turns: {
           '42': [
+            T.stageStarted('fix_fmt', 'codergen'),
+            T.stageFinished('implement', 'pass', 'pass', ['fix_fmt']),
             T.stageStarted('implement', 'codergen'),
-            T.stageFinished('expand_spec', 'pass', 'pass', ['implement']),
-            T.stageStarted('expand_spec', 'codergen'),
             T.runStarted('simple_pipeline', RUN_1),
           ],
           '43': [
@@ -273,10 +273,10 @@
         contexts: { 0: [ctx('42', RUN_1)] },
         turns: {
           '42': [
-            T.stageStarted('implement', 'codergen'),
-            T.stageRetrying('implement'),
-            T.stageFailed('implement', true),
-            T.stageStarted('implement', 'codergen'),
+            T.stageStarted('fix_fmt', 'codergen'),
+            T.stageRetrying('fix_fmt'),
+            T.stageFailed('fix_fmt', true),
+            T.stageStarted('fix_fmt', 'codergen'),
             T.runStarted('simple_pipeline', RUN_1),
           ],
         },
@@ -288,10 +288,10 @@
         contexts: { 0: [ctx('42', RUN_1)] },
         turns: {
           '42': [
-            T.stageFinished('implement', 'fail', 'fail', []),
+            T.stageFinished('fix_fmt', 'fail', 'fail', []),
+            T.stageStarted('fix_fmt', 'codergen'),
+            T.stageFinished('implement', 'pass', 'pass', ['fix_fmt']),
             T.stageStarted('implement', 'codergen'),
-            T.stageFinished('expand_spec', 'pass', 'pass', ['implement']),
-            T.stageStarted('expand_spec', 'codergen'),
             T.runStarted('simple_pipeline', RUN_1),
           ],
         },
@@ -303,8 +303,8 @@
         contexts: { 0: [ctx('42', RUN_1)] },
         turns: {
           '42': [
-            T.runFailed('implement', 'agent crashed unexpectedly'),
-            T.stageStarted('implement', 'codergen'),
+            T.runFailed('fix_fmt', 'agent crashed unexpectedly'),
+            T.stageStarted('fix_fmt', 'codergen'),
             T.runStarted('simple_pipeline', RUN_1),
           ],
         },
@@ -325,15 +325,15 @@
             // Run A: full pipeline complete
             T.stageFinished('review_gate', 'pass', 'approve', []),
             T.stageFinished('check_fmt', 'pass', 'pass', ['review_gate']),
-            T.stageFinished('implement', 'pass', 'pass', ['check_fmt']),
-            T.stageFinished('expand_spec', 'pass', 'pass', ['implement']),
+            T.stageFinished('fix_fmt', 'pass', 'pass', ['check_fmt']),
+            T.stageFinished('implement', 'pass', 'pass', ['fix_fmt']),
             T.runStarted('simple_pipeline', RUN_A),
           ],
           '11': [
-            // Run B: only expand_spec done, implement running
+            // Run B: only implement done, fix_fmt running
+            T.stageStarted('fix_fmt', 'codergen'),
+            T.stageFinished('implement', 'pass', 'pass', ['fix_fmt']),
             T.stageStarted('implement', 'codergen'),
-            T.stageFinished('expand_spec', 'pass', 'pass', ['implement']),
-            T.stageStarted('expand_spec', 'codergen'),
             T.runStarted('simple_pipeline', RUN_B),
           ],
         },
@@ -357,8 +357,8 @@
         turns: {
           '42': [
             T.toolCall('shell', 'make build'),
-            T.stageStarted('implement', 'codergen'),
-            T.stageFinished('expand_spec', 'pass', 'pass', ['implement']),
+            T.stageStarted('fix_fmt', 'codergen'),
+            T.stageFinished('implement', 'pass', 'pass', ['fix_fmt']),
             T.runStarted('simple_pipeline', RUN_1),
           ],
         },
@@ -370,8 +370,8 @@
         contexts: { 0: [ctx('42', RUN_1)] },
         turns: {
           '42': [
-            T.stageStarted('implement', 'codergen'),
-            T.stageFinished('expand_spec', 'pass', 'pass', ['implement']),
+            T.stageStarted('fix_fmt', 'codergen'),
+            T.stageFinished('implement', 'pass', 'pass', ['fix_fmt']),
             T.runStarted('simple_pipeline', RUN_1),
           ],
         },
@@ -388,7 +388,7 @@
             T.interviewCompleted('review_gate', 'YES', 45000),
             T.interviewStarted('review_gate', 'Approve the implementation?', 'SingleSelect'),
             T.stageStarted('review_gate', 'human_gate'),
-            T.stageFinished('implement', 'pass', 'pass', ['review_gate']),
+            T.stageFinished('fix_fmt', 'pass', 'pass', ['review_gate']),
             T.runStarted('simple_pipeline', RUN_1),
           ],
         },
@@ -415,7 +415,7 @@
           '42': [
             T.stageStarted('check_fmt', 'tool'),
             T.stageStarted('review_gate', 'human_gate'),
-            T.stageStarted('implement', 'codergen'),
+            T.stageStarted('fix_fmt', 'codergen'),
             T.runStarted('simple_pipeline', RUN_1),
           ],
         },
@@ -427,8 +427,8 @@
         contexts: { 0: [ctx('42', RUN_1)] },
         turns: {
           '42': [
-            T.stageStarted('implement', 'codergen'),
-            T.stageFinished('expand_spec', 'pass', 'pass', ['implement', 'check_fmt']),
+            T.stageStarted('fix_fmt', 'codergen'),
+            T.stageFinished('implement', 'pass', 'pass', ['fix_fmt', 'check_fmt']),
             T.runStarted('simple_pipeline', RUN_1),
           ],
         },
@@ -441,7 +441,7 @@
         turns: {
           '42': [
             T.prompt('A'.repeat(50000)),
-            T.stageStarted('implement', 'codergen'),
+            T.stageStarted('fix_fmt', 'codergen'),
             T.runStarted('simple_pipeline', RUN_1),
           ],
         },
@@ -453,7 +453,7 @@
         contexts: { 0: [ctx('42', RUN_1)] },
         turns: {
           '42': [
-            T.stageFinished('check_quality', 'process', 'process', ['implement']),
+            T.stageFinished('check_quality', 'process', 'process', ['fix_fmt']),
             T.stageStarted('check_quality', 'tool'),
             T.runStarted('all_shapes', RUN_1),
           ],

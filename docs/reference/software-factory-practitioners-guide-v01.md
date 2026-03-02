@@ -2,11 +2,9 @@
 
 **A reference for implementing factory-pattern development within an enterprise SOA.**
 
-**Version: 1**
+**Version 1**: [PDF](https://thewoolleyweb.com/software-factory-practitioners-guide-v01.pdf) - [Markdown](https://github.com/thewoolleyman/software-factory-practitioners-guide/blob/main/software-factory-practitioners-guide-v01.md) - [HTML](https://thewoolleyweb.com/software-factory-practitioners-guide-v01.html)
 
-[https://thewoolleyweb.com/software-factory-practitioners-guide-v01.pdf](https://thewoolleyweb.com/software-factory-practitioners-guide-v01.pdf)
-
-[https://github.com/thewoolleyman/software-factory-practitioners-guide/blob/main/software-factory-practitioners-guide-v01.md](https://github.com/thewoolleyman/software-factory-practitioners-guide/blob/main/software-factory-practitioners-guide-v01.md)
+[**Latest Version**](https://thewoolleyweb.com/software-factory-practitioners-guide) - [**All Versions**](https://thewoolleyweb.com/software-factory-practitioners-guide-versions)
 
 **Chad Woolley, thewoolleyman@gmail.com, February 2026**
 
@@ -15,6 +13,7 @@
 ## Table of Contents
 
 - [Executive Summary](#executive-summary)
+- [Audience and Content](#audience-and-content)
 - [1. Overview and Scope](#1-overview-and-scope)
   - [Reality Check: This is an Aspirational Guide](#reality-check-this-is-an-aspirational-guide)
 - [2. Repository Layout](#2-repository-layout)
@@ -88,7 +87,23 @@ The software factory pattern represents a fundamental shift in how software is b
 
 **What remains unsolved.** Production observability feeding back into specification evolution is the largest open problem — no existing system fully closes this loop. Enterprise governance [[4](#ref-4)], code provenance, cross-service contract propagation, organizational transformation, and cost management are all critical concerns acknowledged but intentionally scoped out.
 
-**This is an aspirational guide.** StrongDM [[3](#ref-3)] has demonstrated the pattern at a startup with a greenfield codebase. No large enterprise has publicly implemented it at scale. **_The author has not yet produced usable software with this approach — early experiments have mainly revealed how hard it is to define specifications with machine-executable rigor_**. The guide describes what is becoming possible, grounded in published experience from StrongDM, 8090 [[5](#ref-5)], Superpowers [[6](#ref-6)], GitHub's Spec Kit [[7](#ref-7)], and the author's own factory experiments using a forked implementation of Kilroy [[8](#ref-8)] (a Go-based Attractor implementation). It is versioned because we are all still learning.
+**This is an aspirational guide.** StrongDM [[3](#ref-3)] has demonstrated the pattern at a startup with a greenfield codebase. No large enterprise has publicly implemented it at scale. **_I have not yet produced usable software with this approach — early experiments have mainly revealed how hard it is to define specifications with machine-executable rigor_**. The guide describes what is becoming possible, grounded in published experience from StrongDM, 8090 [[5](#ref-5)], Superpowers [[6](#ref-6)], GitHub's Spec Kit [[7](#ref-7)], and my own factory experiments using a forked implementation of Kilroy [[8](#ref-8)] (a Go-based Attractor implementation). It is versioned because we are all still learning, and there is more to come.
+
+---
+
+## Audience and Content
+
+This paper is for people who want to learn about, create, and run Software Factories. It's primarily aimed at more complex enterprise environments, but any project of any size can use the information and techniques presented.
+
+It was researched, drafted, and edited with the help of AI — em dashes and all — with significant manual curation, content additions, and editing.
+
+The personal note at the end, however, was entirely conceived and written by a human.
+
+It's long, but that is intentional.
+
+The goal is to be a combination of "here's some concrete details on how you can actually start doing this" and "here's an AI-assisted brain dump of everything I know about this so far with lots of references for you to learn more".
+
+Hopefully it is helpful to you :)
 
 ---
 
@@ -104,7 +119,7 @@ This guide targets the Level 4-to-5 transition for a single service. It does not
 
 **Prerequisites assumed by this guide:**
 
-The reader's organization already operates an SOA with defined service boundaries, API contracts, and deployment infrastructure. The new service has a clear domain bounded by contracts with neighboring services. The team has access to frontier-class language models (Claude Opus/Sonnet, GPT-5.x, or equivalent) and is willing to invest meaningfully in token spend — StrongDM's benchmark of $1,000/day per human engineer is aggressive, but directionally correct for Level 5 operation. At least one engineer with deep domain expertise will serve as the specification author and factory operator.
+Your organization already operates an SOA with defined service boundaries, API contracts, and deployment infrastructure. The new service has a clear domain bounded by contracts with neighboring services. The team has access to frontier-class language models (Claude Opus/Sonnet, GPT-5.x, or equivalent) and is willing to invest meaningfully in token spend — StrongDM's benchmark of $1,000/day per human engineer is aggressive, but directionally correct for Level 5 operation. At least one engineer with deep domain expertise will serve as the specification author and factory operator.
 
 **What this guide covers:**
 
@@ -112,9 +127,9 @@ The repository structure that separates human-authored specification from machin
 
 ### Reality Check: This is an Aspirational Guide
 
-This guide describes what is becoming possible, not what most people are doing right now. StrongDM has demonstrated the approach at a startup with a greenfield codebase and no customers yet. Other small and mid-size companies are beginning to explore similar patterns. But as of this writing, to the author's knowledge, no large enterprise has publicly shared an implementation of factory-pattern development at scale. Sections [13](#13-out-of-scope) and [14](#14-open-questions) list many large, critical barriers — established SDLC processes, customers with SLAs, and significant legal and contractual commitments among them.
+This guide describes what is becoming possible, not what most people are doing right now. StrongDM has demonstrated the approach at a startup with a greenfield codebase and no customers yet. Other small and mid-size companies are beginning to explore similar patterns. But as of this writing, to my knowledge, no large enterprise has publicly shared an implementation of factory-pattern development at scale. Sections [13](#13-out-of-scope) and [14](#14-open-questions) list many large, critical barriers — established SDLC processes, customers with SLAs, and significant legal and contractual commitments among them.
 
-The author's own early factory experiments have confirmed that this is genuinely _HARD_. To be transparent: **_I have not yet produced usable software with the Software Factory approach, even of alpha quality._** After a week or two of hands-on experimentation, the main lessons have been about what _doesn't_ work — specifically, that you cannot take shortcuts by relying too heavily on AI to generate the specification. The difficulties are real:
+My own early factory experiments have confirmed that this is genuinely _HARD_. To break the fourth wall and be fully transparent: **_I have not yet produced usable software with the Software Factory approach, even of alpha quality._** After a week or two of hands-on experimentation, the main lessons have been about what _doesn't_ work — specifically, that you cannot take shortcuts by relying too heavily on AI to generate the specification. The difficulties are real:
 
 - Defining specifications with machine-executable rigor, when you can't rely on an experienced domain-aware human to "know what you really mean."
 - Creating the pipeline itself, with all of the quality gates you would expect for a development and CI environment, but turned up to 11 and able to run in an automated feedback loop.
@@ -583,7 +598,7 @@ This guide focuses on the factory mechanics: turning human intent into working, 
 
 **Organizational transformation.** Adopting the factory pattern changes what it means to be a software engineer. The skill profile shifts from code production to specification authoring, scenario design, and system thinking. The Stanford Law analysis notes: "The skill of reading and writing code, the bedrock of software engineering for seventy years, becomes unnecessary" in a full dark factory. How organizations manage this transition — retraining, role redefinition, hiring, career ladders — is a significant challenge this guide does not address.
 
-**Cost management.** StrongDM's $1,000/day benchmark is aggressive. Not every organization can or should operate at that spend level. Optimizing token costs, choosing between expensive reasoning models and cheaper fast models, and projecting factory operating costs are left to the reader.
+**Cost management.** StrongDM's $1,000/day benchmark is aggressive. Not every organization can or should operate at that spend level. Optimizing token costs, choosing between expensive reasoning models and cheaper fast models, and projecting factory operating costs are left to you.
 
 ---
 
@@ -704,5 +719,3 @@ It's outside the scope of this paper to discuss the _quality_ of the code I dire
 What I _can_ say is that the working Level 3-4 code I have produced is undoubtedly of a _different_ quality than the code I have written by hand over the last 40 years. But is it better? Worse? Both, depending on how you look at it? Yes, all of the above. Again, highly subjective.
 
 What I do know is this: software development will never be the same. I'm more convinced of that than anything in my last 40 years of doing it. Will it change overnight? No, of course not. Will it change almost everywhere, eventually? Yes.
-
-_(Disclosure: this paper was researched, drafted, and edited with the help of AI — em dashes and all. This personal note was conceived and written by a human.)_

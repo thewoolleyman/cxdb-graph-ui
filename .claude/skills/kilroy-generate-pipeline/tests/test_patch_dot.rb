@@ -20,9 +20,9 @@ class TestPatchDot < Minitest::Test
       start [shape=Mdiamond]
       exit [shape=Msquare]
 
-      expand_spec [
+      implement [
         shape=box,
-        prompt="Old expand spec prompt."
+        prompt="Do the work."
       ]
 
       verify_build [
@@ -35,8 +35,8 @@ class TestPatchDot < Minitest::Test
         tool_command="old test command"
       ]
 
-      start -> expand_spec
-      expand_spec -> verify_build
+      start -> implement
+      implement -> verify_build
       verify_build -> verify_test
       verify_test -> exit
     }
@@ -47,7 +47,6 @@ class TestPatchDot < Minitest::Test
       {"id" => "verify_build", "tool_command" => "cargo build --release"},
       {"id" => "verify_test", "tool_command" => "cargo test --all"}
     ],
-    "expand_spec_prompt" => "New expand spec prompt.\nWith multiple lines.",
     "model_stylesheet" => "* { llm_model: claude-sonnet-4-6; llm_provider: anthropic; max_tokens: 65536; }"
   }
 
@@ -81,16 +80,6 @@ class TestPatchDot < Minitest::Test
       assert_includes dot, 'tool_command="cargo test --all"'
       refute_includes dot, "old build command"
       refute_includes dot, "old test command"
-    end
-  end
-
-  def test_patches_expand_spec_prompt
-    with_files(SAMPLE_CONFIG, SAMPLE_DOT) do |yaml_path, dot_path|
-      run_script(yaml_path, dot_path)
-
-      dot = File.read(dot_path)
-      assert_includes dot, "New expand spec prompt."
-      refute_includes dot, "Old expand spec prompt."
     end
   end
 

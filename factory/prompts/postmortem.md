@@ -10,7 +10,12 @@ One of the pipeline stages failed. Read the failure diagnostics and create `.ai/
 
 ## Files to Read
 
-- `.ai/spec.md` — Original specification
+**Read the full specification:**
+- All files under `specification/intent/` — Overview, architecture, server, DOT rendering, CXDB integration, status overlay, detail panel, UI layout
+- All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements
+- All files under `specification/contracts/` — Server API (downstream) and CXDB API (upstream)
+
+**Read failure diagnostics:**
 - `.ai/review_final.md` — If review failed, read this for specific AC failures
 - Source files that failed (`ui/main.go`, `ui/index.html`, `ui/go.mod`)
 

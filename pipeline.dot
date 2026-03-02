@@ -1,7 +1,7 @@
 digraph cxdb_graph_ui_pipeline {
   graph [
-    config_sha256="5404bb33543b0f4bd9bbd803768746a53aab6c2369d10a03af956764dbd1f28d",
-    goal="a Go HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per the specification at specification/intent/cxdb-graph-ui-spec.md",
+    config_sha256="f7dcb933501e7640d061ba35b01227d282924706e6927d4a71251c89d5a83e02",
+    goal="a Go HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per all files under specification/ (intent, contracts, and constraints)",
     rankdir=LR,
     default_max_retry=3,
     retry_target="implement",
@@ -15,27 +15,15 @@ digraph cxdb_graph_ui_pipeline {
 
   start [shape=Mdiamond]
   exit [shape=Msquare]
-  expand_spec [shape=box, prompt="Read the specification file at `specification/intent/cxdb-graph-ui-spec.md`.
-
-Copy its content verbatim into `.ai/spec.md`, prepending a header:
-```
-# CXDB Graph UI — Combined Specification
-Source: specification/intent/cxdb-graph-ui-spec.md
-Date: <today's date>
-```
-
-Write status to $KILROY_STAGE_STATUS_PATH with schema {\"status\":\"success\"}.
-If $KILROY_STAGE_STATUS_PATH is unavailable, write to $KILROY_STAGE_STATUS_FALLBACK_PATH."]
-  check_expand_spec [shape=diamond]
   implement [shape=box, class="hard", prompt="# Implement CXDB Graph UI
 
 ## Task
 
 **CRITICAL: Read `.ai/postmortem_latest.md` first if it exists.**
 - If postmortem exists: This is a REPAIR iteration. Fix only the specific gaps/failures identified. Do not regenerate working code.
-- If postmortem absent: This is a FRESH implementation. Execute `.ai/spec.md` from scratch.
+- If postmortem absent: This is a FRESH implementation. Execute the specification from scratch.
 
-Implement the CXDB Graph UI per `.ai/spec.md`.
+Implement the CXDB Graph UI per the specification under `specification/` (intent, contracts, and constraints).
 
 ## Context
 
@@ -50,8 +38,10 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 **ALWAYS READ FIRST:**
 - `.ai/postmortem_latest.md` — If present, this is a repair iteration. Read this BEFORE reading anything else.
 
-**Then read:**
-- `.ai/spec.md` — Complete specification (all sections)
+**Then read the full specification:**
+- All files under `specification/intent/` — Overview, architecture, server, DOT rendering, CXDB integration, status overlay, detail panel, UI layout
+- All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements
+- All files under `specification/contracts/` — Server API (downstream) and CXDB API (upstream)
 
 **If repair iteration, also read the files mentioned in the postmortem.**
 
@@ -78,7 +68,7 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 - No `require` directives — standard library only
 
 ### ui/main.go
-Implement all routes per spec Section 3:
+Implement all routes per `specification/contracts/server-api.md`:
 - `GET /` — Serve embedded `index.html` via `//go:embed index.html`
 - `GET /dots/{name}` — Serve registered DOT files (read fresh each request)
 - `GET /dots/{name}/nodes` — Return JSON map of node ID → attributes (shape, class, prompt, tool_command, question, goal_gate)
@@ -95,9 +85,9 @@ CLI flags:
 Startup checks (exit non-zero on violation):
 - At least one `--dot` flag required
 - No duplicate base filenames across `--dot` paths
-- No duplicate graph IDs across registered DOT files (parse graph ID using regex from spec Section 3.2; reject anonymous graphs)
+- No duplicate graph IDs across registered DOT files (parse graph ID using regex from `specification/contracts/server-api.md`; reject anonymous graphs)
 
-DOT parsing (spec Section 3.2):
+DOT parsing (`specification/contracts/server-api.md`):
 - Strip `//` line comments and `/* */` block comments (per spec comment-stripping rules)
 - Parse node attributes: quoted and unquoted values, `+` string concatenation, multi-line quoted strings, escape decoding (`\\\"` → `\"`, `\\n` → newline, `\\\\` → `\\`)
 - Parse edge statements: `->` chains expanded, port syntax stripped, same attribute parsing rules
@@ -110,7 +100,7 @@ Server properties:
 - Standard library only — no imports outside `go` standard library
 
 ### ui/index.html
-Implement the full SPA per spec Sections 4–8:
+Implement the full SPA per the intent specification (Sections 4–8):
 
 **CDN imports (pinned versions, ES modules):**
 ```html
@@ -293,7 +283,7 @@ Do not write nested `status.json` files after `cd`."]
 
 ## Task
 
-Perform a final semantic review of the CXDB Graph UI implementation to ensure it meets all acceptance criteria from `.ai/spec.md`.
+Perform a final semantic review of the CXDB Graph UI implementation to ensure it meets all acceptance criteria from the specification.
 
 ## Context
 
@@ -301,7 +291,12 @@ All deterministic gates (fmt, vet, build, tests, browser) have passed. This is t
 
 ## Files to Read
 
-- `.ai/spec.md` — Complete specification and acceptance criteria
+**Read the full specification:**
+- All files under `specification/intent/` — Overview, architecture, server, DOT rendering, CXDB integration, status overlay, detail panel, UI layout
+- All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements
+- All files under `specification/contracts/` — Server API (downstream) and CXDB API (upstream)
+
+**Read the implementation:**
 - `ui/main.go` — Go server implementation
 - `ui/index.html` — Browser SPA implementation
 - `ui/go.mod` — Module file
@@ -382,7 +377,12 @@ One of the pipeline stages failed. Read the failure diagnostics and create `.ai/
 
 ## Files to Read
 
-- `.ai/spec.md` — Original specification
+**Read the full specification:**
+- All files under `specification/intent/` — Overview, architecture, server, DOT rendering, CXDB integration, status overlay, detail panel, UI layout
+- All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements
+- All files under `specification/contracts/` — Server API (downstream) and CXDB API (upstream)
+
+**Read failure diagnostics:**
 - `.ai/review_final.md` — If review failed, read this for specific AC failures
 - Source files that failed (`ui/main.go`, `ui/index.html`, `ui/go.mod`)
 
@@ -442,12 +442,7 @@ Options:
 [R] Retry after manual fix
 [A] Abort pipeline", options="Retry after manual fix,Abort pipeline"]
 
-  start -> expand_spec
-  expand_spec -> check_expand_spec
-  check_expand_spec -> implement [condition="outcome = success"]
-  check_expand_spec -> expand_spec [condition="outcome = fail && context.failure_class = transient_infra", loop_restart=true]
-  check_expand_spec -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
-  check_expand_spec -> postmortem
+  start -> implement
   implement -> check_implement
   check_implement -> fix_fmt [condition="outcome = success"]
   check_implement -> implement [condition="outcome = fail && context.failure_class = transient_infra", loop_restart=true]

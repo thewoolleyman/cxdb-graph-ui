@@ -105,10 +105,6 @@ factory/
 └── run.yaml
 ```
 
-The `expand_spec` node is special — its prompt lives in the YAML config
-as `expand_spec_prompt` (not as a file), since it's typically a short
-one-liner.
-
 ## Config file reference
 
 The config file lives at `factory/pipeline-config.yaml`.
@@ -129,7 +125,6 @@ The config file lives at `factory/pipeline-config.yaml`.
 | `nodes` | yes* | Node inventory — list of nodes with shapes. Drives compilation and verification. |
 | `edges` | yes* | Edge definitions — list of edges with optional conditions. Drives compilation. |
 | `required_gates` | yes | List of verification gate definitions (see below). |
-| `expand_spec_prompt` | yes | Prompt text for the `expand_spec` node. |
 | `model_stylesheet` | yes | CSS-like stylesheet assigning LLM models to node classes. |
 | `goal` | bootstrap | Multi-line description for LLM prompt (only used in bootstrap mode). |
 | `rules` | bootstrap | List of rules for the LLM (only used in bootstrap mode). |

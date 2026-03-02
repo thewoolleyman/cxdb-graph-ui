@@ -61,7 +61,7 @@ cat > "$TMPDIR_TEST/ack_standard.md" <<'EOF'
 Fixed the error handling in the spec.
 
 Changes:
-- `specification/intent/cxdb-graph-ui-spec.md`: Added error handling section
+- `specification/intent/overview.md`: Added error handling section
 
 ## Issue #2: Incomplete API docs
 
@@ -76,7 +76,7 @@ Out of scope for this revision.
 Added SSE documentation.
 
 Changes:
-- `specification/intent/cxdb-graph-ui-spec.md`: Section 10
+- `specification/intent/overview.md`: Section 10
 
 ## Issue #4: Active sessions fields
 
@@ -91,7 +91,7 @@ Added some fields but not all.
 Rewrote discovery algorithm.
 
 Changes:
-- `specification/intent/cxdb-graph-ui-spec.md`: Section 5.5
+- `specification/intent/overview.md`: Section 5.5
 EOF
 
 output=$("$ROUND_SUMMARY" "$TMPDIR_TEST/ack_standard.md")

@@ -194,12 +194,12 @@ Then the detail panel shows Node ID: "review step" and Type: "LLM Task"
 ```
 Given CXDB is running and reachable
   And an Attractor pipeline run is in progress
-  And the agent has completed expand_spec and implement_proto
-  And the agent is currently on the implement node
+  And the agent has completed implement and check_implement
+  And the agent is currently on the fix_fmt node
 When the UI polls CXDB and builds the node status map
-Then expand_spec is colored green (complete)
-  And implement_proto is colored green (complete)
-  And implement is colored blue with a pulsing animation (running)
+Then implement is colored green (complete)
+  And check_implement is colored green (complete)
+  And fix_fmt is colored blue with a pulsing animation (running)
   And subsequent nodes are colored gray (pending)
 ```
 

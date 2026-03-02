@@ -4,9 +4,9 @@
 
 **CRITICAL: Read `.ai/postmortem_latest.md` first if it exists.**
 - If postmortem exists: This is a REPAIR iteration. Fix only the specific gaps/failures identified. Do not regenerate working code.
-- If postmortem absent: This is a FRESH implementation. Execute `.ai/spec.md` from scratch.
+- If postmortem absent: This is a FRESH implementation. Execute the specification from scratch.
 
-Implement the CXDB Graph UI per `.ai/spec.md`.
+Implement the CXDB Graph UI per the specification under `specification/` (intent, contracts, and constraints).
 
 ## Context
 
@@ -21,8 +21,10 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 **ALWAYS READ FIRST:**
 - `.ai/postmortem_latest.md` — If present, this is a repair iteration. Read this BEFORE reading anything else.
 
-**Then read:**
-- `.ai/spec.md` — Complete specification (all sections)
+**Then read the full specification:**
+- All files under `specification/intent/` — Overview, architecture, server, DOT rendering, CXDB integration, status overlay, detail panel, UI layout
+- All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements
+- All files under `specification/contracts/` — Server API (downstream) and CXDB API (upstream)
 
 **If repair iteration, also read the files mentioned in the postmortem.**
 
@@ -49,7 +51,7 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 - No `require` directives — standard library only
 
 ### ui/main.go
-Implement all routes per spec Section 3:
+Implement all routes per `specification/contracts/server-api.md`:
 - `GET /` — Serve embedded `index.html` via `//go:embed index.html`
 - `GET /dots/{name}` — Serve registered DOT files (read fresh each request)
 - `GET /dots/{name}/nodes` — Return JSON map of node ID → attributes (shape, class, prompt, tool_command, question, goal_gate)
@@ -66,9 +68,9 @@ CLI flags:
 Startup checks (exit non-zero on violation):
 - At least one `--dot` flag required
 - No duplicate base filenames across `--dot` paths
-- No duplicate graph IDs across registered DOT files (parse graph ID using regex from spec Section 3.2; reject anonymous graphs)
+- No duplicate graph IDs across registered DOT files (parse graph ID using regex from `specification/contracts/server-api.md`; reject anonymous graphs)
 
-DOT parsing (spec Section 3.2):
+DOT parsing (`specification/contracts/server-api.md`):
 - Strip `//` line comments and `/* */` block comments (per spec comment-stripping rules)
 - Parse node attributes: quoted and unquoted values, `+` string concatenation, multi-line quoted strings, escape decoding (`\"` → `"`, `\n` → newline, `\\` → `\`)
 - Parse edge statements: `->` chains expanded, port syntax stripped, same attribute parsing rules
@@ -81,7 +83,7 @@ Server properties:
 - Standard library only — no imports outside `go` standard library
 
 ### ui/index.html
-Implement the full SPA per spec Sections 4–8:
+Implement the full SPA per the intent specification (Sections 4–8):
 
 **CDN imports (pinned versions, ES modules):**
 ```html
