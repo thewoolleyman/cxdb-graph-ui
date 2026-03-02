@@ -2,65 +2,37 @@
 
 ### 4.1 Graphviz WASM
 
-The browser loads `@hpcc-js/wasm-graphviz` from the esm.sh CDN at a pinned version:
+The `@hpcc-js/wasm-graphviz` package is installed via pnpm and imported as a standard TypeScript module:
 
-```
-https://esm.sh/@hpcc-js/wasm-graphviz@1.6.1
-```
-
-This URL serves a valid ES module (`export * from "/@hpcc-js/wasm-graphviz@1.6.1/es2022/wasm-graphviz.mjs"`) compatible with `<script type="module">` imports. The jsDelivr CDN URL (`dist/index.min.js`) for this package is a UMD bundle, not an ES module — importing it with `<script type="module">` would produce a `SyntaxError: The requested module does not provide an export named 'Graphviz'` error and block SVG rendering entirely. The esm.sh CDN handles the ESM transformation for this package.
-
-This library compiles Graphviz to WebAssembly and exposes a `Graphviz` named export. The expected import and usage pattern is:
-
-```javascript
-import { Graphviz } from "https://esm.sh/@hpcc-js/wasm-graphviz@1.6.1";
+```typescript
+import { Graphviz } from "@hpcc-js/wasm-graphviz";
 const gv = await Graphviz.load();
 const svg = gv.layout(dotString, "svg", "dot");
 ```
 
-The UI calls `gv.layout(dotString, "svg", "dot")` with the raw DOT file content fetched from `/dots/{name}`. The resulting SVG is injected into the main content area.
+This library compiles Graphviz to WebAssembly and exposes a `Graphviz` named export with TypeScript type definitions. Vite handles bundling and WASM asset loading. The UI calls `gv.layout(dotString, "svg", "dot")` with the raw DOT file content fetched from `/dots/{name}`. The resulting SVG is injected into the main content area via the `GraphViewer` component.
 
-If the Graphviz CDN is unreachable, the WASM module fails to load and the graph area displays an error message. The rest of the UI (tabs, connection indicator) still renders — this requires that CDN dependencies are loaded with import isolation (see Section 4.1.1) so that a failure in one dependency does not prevent the module from executing.
+If the WASM module fails to load (e.g., corrupted build artifact, browser incompatibility), the graph area displays an error message. The rest of the UI (tabs, connection indicator) still renders — the Graphviz initialization is isolated in the `useGraphviz` hook and its failure does not prevent other React components from mounting.
 
 ### 4.1.1 Browser Dependencies
 
-The browser loads two CDN dependencies. Both are ES modules used in `index.html`:
+The frontend has two npm dependencies for browser-side functionality, both installed via pnpm and bundled by Vite:
 
-**Import isolation.** To uphold the graceful degradation principle (Section 1.2), CDN dependencies must not share a single top-level `import` scope where one failure prevents all JavaScript from executing. The msgpack decoder — used only for CXDB pipeline discovery (`decodeFirstTurn`, Section 5.2) — must be loaded via dynamic `import()` with error handling, not as a top-level `import` statement. This ensures that if the msgpack CDN is unreachable or returns an error, DOT rendering, tab creation, and the connection indicator still function. The Graphviz WASM dependency may remain a top-level import since DOT rendering is the UI's primary function and cannot proceed without it. The recommended pattern for msgpack is a lazy singleton loaded on first use:
+1. **Graphviz WASM** — `@hpcc-js/wasm-graphviz` (pinned version in `package.json`). Used for DOT-to-SVG rendering. Imported as a standard ES module with full TypeScript types.
 
-```javascript
-let msgpackModule = null;
-async function getMsgpack() {
-    if (!msgpackModule) {
-        msgpackModule = await import("https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-beta2/dist.es5+esm/index.mjs");
-    }
-    return msgpackModule;
-}
-```
+2. **Msgpack decoder** — `@msgpack/msgpack` (pinned version in `package.json`). Used exclusively by `decodeFirstTurn` (Section 5.2) to extract `graph_name` and `run_id` from the raw msgpack payload of `RunStarted` turns fetched with `view=raw`. Not used during regular turn polling (`view=typed`), which returns pre-decoded JSON. The expected usage:
 
-If the dynamic `import()` fails, `decodeFirstTurn` returns `null` for the affected context, and pipeline discovery falls back to retrying on the next poll cycle. DOT rendering and the rest of the UI are unaffected.
-
-1. **Graphviz WASM** — `@hpcc-js/wasm-graphviz` at pinned version via esm.sh (documented above in Section 4.1). Used for DOT-to-SVG rendering.
-
-2. **Msgpack decoder** — `@msgpack/msgpack` at a pinned CDN URL:
-
-```
-https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-beta2/dist.es5+esm/index.mjs
-```
-
-The expected usage pattern is via the `getMsgpack()` lazy loader (see "Import isolation" above):
-
-```javascript
-const { decode } = await getMsgpack();
+```typescript
+import { decode } from "@msgpack/msgpack";
 const payload = decode(uint8ArrayBytes);
 ```
 
-This library provides a `decode(Uint8Array)` named export that decodes msgpack bytes into JavaScript objects. It is used exclusively by `decodeFirstTurn` (Section 5.2) to extract `graph_name` and `run_id` from the raw msgpack payload of `RunStarted` turns fetched with `view=raw`. It is not used during regular turn polling (`view=typed`), which returns pre-decoded JSON.
+**Graceful degradation for msgpack.** Although both dependencies are now bundled (eliminating CDN failure modes), the msgpack decoder should still be loaded lazily via dynamic `import()` in the `decodeFirstTurn` code path. If the WASM module for msgpack fails to initialize, `decodeFirstTurn` returns `null` for the affected context, and pipeline discovery falls back to retrying on the next poll cycle. DOT rendering and the rest of the UI are unaffected.
 
 **Base64 decoding** uses the browser's built-in `atob()` function combined with a `Uint8Array` conversion — no additional library is needed:
 
-```javascript
-function base64ToBytes(b64) {
+```typescript
+function base64ToBytes(b64: string): Uint8Array {
     const binary = atob(b64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
@@ -70,7 +42,7 @@ function base64ToBytes(b64) {
 }
 ```
 
-No other CDN dependencies are required. All other functionality (DOM manipulation, fetch, SVG interaction) uses browser built-in APIs.
+No other npm packages are required for browser-side functionality. All other functionality (DOM manipulation, fetch, SVG interaction) uses browser built-in APIs.
 
 ### 4.2 SVG Node Identification
 
@@ -130,7 +102,7 @@ Switching tabs fetches the DOT file fresh and re-renders the SVG. On every tab s
 
 When the browser loads `index.html`, the following sequence executes:
 
-1. **Load Graphviz WASM** — Import `@hpcc-js/wasm-graphviz` from CDN. During loading, the graph area shows "Loading Graphviz...".
+1. **Load Graphviz WASM** — Initialize `@hpcc-js/wasm-graphviz` (bundled via Vite). During loading, the graph area shows "Loading Graphviz...".
 2. **Fetch DOT file list** — `GET /api/dots` returns available DOT filenames (as a JSON object with a `dots` array). Build the tab bar.
 3. **Fetch CXDB instance list** — `GET /api/cxdb/instances` returns configured CXDB URLs.
 4. **Prefetch node IDs and edges for all pipelines** — For every DOT filename returned by `/api/dots`, fetch `GET /dots/{name}/nodes` to obtain `dotNodeIds` and `GET /dots/{name}/edges` to obtain the edge list for each pipeline. The `/nodes` prefetch ensures that background polling (step 6) can compute per-context status maps for all pipelines from the first poll cycle, not just the active tab. Without this, the holdout scenario "Switch between pipeline tabs" (which expects cached status to be immediately reapplied with no gray flash) cannot be satisfied. The `/edges` prefetch ensures that human gate choices (derived from outgoing edge labels — Section 7.1) are available for the initially rendered pipeline without requiring a tab switch. Without this, clicking a human gate node on the first pipeline would show no choices until the user switches away and back. **Error handling:** If any `/nodes` prefetch fails — whether 400 (DOT parse error), 404 (DOT file removed between `/api/dots` and `/nodes`), 500 (internal server error), or network error — the browser logs a warning and proceeds with an empty `dotNodeIds` set for that pipeline. If any `/edges` prefetch fails, the browser logs a warning and proceeds with an empty edge list for that pipeline. A failed prefetch must not block steps 5 or 6. The active tab still renders its SVG, and polling starts for all pipelines. The affected pipeline will have no status overlay (for `/nodes` failures) or no human gate choices (for `/edges` failures) until the next tab switch triggers a fresh fetch.

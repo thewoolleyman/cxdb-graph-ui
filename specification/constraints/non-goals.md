@@ -14,7 +14,7 @@
 
 7. **No historical playback.** The UI shows current or final state. There is no timeline slider or step-through mode.
 
-8. **No JS build toolchain.** No npm, webpack, bundler, TypeScript, or framework. A single HTML file with CDN imports.
+8. **No server-side rendering.** The frontend is a statically-built SPA. No SSR, no ISR, no server components. Vite builds the frontend into static assets; the Rust server serves them as-is.
 
 9. **No mobile support.** The UI targets desktop browsers at 1200px+ width.
 

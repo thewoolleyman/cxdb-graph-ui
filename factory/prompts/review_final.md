@@ -6,7 +6,7 @@ Perform a final semantic review of the CXDB Graph UI implementation to ensure it
 
 ## Context
 
-All deterministic gates (fmt, clippy, build, tests, browser) have passed. This is the final semantic fidelity check before marking the pipeline complete.
+All deterministic gates (fmt, clippy, build, tests, frontend build, lint, unit tests, E2E tests) have passed. This is the final semantic fidelity check before marking the pipeline complete.
 
 ## Files to Read
 
@@ -15,7 +15,7 @@ All deterministic gates (fmt, clippy, build, tests, browser) have passed. This i
 - All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements, ROP requirements
 - All files under `specification/contracts/` — Server API (downstream) and CXDB API (upstream)
 
-**Read the implementation:**
+**Read the Rust implementation:**
 - `server/Cargo.toml` — Crate manifest (dependencies, lint config)
 - `server/src/main.rs` — Binary entry point
 - `server/src/lib.rs` — Module declarations
@@ -24,10 +24,15 @@ All deterministic gates (fmt, clippy, build, tests, browser) have passed. This i
 - `server/src/server.rs` — Route handlers
 - `server/src/dot_parser.rs` — DOT parsing
 - `server/src/cxdb_proxy.rs` — CXDB proxy
-- `server/assets/index.html` — Browser SPA
 - `Cargo.toml` — Workspace root
 - `Makefile` — Build targets
-- `.ai/verify_browser.md` — Browser verification results (from previous stage)
+
+**Read the frontend implementation:**
+- `frontend/package.json` — Dependencies and scripts
+- `frontend/tsconfig.json` — TypeScript config (verify strict: true)
+- `frontend/vite.config.ts` — Build config (verify output to server/assets/)
+- `frontend/src/` — React components, hooks, lib, types
+- `frontend/tests/` — Playwright E2E and Vitest unit tests
 
 ## Files to Write
 
@@ -38,7 +43,8 @@ All deterministic gates (fmt, clippy, build, tests, browser) have passed. This i
 1. Verify all deliverables exist:
    - `Cargo.toml` (workspace root), `server/Cargo.toml`, `Makefile`
    - `server/src/main.rs`, `server/src/lib.rs`, `server/src/error.rs`, `server/src/config.rs`, `server/src/server.rs`, `server/src/dot_parser.rs`, `server/src/cxdb_proxy.rs`
-   - `server/assets/index.html`
+   - `frontend/package.json`, `frontend/tsconfig.json`, `frontend/vite.config.ts`
+   - `frontend/src/` component tree
 
 2. Check ROP enforcement (spec `specification/constraints/railway-oriented-programming-requirements.md`):
    - **AC-R1**: `[lints.clippy]` in `server/Cargo.toml` denies `unwrap_used`, `expect_used`, `panic`, `unwrap_in_result`
@@ -49,9 +55,9 @@ All deterministic gates (fmt, clippy, build, tests, browser) have passed. This i
 
 3. Check server implementation (spec Section 3):
    - **AC-1**: `--port`, `--cxdb` (repeatable), `--dot` (repeatable, required) CLI flags via clap
-   - **AC-2**: All 7 routes implemented: `GET /`, `/dots/{name}`, `/dots/{name}/nodes`, `/dots/{name}/edges`, `/api/cxdb/{index}/*`, `/api/dots`, `/api/cxdb/instances`
+   - **AC-2**: All routes implemented: `GET /`, `/assets/*`, `/dots/{name}`, `/dots/{name}/nodes`, `/dots/{name}/edges`, `/api/cxdb/{index}/*`, `/api/dots`, `/api/cxdb/instances`
    - **AC-3**: DOT files read fresh on each request (no caching)
-   - **AC-4**: `index.html` embedded via `include_str!()` from `server/assets/`
+   - **AC-4**: Frontend build output embedded via `include_dir` from `server/assets/`
    - **AC-5**: Startup rejects: duplicate base filenames, duplicate graph IDs, anonymous graphs, missing `--dot`
    - **AC-6**: DOT parser handles comment stripping, multi-line strings, `+` concatenation, escape decoding
    - **AC-7**: Node ID normalization (unquote, unescape, trim)
@@ -61,15 +67,9 @@ All deterministic gates (fmt, clippy, build, tests, browser) have passed. This i
    - **AC-11**: CXDB proxy strips `/api/cxdb/{index}` prefix and forwards remainder
    - **AC-12**: `/api/dots` returns filenames in `--dot` flag order
 
-4. Check browser verification passed (previous stage):
-   - **AC-22**: `.ai/verify_browser.md` exists and reports all checks passed
-   - **AC-23**: Graphviz WASM loaded successfully (no stuck "Loading Graphviz...")
-   - **AC-24**: SVG rendered with expected nodes, tabs showed correct graph IDs, node click opened detail panel
-   - **AC-25**: No blocking JavaScript errors (CDN 404s, uncaught exceptions)
-
-5. Check browser SPA (spec Sections 4–8):
-   - **AC-13**: CDN URLs pinned to exact versions (esm.sh for wasm-graphviz, jsDelivr for msgpack)
-   - **AC-14**: DOT rendered to SVG via `Graphviz.load()` + `gv.layout(dot, "svg", "dot")`
+4. Check frontend implementation:
+   - **AC-13**: TypeScript strict mode enabled (`strict: true` in tsconfig.json)
+   - **AC-14**: DOT rendered to SVG via Graphviz WASM (npm package, bundled by Vite)
    - **AC-15**: Pipeline tabs from `/api/dots`, labeled with graph ID (fallback: filename)
    - **AC-16**: Tab labels use `textContent` (not innerHTML)
    - **AC-17**: Status poll every 3 seconds
@@ -78,12 +78,28 @@ All deterministic gates (fmt, clippy, build, tests, browser) have passed. This i
    - **AC-20**: Detail panel shows node attributes on click; user content via textContent/escaped HTML
    - **AC-21**: Graceful degradation when CXDB unreachable (graph still renders)
 
-6. Write `.ai/review_final.md` with:
-   - Section for each major component (ROP compliance, server routes, DOT parsing, browser rendering, status overlay, detail panel)
+5. Perform visual browser verification (smoke test):
+   - Start the server with fixture DOT files from `holdout-scenarios/fixtures/`
+   - Navigate to `http://127.0.0.1:9030` using Playwright MCP browser tools
+   - **AC-22**: Page loads without stuck "Loading" state
+   - **AC-23**: SVG pipeline graph visible with labeled nodes and edges
+   - **AC-24**: Multiple tabs visible matching DOT file graph IDs
+   - **AC-25**: Node click opens detail panel
+   - **AC-26**: No blocking JavaScript errors (check `browser_console_messages` level "error"; ignore favicon 404)
+   - Kill the server process after verification
+
+6. Check frontend tooling:
+   - **AC-27**: `frontend/package.json` has correct scripts (build, lint, test:unit, test:e2e)
+   - **AC-28**: ESLint configured with TypeScript and React rules
+   - **AC-29**: Vite builds to `../server/assets/`
+   - **AC-30**: React components follow conventions: named exports, `data-testid` attributes, `@/` path alias
+
+7. Write `.ai/review_final.md` with:
+   - Section for each major component (ROP compliance, server routes, DOT parsing, frontend components, status overlay, detail panel, browser verification)
    - Pass/fail for each AC above
    - List any gaps with specific AC identifiers
 
-7. If ANY acceptance criteria fail, set `failure_signature` to comma-separated sorted list of failed AC IDs (e.g. "AC-3,AC-7")
+8. If ANY acceptance criteria fail, set `failure_signature` to comma-separated sorted list of failed AC IDs (e.g. "AC-3,AC-7")
 
 ## Acceptance Checks
 

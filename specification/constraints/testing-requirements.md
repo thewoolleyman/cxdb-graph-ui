@@ -1,6 +1,6 @@
 # Testing Requirements
 
-The implementation requires four distinct testing layers. All four layers must pass before the implementation is considered complete.
+The implementation requires three distinct testing layers. All three layers must pass before the implementation is considered complete.
 
 ## 12.1 Rust Unit Tests — Server Layer
 
@@ -19,75 +19,105 @@ cargo llvm-cov --fail-under-lines 100
 
 **Must run without** a live CXDB instance or browser. Unit tests live in `#[cfg(test)] mod tests` blocks within each module, giving direct access to private functions. Integration tests live in `server/tests/`.
 
-**Enforcement:** `make test` runs `cargo test` and must pass before any commit is landed. The Clippy gate (`cargo clippy -- -D warnings`) enforces the ROP lints from `specification/constraints/railway-oriented-programming-requirements.md`. `make precommit` runs `make fmt-check && make clippy && make test`.
+**Enforcement:** `make test` runs `cargo test` and must pass before any commit is landed. The Clippy gate (`cargo clippy -- -D warnings`) enforces the ROP lints from `specification/constraints/railway-oriented-programming-requirements.md`. `make precommit` runs `make fmt-check && make clippy && make test && make ui-lint && make ui-test-unit`.
 
-## 12.2 JavaScript Unit Tests — Client Logic Layer
+## 12.2 TypeScript Unit Tests — Client Logic Layer
 
-**Coverage target: 100% line and branch coverage** for all JavaScript in `server/assets/index.html`.
-
-**Pre-requisite:** JavaScript logic must be extracted from inline `<script>` tags into importable ES modules before this layer can be implemented. The inline-script constraint of the "No build toolchain" principle (Section 1.2) applies to the deployed artifact, not to the development and test workflow — the source can be modular ES modules that are inlined (or concatenated) as part of a simple build step.
+**Coverage target: 100% line and branch coverage** for all TypeScript in `frontend/src/lib/`.
 
 **Tooling:** Vitest with V8 coverage provider:
+```bash
+cd frontend && pnpm test:unit
+```
+which runs:
 ```bash
 vitest run --coverage --coverage.provider=v8 --coverage.100
 ```
 
-**Scope:** The behaviors listed in Invariant 20 (Section 9) must each have unit tests that inject mock CXDB API responses and assert on internal state transitions. This is the only practical way to verify these behaviors — Playwright DOM inspection cannot observe intermediate state such as which endpoint was called, how many times, or what was cached.
+**Scope:** All pure logic in `frontend/src/lib/` — the 9 discovery behaviors from Invariant 20, plus status derivation, merging, error heuristic, stale detection, gap recovery, and turn formatting. The TypeScript module structure in `frontend/src/lib/` is directly importable by Vitest — no extraction step is needed.
+
+The behaviors listed in Invariant 20 (Section 9) must each have unit tests that inject mock CXDB API responses and assert on internal state transitions. This is the only practical way to verify these behaviors — Playwright DOM inspection cannot observe intermediate state such as which endpoint was called, how many times, or what was cached.
 
 **Must run without** a live server, browser, or CXDB instance.
 
-## 12.3 Browser Integration Tests — Smoke Layer
+**Enforcement:** `make ui-test-unit` runs `cd frontend && pnpm test:unit`. Added to `make precommit`.
 
-**Purpose:** Verify that the assembled application actually loads and renders in a real browser. This layer catches CDN failures, WASM initialization errors, and module-level import breakages that unit tests cannot detect.
+## 12.3 Playwright E2E Tests — Integration Layer
 
-**Tooling:** `headless_chrome`, `chromiumoxide`, or `fantoccini` (Rust crates for headless browser testing). Tests live in the Rust integration test suite (`server/tests/` directory) and require no Node.js or external test runner.
+**Purpose:** Verify the fully assembled application in a real browser: WASM initialization, SVG rendering, React component behavior, user interactions, network error handling, and CXDB status overlay (with mock CXDB via Playwright request routing). This replaces both the previous Rust browser smoke tests (no longer needed with bundled npm packages — CDN URL breakage is impossible) and the previous Playwright UI tests into a single comprehensive E2E layer.
 
+**Tooling:**
 ```bash
-cargo test --features browser -- --test-threads=1
+cd frontend && pnpm test:e2e
 ```
+which runs Playwright tests in `frontend/tests/*.spec.ts`.
 
-**Feature flag isolation:** Tests use `#[cfg(feature = "browser")]` so that the fast unit test suite (`cargo test`) is unaffected. Browser tests run only when explicitly invoked with `--features browser`.
+**Scope:** Visual rendering, DOM structure, user interactions, network error handling, and CXDB status overlay.
 
-**In-process server:** Tests bind to `127.0.0.1:0` with `tokio::net::TcpListener` and run the `axum` server in-process, eliminating external process management. A fixture DOT file is used as the `--dot` input.
+**What Playwright tests:** Application loads and WASM initializes, SVG rendered from DOT, tab labels match graph IDs, node colors match expected status, detail panel content, HTML escaping (no XSS), DOT file changes picked up on tab switch, CXDB unreachable states, `data-testid` attribute coverage.
 
-**Minimum required assertions:**
-- The page loads without JavaScript errors that block module execution
-- Graphviz WASM initializes (the "Loading Graphviz..." message disappears)
-- An SVG element is present in the DOM containing expected node IDs from the fixture DOT file
-- Pipeline tabs render with correct graph IDs
-- Clicking a node opens the detail panel
+**What Playwright does NOT test:** Internal TypeScript state machine steps, API JSON format details (edge chain structure, port stripping, parse error body shape), server startup behavior (exit codes, stderr messages). These are covered by Sections 12.1 and 12.2 respectively.
 
-**CDN dependency validation:** Because the tests load the actual `index.html` with its CDN imports, any broken CDN URL causes the module to fail to load, which causes the SVG assertion to timeout and fail. This directly prevents the class of bug seen in v58 (broken msgpack CDN URL).
+**Test infrastructure (cxdb conventions):**
+- Tests in `frontend/tests/*.spec.ts`
+- Custom fixtures extending `test` with server spawning (build Rust binary in `global-setup.ts`, spawn per-test)
+- `page.route()` for CXDB mock responses (fixture responses in test utils)
+- `data-testid` attributes as test selectors (see Section 12.6)
+- Workers: 1 (sequential — each test spawns its own server instance)
 
-**Pipeline integration:** A dedicated pipeline gate (e.g., `verify_browser`) runs the browser test command after `verify_tests`. This keeps the fast unit test loop clean while ensuring browser rendering is verified before `review_final`.
+**Mock CXDB:** Status overlay scenarios use Playwright's request routing (`page.route`) to intercept `/api/cxdb/*` requests and return fixture JSON responses without a live CXDB instance.
 
-**Enforcement:** `make test-browser` runs `cargo test --features browser -- --test-threads=1` and must pass before a pipeline run is considered successful.
+**Server startup scenarios** (no `--dot` flag, duplicate basenames, duplicate graph IDs, anonymous graph) are tested via Bash subprocess in the same Playwright test suite or via a separate test file: run the binary, capture exit code and stderr, assert on expected values.
 
-## 12.4 Playwright UI Tests — Integration Layer
+**Enforcement:** `make ui-test-e2e` runs `cd frontend && pnpm test:e2e`.
 
-**Scope:** Visual rendering, DOM structure, user interactions, network error handling, and CXDB status overlay (with mock CXDB via Playwright request routing).
-
-**What Playwright tests:** SVG rendered from DOT, tab labels match graph IDs, node colors match expected status, detail panel content, HTML escaping (no XSS), DOT file changes picked up on tab switch, CXDB unreachable states.
-
-**What Playwright does NOT test:** Internal JS state machine steps, API JSON format details (edge chain structure, port stripping, parse error body shape), server startup behavior (exit codes, stderr messages). These are covered by Sections 12.1 and 12.2 respectively.
-
-**Mock CXDB:** Status overlay scenarios use Playwright's request routing (`page.route`) to intercept `/api/cxdb/*` requests and return fixture JSON responses without a live CXDB instance. Fixture responses are stored in `.claude/skills/run-holdout-scenarios/fixtures/mock-cxdb/`.
-
-**Server startup scenarios** (no `--dot` flag, duplicate basenames, duplicate graph IDs, anonymous graph) are tested via Bash subprocess in the same skill: run the binary, capture exit code and stderr, assert on expected values.
-
-## 12.5 Testing Layer Boundaries
+## 12.4 Testing Layer Boundaries
 
 The following table maps scenario categories to their required testing layer:
 
 | Scenario Category | Testing Layer |
 |---|---|
-| DOT Rendering — visual (SVG shapes, tab labels, HTML escaping) | Playwright (12.4) |
+| DOT Rendering — visual (SVG shapes, tab labels, HTML escaping) | Playwright E2E (12.3) |
 | DOT Rendering — API contract (edge chain JSON, port stripping, parse error bodies) | Rust tests (12.1) |
-| Application loads and renders (CDN deps, WASM init, SVG output) | Browser integration (12.3) |
-| CXDB Status Overlay (node colors, pulsing, stale detection) | Playwright + mock CXDB (12.4) |
-| Pipeline Discovery state machine (ULID selection, gap recovery, CQL flag, etc.) | JS unit tests (12.2) |
-| Detail Panel — visual (panel opens, content rendered) | Playwright (12.4) |
-| Detail Panel — CXDB turn format (StageStarted/Finished/Failed output strings) | JS unit tests (12.2) |
-| CXDB Connection Handling (unreachable → message, partial connectivity indicator) | Playwright + mock CXDB (12.4) |
-| Server startup validation (exit code, error messages) | Bash subprocess (12.4 skill) |
+| Application loads and renders (WASM init, SVG output, React mount) | Playwright E2E (12.3) |
+| CXDB Status Overlay (node colors, pulsing, stale detection) | Playwright E2E + mock CXDB (12.3) |
+| Pipeline Discovery state machine (ULID selection, gap recovery, CQL flag, etc.) | TypeScript unit tests (12.2) |
+| Detail Panel — visual (panel opens, content rendered) | Playwright E2E (12.3) |
+| Detail Panel — CXDB turn format (StageStarted/Finished/Failed output strings) | TypeScript unit tests (12.2) |
+| CXDB Connection Handling (unreachable → message, partial connectivity indicator) | Playwright E2E + mock CXDB (12.3) |
+| Server startup validation (exit code, error messages) | Bash subprocess (12.3) |
 | Server API format (`/api/dots`, `/api/cxdb/instances`, `/dots/{name}` 404) | Rust tests (12.1) |
+
+## 12.5 ESLint Configuration
+
+The frontend uses ESLint for TypeScript and React code quality enforcement, matching cxdb's conventions:
+
+```json
+{
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react-hooks/recommended"
+  ],
+  "parser": "@typescript-eslint/parser"
+}
+```
+
+**Enforcement:** `pnpm lint` is added to `make precommit` (via `make ui-lint`) and to the CI `frontend.yml` workflow.
+
+## 12.6 `data-testid` Convention
+
+All interactive and assertable DOM elements must have `data-testid` attributes for Playwright test selectors. Required selectors:
+
+| Element | `data-testid` Value |
+|---------|-------------------|
+| Tab container | `tab-bar` |
+| Individual pipeline tab | `tab-{graphId}` |
+| SVG graph container | `graph-area` |
+| Detail panel sidebar | `detail-panel` |
+| CXDB status indicator | `connection-indicator` |
+| Individual turn in detail panel | `turn-row-{turnId}` |
+| Loading message | `loading-message` |
+| Error display area | `error-message` |
+
+This follows the `data-testid` convention (widely adopted by React Testing Library and Playwright) and ensures Playwright tests do not rely on brittle CSS class selectors or text content matching.

@@ -56,9 +56,13 @@ The server prints the URL on startup: `Kilroy Pipeline UI: http://127.0.0.1:9030
 
 ### `GET /` — Dashboard
 
-Serves `index.html` embedded in the binary at compile time using `include_str!()` or the `rust-embed` crate, serving it from the embedded data. The `include_str!()` macro resolves paths relative to the source file at compile time, so the embedded content is always available regardless of the working directory at runtime. Returns 500 if the embed fails to load (should not happen in a correctly compiled binary).
+Serves `index.html` from the `server/assets/` directory, which contains the Vite build output from `frontend/`. Assets are embedded in the binary at compile time using the `include_dir` crate, which embeds the entire `server/assets/` directory. `GET /` returns `index.html`, and `GET /assets/*` returns the hashed build artifacts (JS, CSS, WASM). Returns 500 if the embed fails to load (should not happen in a correctly compiled binary). The server sets correct MIME types for all served files (`.html`, `.js`, `.css`, `.wasm`).
 
-**`index.html` file location.** `index.html` must reside at a path reachable by the `include_str!()` macro relative to the embedding source file (typically in `server/assets/`). The embedding source file and the asset must be within the same crate.
+**Development mode.** A `--dev` flag on the CLI causes the server to serve files from the filesystem path `server/assets/` (or a configurable `--assets-dir`) instead of the embedded copy. This enables hot-reload during development: run `pnpm dev` in `frontend/` (which writes to `server/assets/`) alongside `cargo run -- --dev` in `server/`.
+
+**Build dependency.** The `server/assets/` directory must be populated by `pnpm build` (from `frontend/`) before `cargo build`. The `make build-all` target runs both steps in order. When `server/assets/` is empty or absent at compile time, `include_dir!()` embeds an empty directory and the server returns 404 for all asset requests — the `make build-all` target prevents this in normal workflow. A minimal placeholder `index.html` may optionally be committed to prevent `include_dir!()` from failing on a fresh clone before the first `pnpm build`; this placeholder should say "Frontend not built. Run `pnpm build` in frontend/ first."
+
+**`server/assets/` directory.** This directory is gitignored (it is a build artifact). The Vite build config (`frontend/vite.config.ts`) sets the output directory to `../server/assets/`. The `include_dir` crate is added to the server's `Cargo.toml` dependencies.
 
 ### `GET /dots/{name}` — DOT Files
 

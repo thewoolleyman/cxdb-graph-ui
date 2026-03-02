@@ -12,8 +12,8 @@ Implement the CXDB Graph UI per the specification under `specification/` (intent
 
 The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT files as interactive SVG graphs with real-time execution status from CXDB. It has two components:
 
-1. **`server/`** — A Rust HTTP server using axum/tokio that serves the SPA, DOT files, parsed node/edge data, and proxies CXDB API requests. All fallible operations return `Result<T, E>` with railway-oriented error handling (see `specification/constraints/railway-oriented-programming-requirements.md`).
-2. **`server/assets/index.html`** — A browser SPA (single HTML file, inline CSS/JS, no build toolchain) that renders DOT → SVG via Graphviz WASM and overlays CXDB execution state onto graph nodes.
+1. **`server/`** — A Rust HTTP server using axum/tokio that serves the frontend build output (embedded via `include_dir`), DOT files, parsed node/edge data, and proxies CXDB API requests. All fallible operations return `Result<T, E>` with railway-oriented error handling (see `specification/constraints/railway-oriented-programming-requirements.md`).
+2. **`frontend/`** — A React 18 SPA built with Vite, TypeScript (strict mode), and Tailwind CSS v3. Package management via pnpm v9. Renders DOT → SVG via @hpcc-js/wasm-graphviz and overlays CXDB execution state onto graph nodes. Vite builds into `server/assets/` (gitignored), which the Rust server embeds at compile time.
 
 ## Files to Read
 
@@ -34,7 +34,7 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 - `Makefile` — Top-level build targets per `specification/intent/server.md` Section 3.4
 
 ### server/
-- `server/Cargo.toml` — Crate manifest with dependencies (axum, tokio, hyper, clap, thiserror, serde, serde_json, tower-http) and `[lints.clippy]` enforcing ROP (unwrap_used = "deny", expect_used = "deny", panic = "deny", unwrap_in_result = "deny")
+- `server/Cargo.toml` — Crate manifest with dependencies (axum, tokio, hyper, clap, thiserror, serde, serde_json, tower-http, include_dir) and `[lints.clippy]` enforcing ROP (unwrap_used = "deny", expect_used = "deny", panic = "deny", unwrap_in_result = "deny")
 - `server/src/main.rs` — Thin binary entry point: CLI parsing via clap, Config construction, server startup, graceful shutdown
 - `server/src/lib.rs` — Library crate declaring all public modules
 - `server/src/error.rs` — `AppError` enum (thiserror), `AppResult<T>` type alias, `From` impls for upstream errors
@@ -42,7 +42,17 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 - `server/src/server.rs` — axum router, all route handlers returning `impl IntoResponse`
 - `server/src/dot_parser.rs` — DOT file parsing (nodes, edges, comments, graph ID extraction, normalization)
 - `server/src/cxdb_proxy.rs` — CXDB reverse proxy handler
-- `server/assets/index.html` — Browser SPA
+
+### frontend/
+- `frontend/package.json` — pnpm manifest with React 18, Vite, TypeScript, Tailwind CSS v3, ESLint, Vitest, Playwright
+- `frontend/tsconfig.json` — TypeScript config with `strict: true`
+- `frontend/vite.config.ts` — Vite config with React plugin, build output to `../server/assets/`
+- `frontend/tailwind.config.ts` — Tailwind config
+- `frontend/postcss.config.mjs` — PostCSS config with Tailwind and autoprefixer
+- `frontend/.eslintrc.json` — ESLint config with TypeScript and React rules
+- `frontend/vitest.config.ts` — Vitest config
+- `frontend/playwright.config.ts` — Playwright config
+- `frontend/src/` — React components, hooks, lib, types per specification Section 3.3
 
 ## What to Do
 
@@ -57,12 +67,12 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 
 ### Workspace root
 - `Cargo.toml` with `[workspace]` section
-- `Makefile` with targets: build, release, test, test-browser, clippy, fmt, fmt-check, check, clean, run, precommit
+- `Makefile` with targets: build, build-all, release, test, clippy, fmt, fmt-check, check, clean, run, ui-install, ui-build, ui-dev, ui-lint, ui-test-unit, ui-test-e2e, precommit
 
 ### server/Cargo.toml
 - Crate name: `cxdb-graph-ui`
 - Edition: `2021`
-- Dependencies: axum, tokio (features: full), hyper, clap (features: derive), thiserror, serde (features: derive), serde_json, tower-http (features: as needed for proxy)
+- Dependencies: axum, tokio (features: full), hyper, clap (features: derive), thiserror, serde (features: derive), serde_json, tower-http (features: as needed for proxy), include_dir
 - `[lints.clippy]` section with ROP lints set to "deny"
 
 ### server/src/error.rs
@@ -78,7 +88,8 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 
 ### server/src/server.rs
 Implement all routes per `specification/contracts/server-api.md`:
-- `GET /` — Serve embedded `index.html` via `include_str!()`
+- `GET /` — Serve embedded frontend build output via `include_dir`
+- `GET /assets/*` — Serve hashed build artifacts with correct MIME types
 - `GET /dots/{name}` — Serve registered DOT files (read fresh each request via `tokio::fs::read_to_string`)
 - `GET /dots/{name}/nodes` — Return JSON map of node ID → attributes (shape, class, prompt, tool_command, question, goal_gate)
 - `GET /dots/{name}/edges` — Return JSON array of edges (source, target, label)
@@ -100,15 +111,13 @@ DOT parsing (`specification/contracts/server-api.md`):
 - Normalize node/edge IDs: strip outer quotes, resolve escape sequences, trim whitespace
 - All parse functions return `AppResult<T>` — parse errors produce `AppError::DotParse` with context
 
-### server/assets/index.html
-Implement the full SPA per the intent specification (Sections 4–8):
+### frontend/
+Implement the full React SPA per the intent specification (Sections 4–8):
 
-**CDN imports (pinned versions, ES modules):**
-```html
-<script type="module">
-import { Graphviz } from "https://esm.sh/@hpcc-js/wasm-graphviz@1.6.1";
-import { decode } from "https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-beta2/dist.es5+esm/mod.min.mjs";
-```
+**React components** (per Section 3.3):
+- App, PipelineTabs, GraphView, StatusOverlay, DetailPanel, ConnectionIndicator
+- Hooks: useGraphviz, useCxdbPoller, usePipelineDiscovery
+- Lib: dotRenderer, statusMapper, msgpackDecoder, cxdbClient
 
 **Pipeline tabs** (Section 4.4):
 - Fetch `/api/dots` on load, render a tab per DOT file
@@ -116,7 +125,7 @@ import { decode } from "https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-beta
 - Tab labels rendered via `textContent` (no innerHTML — XSS prevention)
 
 **DOT rendering** (Section 4.1):
-- Fetch DOT content from `/dots/{name}`, render SVG via `Graphviz.load()` then `gv.layout(dot, "svg", "dot")`
+- Fetch DOT content from `/dots/{name}`, render SVG via Graphviz WASM
 - Inject resulting SVG into main content area
 
 **Status overlay** (Sections 4.2, 5, 6):
@@ -141,16 +150,20 @@ import { decode } from "https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-beta
 ## Acceptance Checks
 
 - `Cargo.toml` (workspace root) and `server/Cargo.toml` exist and are valid
+- `frontend/package.json` exists with correct dependencies
 - `Makefile` exists with required targets
+- `pnpm install --frozen-lockfile` succeeds from `frontend/`
+- `pnpm build` succeeds from `frontend/`
+- `pnpm lint` passes from `frontend/`
+- `pnpm test:unit` passes from `frontend/`
 - `cargo build` succeeds from `server/`
 - `cargo clippy -- -D warnings` passes (enforces ROP: no unwrap/expect/panic outside tests)
 - `cargo fmt --check` passes
 - `cargo test` passes
-- `server/assets/index.html` exists
-- All 7 routes implemented
+- All 7+ routes implemented
 - DOT parser handles comments, multi-line strings, `+` concatenation, escape sequences
 - Startup rejects duplicate basenames, duplicate graph IDs, anonymous graphs
-- CDN URLs pinned to exact versions from spec
+- TypeScript strict mode enabled
 
 ## Status Contract
 

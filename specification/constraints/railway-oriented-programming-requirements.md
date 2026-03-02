@@ -92,5 +92,4 @@ Beyond ROP, the following Rust idioms are enforced:
 - `#[cfg(test)]` for unit test modules within source files
 - `server/tests/` directory for integration tests
 - `#[tokio::test]` for async test functions
-- Feature-gated browser tests via `#[cfg(feature = "browser")]`
 - Integration tests use `tempfile::tempdir()` for filesystem isolation (cxdb pattern)

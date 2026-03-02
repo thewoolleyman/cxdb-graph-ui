@@ -375,18 +375,24 @@ After building the status map, the UI walks SVG `<g class="node">` elements and 
 | `error` | `node-error` | Red fill |
 | `stale` | `node-stale` | Orange/amber fill, no animation |
 
+These CSS rules are defined in `frontend/src/app/globals.css` using Tailwind's `@layer` directive, since the SVG elements are generated at runtime by Graphviz WASM (not authored in JSX) and cannot use Tailwind utility classes directly:
+
 ```css
-.node-pending polygon, .node-pending ellipse, .node-pending path   { fill: #e0e0e0; }
-.node-running polygon, .node-running ellipse, .node-running path   { fill: #90caf9; animation: pulse 1.5s infinite; }
-.node-complete polygon, .node-complete ellipse, .node-complete path  { fill: #a5d6a7; }
-.node-error polygon, .node-error ellipse, .node-error path        { fill: #ef9a9a; }
-.node-stale polygon, .node-stale ellipse, .node-stale path        { fill: #ffcc80; }
+@layer components {
+  .node-pending polygon, .node-pending ellipse, .node-pending path   { fill: #e0e0e0; }
+  .node-running polygon, .node-running ellipse, .node-running path   { fill: #90caf9; animation: pulse 1.5s infinite; }
+  .node-complete polygon, .node-complete ellipse, .node-complete path  { fill: #a5d6a7; }
+  .node-error polygon, .node-error ellipse, .node-error path        { fill: #ef9a9a; }
+  .node-stale polygon, .node-stale ellipse, .node-stale path        { fill: #ffcc80; }
+}
 
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.6; }
 }
 ```
+
+The status colors may also be defined as custom colors in `frontend/tailwind.config.ts` for use in non-SVG UI elements (e.g., status badges in the detail panel). The pulsing animation for "running" nodes is a Tailwind custom animation matching cxdb's `breathe` and `glow-pulse` animation patterns. A `cn()` utility in `frontend/src/lib/utils.ts` (matching cxdb's pattern) handles conditional class merging for React components.
 
 **SVG element coverage.** The CSS selectors (`polygon`, `ellipse`, `path`) cover all ten node shapes in the Kilroy shape vocabulary (Section 7.3). Most shapes (`Mdiamond`, `Msquare`, `box`, `diamond`, `parallelogram`, `hexagon`, `component`, `tripleoctagon`, `house`) render as `<polygon>`. `circle` renders as `<ellipse>`. `doublecircle` renders as two nested `<ellipse>` elements — the CSS selectors match both, coloring the entire node correctly. No shapes render as elements outside the `polygon`/`ellipse`/`path` set.
 

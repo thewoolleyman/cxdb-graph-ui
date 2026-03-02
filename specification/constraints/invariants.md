@@ -50,7 +50,7 @@
 
    **Client-Side Logic**
 
-20. **Discovery state machine behavior is verified by JavaScript unit tests, not by UI tests.** The following client-side behaviors require direct JS-level testing (mocking CXDB API responses and inspecting internal state) and cannot be reliably verified through Playwright DOM inspection alone:
+20. **Discovery state machine behavior is verified by TypeScript unit tests, not by UI tests.** The pure logic modules in `frontend/src/lib/` (discovery, status derivation, merging, gap recovery) are directly importable by Vitest. The following client-side behaviors require direct TypeScript-level testing (mocking CXDB API responses and inspecting internal state) and cannot be reliably verified through Playwright DOM inspection alone:
     - `fetchFirstTurn` pagination and `MAX_PAGES` cap
     - `knownMappings` caching and null-entry semantics
     - `determineActiveRuns` ULID-based run selection
@@ -61,4 +61,4 @@
     - Supplemental context list dedup merge
     - `cachedContextLists` population for liveness checks
 
-    This invariant establishes the testing layer boundary: these behaviors belong in a JS unit test suite that imports the discovery module directly, not in the Playwright UI test skill.
+    This invariant establishes the testing layer boundary: these behaviors belong in the Vitest unit test suite that imports the `frontend/src/lib/` modules directly, not in the Playwright UI test skill.

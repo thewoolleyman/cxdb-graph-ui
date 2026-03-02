@@ -1,7 +1,7 @@
 digraph cxdb_graph_ui_pipeline {
   graph [
-    config_sha256="9199f490c7df853833af7ab0920e9c615684072db8250570a1961678c6ecfd73",
-    goal="a Rust HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per all files under specification/ (intent, contracts, and constraints)",
+    config_sha256="553b068aef9b46ed83774cfe5ff1248b89a6a75fa63b54410738ccaa5a2c94c1",
+    goal="a Rust HTTP server with a Vite + React 18 TypeScript frontend that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per all files under specification/ (intent, contracts, and constraints)",
     rankdir=LR,
     default_max_retry=3,
     retry_target="implement",
@@ -29,8 +29,8 @@ Implement the CXDB Graph UI per the specification under `specification/` (intent
 
 The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT files as interactive SVG graphs with real-time execution status from CXDB. It has two components:
 
-1. **`server/`** — A Rust HTTP server using axum/tokio that serves the SPA, DOT files, parsed node/edge data, and proxies CXDB API requests. All fallible operations return `Result<T, E>` with railway-oriented error handling (see `specification/constraints/railway-oriented-programming-requirements.md`).
-2. **`server/assets/index.html`** — A browser SPA (single HTML file, inline CSS/JS, no build toolchain) that renders DOT → SVG via Graphviz WASM and overlays CXDB execution state onto graph nodes.
+1. **`server/`** — A Rust HTTP server using axum/tokio that serves the frontend build output (embedded via `include_dir`), DOT files, parsed node/edge data, and proxies CXDB API requests. All fallible operations return `Result<T, E>` with railway-oriented error handling (see `specification/constraints/railway-oriented-programming-requirements.md`).
+2. **`frontend/`** — A React 18 SPA built with Vite, TypeScript (strict mode), and Tailwind CSS v3. Package management via pnpm v9. Renders DOT → SVG via @hpcc-js/wasm-graphviz and overlays CXDB execution state onto graph nodes. Vite builds into `server/assets/` (gitignored), which the Rust server embeds at compile time.
 
 ## Files to Read
 
@@ -51,7 +51,7 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 - `Makefile` — Top-level build targets per `specification/intent/server.md` Section 3.4
 
 ### server/
-- `server/Cargo.toml` — Crate manifest with dependencies (axum, tokio, hyper, clap, thiserror, serde, serde_json, tower-http) and `[lints.clippy]` enforcing ROP (unwrap_used = \"deny\", expect_used = \"deny\", panic = \"deny\", unwrap_in_result = \"deny\")
+- `server/Cargo.toml` — Crate manifest with dependencies (axum, tokio, hyper, clap, thiserror, serde, serde_json, tower-http, include_dir) and `[lints.clippy]` enforcing ROP (unwrap_used = \"deny\", expect_used = \"deny\", panic = \"deny\", unwrap_in_result = \"deny\")
 - `server/src/main.rs` — Thin binary entry point: CLI parsing via clap, Config construction, server startup, graceful shutdown
 - `server/src/lib.rs` — Library crate declaring all public modules
 - `server/src/error.rs` — `AppError` enum (thiserror), `AppResult<T>` type alias, `From` impls for upstream errors
@@ -59,7 +59,17 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 - `server/src/server.rs` — axum router, all route handlers returning `impl IntoResponse`
 - `server/src/dot_parser.rs` — DOT file parsing (nodes, edges, comments, graph ID extraction, normalization)
 - `server/src/cxdb_proxy.rs` — CXDB reverse proxy handler
-- `server/assets/index.html` — Browser SPA
+
+### frontend/
+- `frontend/package.json` — pnpm manifest with React 18, Vite, TypeScript, Tailwind CSS v3, ESLint, Vitest, Playwright
+- `frontend/tsconfig.json` — TypeScript config with `strict: true`
+- `frontend/vite.config.ts` — Vite config with React plugin, build output to `../server/assets/`
+- `frontend/tailwind.config.ts` — Tailwind config
+- `frontend/postcss.config.mjs` — PostCSS config with Tailwind and autoprefixer
+- `frontend/.eslintrc.json` — ESLint config with TypeScript and React rules
+- `frontend/vitest.config.ts` — Vitest config
+- `frontend/playwright.config.ts` — Playwright config
+- `frontend/src/` — React components, hooks, lib, types per specification Section 3.3
 
 ## What to Do
 
@@ -74,12 +84,12 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 
 ### Workspace root
 - `Cargo.toml` with `[workspace]` section
-- `Makefile` with targets: build, release, test, test-browser, clippy, fmt, fmt-check, check, clean, run, precommit
+- `Makefile` with targets: build, build-all, release, test, clippy, fmt, fmt-check, check, clean, run, ui-install, ui-build, ui-dev, ui-lint, ui-test-unit, ui-test-e2e, precommit
 
 ### server/Cargo.toml
 - Crate name: `cxdb-graph-ui`
 - Edition: `2021`
-- Dependencies: axum, tokio (features: full), hyper, clap (features: derive), thiserror, serde (features: derive), serde_json, tower-http (features: as needed for proxy)
+- Dependencies: axum, tokio (features: full), hyper, clap (features: derive), thiserror, serde (features: derive), serde_json, tower-http (features: as needed for proxy), include_dir
 - `[lints.clippy]` section with ROP lints set to \"deny\"
 
 ### server/src/error.rs
@@ -95,7 +105,8 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 
 ### server/src/server.rs
 Implement all routes per `specification/contracts/server-api.md`:
-- `GET /` — Serve embedded `index.html` via `include_str!()`
+- `GET /` — Serve embedded frontend build output via `include_dir`
+- `GET /assets/*` — Serve hashed build artifacts with correct MIME types
 - `GET /dots/{name}` — Serve registered DOT files (read fresh each request via `tokio::fs::read_to_string`)
 - `GET /dots/{name}/nodes` — Return JSON map of node ID → attributes (shape, class, prompt, tool_command, question, goal_gate)
 - `GET /dots/{name}/edges` — Return JSON array of edges (source, target, label)
@@ -117,15 +128,13 @@ DOT parsing (`specification/contracts/server-api.md`):
 - Normalize node/edge IDs: strip outer quotes, resolve escape sequences, trim whitespace
 - All parse functions return `AppResult<T>` — parse errors produce `AppError::DotParse` with context
 
-### server/assets/index.html
-Implement the full SPA per the intent specification (Sections 4–8):
+### frontend/
+Implement the full React SPA per the intent specification (Sections 4–8):
 
-**CDN imports (pinned versions, ES modules):**
-```html
-<script type=\"module\">
-import { Graphviz } from \"https://esm.sh/@hpcc-js/wasm-graphviz@1.6.1\";
-import { decode } from \"https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-beta2/dist.es5+esm/mod.min.mjs\";
-```
+**React components** (per Section 3.3):
+- App, PipelineTabs, GraphView, StatusOverlay, DetailPanel, ConnectionIndicator
+- Hooks: useGraphviz, useCxdbPoller, usePipelineDiscovery
+- Lib: dotRenderer, statusMapper, msgpackDecoder, cxdbClient
 
 **Pipeline tabs** (Section 4.4):
 - Fetch `/api/dots` on load, render a tab per DOT file
@@ -133,7 +142,7 @@ import { decode } from \"https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-bet
 - Tab labels rendered via `textContent` (no innerHTML — XSS prevention)
 
 **DOT rendering** (Section 4.1):
-- Fetch DOT content from `/dots/{name}`, render SVG via `Graphviz.load()` then `gv.layout(dot, \"svg\", \"dot\")`
+- Fetch DOT content from `/dots/{name}`, render SVG via Graphviz WASM
 - Inject resulting SVG into main content area
 
 **Status overlay** (Sections 4.2, 5, 6):
@@ -158,16 +167,20 @@ import { decode } from \"https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-bet
 ## Acceptance Checks
 
 - `Cargo.toml` (workspace root) and `server/Cargo.toml` exist and are valid
+- `frontend/package.json` exists with correct dependencies
 - `Makefile` exists with required targets
+- `pnpm install --frozen-lockfile` succeeds from `frontend/`
+- `pnpm build` succeeds from `frontend/`
+- `pnpm lint` passes from `frontend/`
+- `pnpm test:unit` passes from `frontend/`
 - `cargo build` succeeds from `server/`
 - `cargo clippy -- -D warnings` passes (enforces ROP: no unwrap/expect/panic outside tests)
 - `cargo fmt --check` passes
 - `cargo test` passes
-- `server/assets/index.html` exists
-- All 7 routes implemented
+- All 7+ routes implemented
 - DOT parser handles comments, multi-line strings, `+` concatenation, escape sequences
 - Startup rejects duplicate basenames, duplicate graph IDs, anonymous graphs
-- CDN URLs pinned to exact versions from spec
+- TypeScript strict mode enabled
 
 ## Status Contract
 
@@ -184,121 +197,20 @@ Do not write nested `status.json` files after `cd`."]
   check_fmt [shape=diamond]
   verify_clippy [shape=parallelogram, tool_command="mise exec -- sh -c 'cd server && cargo clippy -- -D warnings -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::unwrap_in_result'", timeout="120s"]
   check_clippy [shape=diamond]
+  verify_ui_install [shape=parallelogram, tool_command="mise exec -- sh -c 'cd frontend && pnpm install --frozen-lockfile'", timeout="120s"]
+  check_ui_install [shape=diamond]
+  verify_ui_build [shape=parallelogram, tool_command="mise exec -- sh -c 'cd frontend && pnpm build'", timeout="120s"]
+  check_ui_build [shape=diamond]
+  verify_ui_lint [shape=parallelogram, tool_command="mise exec -- sh -c 'cd frontend && pnpm lint'", timeout="60s"]
+  check_ui_lint [shape=diamond]
+  verify_ui_test_unit [shape=parallelogram, tool_command="mise exec -- sh -c 'cd frontend && pnpm test:unit'", timeout="120s"]
+  check_ui_test_unit [shape=diamond]
   verify_build [shape=parallelogram, tool_command="mise exec -- sh -c 'cd server && cargo build'", timeout="120s"]
   check_build [shape=diamond]
   verify_tests [shape=parallelogram, tool_command="mise exec -- sh -c 'cd server && cargo test'", timeout="120s"]
   check_tests [shape=diamond]
-  verify_browser [shape=box, class="verify", prompt="# Browser Rendering Verification
-
-## Task
-
-Verify that the CXDB Graph UI application actually loads and renders a visible graph in a real browser. This is a black-box smoke test: if the page loads and you can see a rendered pipeline graph with nodes and edges, it passes. This catches broken CDN URLs, WASM initialization failures, and JavaScript errors that prevent rendering.
-
-## Context
-
-All deterministic gates (fmt, clippy, build, tests) have passed. This stage uses the Playwright MCP browser tools to start the server, load the page, and verify that the rendered output is correct.
-
-## Prerequisites
-
-You have access to Playwright MCP browser tools: `browser_navigate`, `browser_snapshot`, `browser_take_screenshot`, `browser_evaluate`, `browser_click`, `browser_wait_for`, `browser_console_messages`.
-
-## What to Do
-
-### Step 1: Start the server
-
-Build and start the server in the background with the fixture DOT files shipped in `holdout-scenarios/fixtures/`:
-
-```bash
-REPO=$(pwd)
-cd server && cargo build --release && cd ..
-./server/target/release/cxdb-graph-ui \\
-  --dot \"$REPO/holdout-scenarios/fixtures/simple-pipeline.dot\" \\
-  --dot \"$REPO/holdout-scenarios/fixtures/multi-tab-b.dot\" &
-sleep 2
-```
-
-Verify the server is responding:
-```bash
-curl -sf http://127.0.0.1:9030/ > /dev/null
-```
-
-### Step 2: Navigate and wait for rendering
-
-1. Navigate to `http://127.0.0.1:9030`
-2. Wait up to 30 seconds for the \"Loading Graphviz...\" message to disappear
-3. If \"Loading Graphviz...\" is still shown after 30 seconds, this is a **FAIL** — the WASM or a CDN dependency is broken
-
-### Step 3: Verify the graph rendered
-
-Take a screenshot of the page. Visually confirm:
-
-- An SVG pipeline graph is visible (not a blank page, not an error message)
-- The graph contains labeled nodes connected by edges
-- The graph looks like a pipeline (directed graph flowing top-to-bottom or left-to-right)
-
-Also use `browser_evaluate` to programmatically confirm:
-
-```javascript
-(() => {
-  const svg = document.querySelector('svg');
-  if (!svg) return { pass: false, reason: 'No SVG element found' };
-  const nodes = svg.querySelectorAll('.node');
-  const edges = svg.querySelectorAll('.edge');
-  if (nodes.length === 0) return { pass: false, reason: 'SVG has no nodes' };
-  if (edges.length === 0) return { pass: false, reason: 'SVG has no edges' };
-  return { pass: true, nodes: nodes.length, edges: edges.length };
-})()
-```
-
-**FAIL** if no graph is visible or the SVG contains no nodes/edges.
-
-### Step 4: Verify pipeline tabs
-
-Use `browser_evaluate` or `browser_snapshot` to check:
-
-- At least two tabs are visible (we started with two DOT files)
-- The first tab label is \"simple_pipeline\" (graph ID, not filename)
-
-**FAIL** if tabs are missing or the first tab label is wrong.
-
-### Step 5: Verify node click opens detail panel
-
-1. Click on a node in the SVG
-2. Verify the detail panel opens and shows node information (Node ID, Type)
-
-**FAIL** if clicking a node does not open a detail panel.
-
-### Step 6: Check for JavaScript errors
-
-Use `browser_console_messages` with level \"error\" to check for JavaScript errors. CDN 404s, module load failures, and uncaught exceptions will appear here.
-
-- A 404 on `/favicon.ico` is acceptable (ignore it)
-- A 404 or error on any CDN dependency (msgpack, graphviz WASM) is a **FAIL**
-- Any uncaught JavaScript error is a **FAIL**
-
-### Step 7: Clean up
-
-Kill the server process:
-```bash
-pkill -f cxdb-graph-ui 2>/dev/null || true
-```
-
-### Step 8: Report results
-
-Write a summary of pass/fail for each check to `.ai/verify_browser.md`.
-
-## Status Contract
-
-Write status JSON to `$KILROY_STAGE_STATUS_PATH` (absolute path). If unavailable, use `$KILROY_STAGE_STATUS_FALLBACK_PATH`.
-
-Success (all checks pass): `{\"status\":\"success\"}`
-Failure: `{\"status\":\"fail\",\"failure_reason\":\"browser_rendering_broken\",\"failure_signature\":\"<comma-separated-failed-checks>\",\"details\":\"<specific failures>\",\"failure_class\":\"deterministic\"}`
-
-Failure signatures use these check names: `graphviz_load`, `graph_render`, `tabs`, `node_click`, `js_errors`.
-
-Example: `{\"status\":\"fail\",\"failure_reason\":\"browser_rendering_broken\",\"failure_signature\":\"graphviz_load,graph_render\",\"details\":\"Page stuck on Loading Graphviz after 30s. Console shows 404 on msgpack CDN URL.\",\"failure_class\":\"deterministic\"}`
-
-Do not write nested `status.json` files after `cd`."]
+  verify_e2e [shape=parallelogram, tool_command="mise exec -- sh -c 'cd frontend && pnpm test:e2e'", timeout="300s"]
+  check_e2e [shape=diamond]
   review_final [shape=box, class="verify", goal_gate=true, prompt="# Final Review
 
 ## Task
@@ -307,7 +219,7 @@ Perform a final semantic review of the CXDB Graph UI implementation to ensure it
 
 ## Context
 
-All deterministic gates (fmt, clippy, build, tests, browser) have passed. This is the final semantic fidelity check before marking the pipeline complete.
+All deterministic gates (fmt, clippy, build, tests, frontend build, lint, unit tests, E2E tests) have passed. This is the final semantic fidelity check before marking the pipeline complete.
 
 ## Files to Read
 
@@ -316,7 +228,7 @@ All deterministic gates (fmt, clippy, build, tests, browser) have passed. This i
 - All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements, ROP requirements
 - All files under `specification/contracts/` — Server API (downstream) and CXDB API (upstream)
 
-**Read the implementation:**
+**Read the Rust implementation:**
 - `server/Cargo.toml` — Crate manifest (dependencies, lint config)
 - `server/src/main.rs` — Binary entry point
 - `server/src/lib.rs` — Module declarations
@@ -325,10 +237,15 @@ All deterministic gates (fmt, clippy, build, tests, browser) have passed. This i
 - `server/src/server.rs` — Route handlers
 - `server/src/dot_parser.rs` — DOT parsing
 - `server/src/cxdb_proxy.rs` — CXDB proxy
-- `server/assets/index.html` — Browser SPA
 - `Cargo.toml` — Workspace root
 - `Makefile` — Build targets
-- `.ai/verify_browser.md` — Browser verification results (from previous stage)
+
+**Read the frontend implementation:**
+- `frontend/package.json` — Dependencies and scripts
+- `frontend/tsconfig.json` — TypeScript config (verify strict: true)
+- `frontend/vite.config.ts` — Build config (verify output to server/assets/)
+- `frontend/src/` — React components, hooks, lib, types
+- `frontend/tests/` — Playwright E2E and Vitest unit tests
 
 ## Files to Write
 
@@ -339,7 +256,8 @@ All deterministic gates (fmt, clippy, build, tests, browser) have passed. This i
 1. Verify all deliverables exist:
    - `Cargo.toml` (workspace root), `server/Cargo.toml`, `Makefile`
    - `server/src/main.rs`, `server/src/lib.rs`, `server/src/error.rs`, `server/src/config.rs`, `server/src/server.rs`, `server/src/dot_parser.rs`, `server/src/cxdb_proxy.rs`
-   - `server/assets/index.html`
+   - `frontend/package.json`, `frontend/tsconfig.json`, `frontend/vite.config.ts`
+   - `frontend/src/` component tree
 
 2. Check ROP enforcement (spec `specification/constraints/railway-oriented-programming-requirements.md`):
    - **AC-R1**: `[lints.clippy]` in `server/Cargo.toml` denies `unwrap_used`, `expect_used`, `panic`, `unwrap_in_result`
@@ -350,9 +268,9 @@ All deterministic gates (fmt, clippy, build, tests, browser) have passed. This i
 
 3. Check server implementation (spec Section 3):
    - **AC-1**: `--port`, `--cxdb` (repeatable), `--dot` (repeatable, required) CLI flags via clap
-   - **AC-2**: All 7 routes implemented: `GET /`, `/dots/{name}`, `/dots/{name}/nodes`, `/dots/{name}/edges`, `/api/cxdb/{index}/*`, `/api/dots`, `/api/cxdb/instances`
+   - **AC-2**: All routes implemented: `GET /`, `/assets/*`, `/dots/{name}`, `/dots/{name}/nodes`, `/dots/{name}/edges`, `/api/cxdb/{index}/*`, `/api/dots`, `/api/cxdb/instances`
    - **AC-3**: DOT files read fresh on each request (no caching)
-   - **AC-4**: `index.html` embedded via `include_str!()` from `server/assets/`
+   - **AC-4**: Frontend build output embedded via `include_dir` from `server/assets/`
    - **AC-5**: Startup rejects: duplicate base filenames, duplicate graph IDs, anonymous graphs, missing `--dot`
    - **AC-6**: DOT parser handles comment stripping, multi-line strings, `+` concatenation, escape decoding
    - **AC-7**: Node ID normalization (unquote, unescape, trim)
@@ -362,15 +280,9 @@ All deterministic gates (fmt, clippy, build, tests, browser) have passed. This i
    - **AC-11**: CXDB proxy strips `/api/cxdb/{index}` prefix and forwards remainder
    - **AC-12**: `/api/dots` returns filenames in `--dot` flag order
 
-4. Check browser verification passed (previous stage):
-   - **AC-22**: `.ai/verify_browser.md` exists and reports all checks passed
-   - **AC-23**: Graphviz WASM loaded successfully (no stuck \"Loading Graphviz...\")
-   - **AC-24**: SVG rendered with expected nodes, tabs showed correct graph IDs, node click opened detail panel
-   - **AC-25**: No blocking JavaScript errors (CDN 404s, uncaught exceptions)
-
-5. Check browser SPA (spec Sections 4–8):
-   - **AC-13**: CDN URLs pinned to exact versions (esm.sh for wasm-graphviz, jsDelivr for msgpack)
-   - **AC-14**: DOT rendered to SVG via `Graphviz.load()` + `gv.layout(dot, \"svg\", \"dot\")`
+4. Check frontend implementation:
+   - **AC-13**: TypeScript strict mode enabled (`strict: true` in tsconfig.json)
+   - **AC-14**: DOT rendered to SVG via Graphviz WASM (npm package, bundled by Vite)
    - **AC-15**: Pipeline tabs from `/api/dots`, labeled with graph ID (fallback: filename)
    - **AC-16**: Tab labels use `textContent` (not innerHTML)
    - **AC-17**: Status poll every 3 seconds
@@ -379,12 +291,28 @@ All deterministic gates (fmt, clippy, build, tests, browser) have passed. This i
    - **AC-20**: Detail panel shows node attributes on click; user content via textContent/escaped HTML
    - **AC-21**: Graceful degradation when CXDB unreachable (graph still renders)
 
-6. Write `.ai/review_final.md` with:
-   - Section for each major component (ROP compliance, server routes, DOT parsing, browser rendering, status overlay, detail panel)
+5. Perform visual browser verification (smoke test):
+   - Start the server with fixture DOT files from `holdout-scenarios/fixtures/`
+   - Navigate to `http://127.0.0.1:9030` using Playwright MCP browser tools
+   - **AC-22**: Page loads without stuck \"Loading\" state
+   - **AC-23**: SVG pipeline graph visible with labeled nodes and edges
+   - **AC-24**: Multiple tabs visible matching DOT file graph IDs
+   - **AC-25**: Node click opens detail panel
+   - **AC-26**: No blocking JavaScript errors (check `browser_console_messages` level \"error\"; ignore favicon 404)
+   - Kill the server process after verification
+
+6. Check frontend tooling:
+   - **AC-27**: `frontend/package.json` has correct scripts (build, lint, test:unit, test:e2e)
+   - **AC-28**: ESLint configured with TypeScript and React rules
+   - **AC-29**: Vite builds to `../server/assets/`
+   - **AC-30**: React components follow conventions: named exports, `data-testid` attributes, `@/` path alias
+
+7. Write `.ai/review_final.md` with:
+   - Section for each major component (ROP compliance, server routes, DOT parsing, frontend components, status overlay, detail panel, browser verification)
    - Pass/fail for each AC above
    - List any gaps with specific AC identifiers
 
-7. If ANY acceptance criteria fail, set `failure_signature` to comma-separated sorted list of failed AC IDs (e.g. \"AC-3,AC-7\")
+8. If ANY acceptance criteria fail, set `failure_signature` to comma-separated sorted list of failed AC IDs (e.g. \"AC-3,AC-7\")
 
 ## Acceptance Checks
 
@@ -491,21 +419,38 @@ Options:
   check_fmt -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
   check_fmt -> postmortem
   verify_clippy -> check_clippy
-  check_clippy -> verify_build [condition="outcome = success"]
+  check_clippy -> verify_ui_install [condition="outcome = success"]
   check_clippy -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
   check_clippy -> postmortem
+  verify_ui_install -> check_ui_install
+  check_ui_install -> verify_ui_build [condition="outcome = success"]
+  check_ui_install -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
+  check_ui_install -> postmortem
+  verify_ui_build -> check_ui_build
+  check_ui_build -> verify_ui_lint [condition="outcome = success"]
+  check_ui_build -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
+  check_ui_build -> postmortem
+  verify_ui_lint -> check_ui_lint
+  check_ui_lint -> verify_ui_test_unit [condition="outcome = success"]
+  check_ui_lint -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
+  check_ui_lint -> postmortem
+  verify_ui_test_unit -> check_ui_test_unit
+  check_ui_test_unit -> verify_build [condition="outcome = success"]
+  check_ui_test_unit -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
+  check_ui_test_unit -> postmortem
   verify_build -> check_build
   check_build -> verify_tests [condition="outcome = success"]
   check_build -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
   check_build -> postmortem
   verify_tests -> check_tests
-  check_tests -> verify_browser [condition="outcome = success"]
+  check_tests -> verify_e2e [condition="outcome = success"]
   check_tests -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
   check_tests -> postmortem
-  verify_browser -> review_final [condition="outcome = success"]
-  verify_browser -> implement [condition="outcome = fail && context.failure_class = transient_infra", loop_restart=true]
-  verify_browser -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
-  verify_browser -> postmortem
+  verify_e2e -> check_e2e
+  check_e2e -> review_final [condition="outcome = success"]
+  check_e2e -> implement [condition="outcome = fail && context.failure_class = transient_infra", loop_restart=true]
+  check_e2e -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
+  check_e2e -> postmortem
   review_final -> exit [condition="outcome = success"]
   review_final -> postmortem [condition="outcome = fail"]
   review_final -> postmortem

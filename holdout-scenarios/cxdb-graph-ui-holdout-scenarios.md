@@ -8,8 +8,9 @@
 ```
 Given the UI server is running with --dot /path/to/pipeline.dot
 When a user opens the dashboard URL in a browser
-Then the pipeline DOT file is fetched from /dots/pipeline.dot
-  And @hpcc-js/wasm-graphviz renders it as an SVG in the main content area
+Then the React SPA mounts and the GraphViewer component renders
+  And the pipeline DOT file is fetched from /dots/pipeline.dot
+  And @hpcc-js/wasm-graphviz (bundled via Vite) renders it as an SVG in the main content area
   And every node from the DOT file is visible as an SVG element
   And edges between nodes are rendered with arrows
   And the graph layout follows the DOT rankdir attribute
@@ -161,16 +162,15 @@ When a second DOT file also declares: digraph "my \"quoted\" pipeline" {
 Then the server rejects the second DOT file at startup with a duplicate graph ID error
 ```
 
-### Scenario: Msgpack CDN failure does not block DOT rendering or tab creation
+### Scenario: WASM load failure does not crash the application
 ```
-Given the msgpack CDN URL is unreachable or returns an error
-  And the Graphviz WASM CDN is reachable
+Given the Graphviz WASM module fails to initialize (e.g., browser incompatibility)
 When a user opens the dashboard URL in a browser
-Then the pipeline graph still renders as an SVG (DOT rendering works)
+Then the graph area displays an error message indicating WASM load failure
   And pipeline tabs are created and functional
   And the connection indicator renders
-  And CXDB pipeline discovery (decodeFirstTurn) fails gracefully
-  And no JavaScript errors prevent the page from initializing
+  And the rest of the React component tree mounts normally
+  And no unhandled JavaScript errors prevent the page from initializing
 ```
 
 ### Scenario: Quoted node IDs render and interact correctly
@@ -892,4 +892,43 @@ Given a DOT file contains "digraph {" with no graph identifier
 When the user runs: cargo run -- --dot /path/to/anonymous.dot
 Then the server exits with a non-zero code
   And prints an error stating that named graphs are required for discovery
+```
+
+---
+
+## Frontend Build
+
+### Scenario: Frontend build produces valid output
+```
+Given the frontend dependencies are installed (pnpm install)
+When pnpm build is run from the frontend/ directory
+Then the build completes without errors
+  And server/assets/index.html is produced
+  And server/assets/assets/ contains hashed JS, CSS, and WASM files
+  And TypeScript compilation succeeds with zero errors
+```
+
+### Scenario: Frontend lint passes
+```
+Given the frontend dependencies are installed
+When pnpm lint is run from the frontend/ directory
+Then ESLint passes with zero warnings and zero errors
+```
+
+### Scenario: Frontend unit tests pass
+```
+Given the frontend dependencies are installed
+When pnpm test:unit is run from the frontend/ directory
+Then all Vitest unit tests pass
+  And coverage thresholds are met for frontend/src/lib/
+```
+
+### Scenario: Dev workflow with hot-reload
+```
+Given the Rust server is running with --dev flag
+  And pnpm dev is running in the frontend/ directory
+When a TypeScript source file is modified in frontend/src/
+Then Vite rebuilds the affected modules
+  And refreshing the browser shows the updated UI
+  And the Rust server serves the updated assets from disk
 ```

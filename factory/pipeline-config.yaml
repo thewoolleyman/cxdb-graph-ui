@@ -3,7 +3,7 @@ repo_path: .
 output_dot: pipeline.dot
 
 graph_id: cxdb_graph_ui_pipeline
-graph_goal: "a Rust HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per all files under specification/ (intent, contracts, and constraints)"
+graph_goal: "a Rust HTTP server with a Vite + React 18 TypeScript frontend that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per all files under specification/ (intent, contracts, and constraints)"
 topology: no-fanout
 default_max_retry: 3
 retry_target: implement
@@ -29,6 +29,22 @@ nodes:
     shape: parallelogram
   - id: check_clippy
     shape: diamond
+  - id: verify_ui_install
+    shape: parallelogram
+  - id: check_ui_install
+    shape: diamond
+  - id: verify_ui_build
+    shape: parallelogram
+  - id: check_ui_build
+    shape: diamond
+  - id: verify_ui_lint
+    shape: parallelogram
+  - id: check_ui_lint
+    shape: diamond
+  - id: verify_ui_test_unit
+    shape: parallelogram
+  - id: check_ui_test_unit
+    shape: diamond
   - id: verify_build
     shape: parallelogram
   - id: check_build
@@ -37,9 +53,10 @@ nodes:
     shape: parallelogram
   - id: check_tests
     shape: diamond
-  - id: verify_browser
-    shape: box
-    class: verify
+  - id: verify_e2e
+    shape: parallelogram
+  - id: check_e2e
+    shape: diamond
   - id: review_final
     shape: box
     class: verify
@@ -82,12 +99,52 @@ edges:
   - from: verify_clippy
     to: check_clippy
   - from: check_clippy
-    to: verify_build
+    to: verify_ui_install
     condition: "outcome = success"
   - from: check_clippy
     to: postmortem
     condition: "outcome = fail && context.failure_class != transient_infra"
   - from: check_clippy
+    to: postmortem
+  - from: verify_ui_install
+    to: check_ui_install
+  - from: check_ui_install
+    to: verify_ui_build
+    condition: "outcome = success"
+  - from: check_ui_install
+    to: postmortem
+    condition: "outcome = fail && context.failure_class != transient_infra"
+  - from: check_ui_install
+    to: postmortem
+  - from: verify_ui_build
+    to: check_ui_build
+  - from: check_ui_build
+    to: verify_ui_lint
+    condition: "outcome = success"
+  - from: check_ui_build
+    to: postmortem
+    condition: "outcome = fail && context.failure_class != transient_infra"
+  - from: check_ui_build
+    to: postmortem
+  - from: verify_ui_lint
+    to: check_ui_lint
+  - from: check_ui_lint
+    to: verify_ui_test_unit
+    condition: "outcome = success"
+  - from: check_ui_lint
+    to: postmortem
+    condition: "outcome = fail && context.failure_class != transient_infra"
+  - from: check_ui_lint
+    to: postmortem
+  - from: verify_ui_test_unit
+    to: check_ui_test_unit
+  - from: check_ui_test_unit
+    to: verify_build
+    condition: "outcome = success"
+  - from: check_ui_test_unit
+    to: postmortem
+    condition: "outcome = fail && context.failure_class != transient_infra"
+  - from: check_ui_test_unit
     to: postmortem
   - from: verify_build
     to: check_build
@@ -102,24 +159,26 @@ edges:
   - from: verify_tests
     to: check_tests
   - from: check_tests
-    to: verify_browser
+    to: verify_e2e
     condition: "outcome = success"
   - from: check_tests
     to: postmortem
     condition: "outcome = fail && context.failure_class != transient_infra"
   - from: check_tests
     to: postmortem
-  - from: verify_browser
+  - from: verify_e2e
+    to: check_e2e
+  - from: check_e2e
     to: review_final
     condition: "outcome = success"
-  - from: verify_browser
+  - from: check_e2e
     to: implement
     condition: "outcome = fail && context.failure_class = transient_infra"
     loop_restart: true
-  - from: verify_browser
+  - from: check_e2e
     to: postmortem
     condition: "outcome = fail && context.failure_class != transient_infra"
-  - from: verify_browser
+  - from: check_e2e
     to: postmortem
   - from: review_final
     to: exit
@@ -141,7 +200,9 @@ edges:
 goal: |
   Implement the CXDB Graph UI per the specification at `specification/` (intent, contracts, and constraints).
 
-  The deliverables are in `server/`:
+  The deliverables span `server/` (Rust) and `frontend/` (React + TypeScript):
+
+  Rust server (`server/`):
   - `server/Cargo.toml` — Rust crate manifest with dependencies and [lints.clippy] ROP enforcement
   - `server/src/main.rs` — Thin binary entry point (CLI parsing, server startup)
   - `server/src/lib.rs` — Library crate declaring all public modules
@@ -150,13 +211,20 @@ goal: |
   - `server/src/server.rs` — axum router, route handlers
   - `server/src/dot_parser.rs` — DOT file parsing (nodes, edges, comments, normalization)
   - `server/src/cxdb_proxy.rs` — CXDB reverse proxy handler
-  - `server/assets/index.html` — Browser SPA (single HTML file, inline CSS/JS, CDN-loaded deps)
+
+  Frontend (`frontend/`):
+  - `frontend/package.json` — pnpm v9 manifest with Vite, React 18, TypeScript (strict)
+  - `frontend/src/` — React SPA source (components, hooks, lib, types)
+  - `frontend/tests/` — Playwright E2E tests and Vitest unit tests
+  - Vite builds into `server/assets/` (gitignored); Rust embeds via `include_dir`
+
+  Workspace root:
   - `Cargo.toml` — Workspace root with [workspace] members = ["server"]
-  - `Makefile` — Top-level build targets (build, test, clippy, fmt-check, precommit)
+  - `Makefile` — Top-level build targets (build, test, clippy, fmt-check, ui-install, ui-build, ui-lint, ui-test-unit, ui-test-e2e, precommit)
 
   The server:
   - Accepts `--port`, `--cxdb` (repeatable), and `--dot` (repeatable) flags via clap
-  - Serves `index.html` (embedded via `include_str!()`)
+  - Serves frontend build output (embedded via `include_dir` crate)
   - Serves DOT files at `GET /dots/{name}` (read fresh each request)
   - Parses and serves node attributes at `GET /dots/{name}/nodes` (JSON)
   - Parses and serves edges at `GET /dots/{name}/edges` (JSON)
@@ -164,9 +232,9 @@ goal: |
   - Serves DOT file list at `GET /api/dots`
   - Serves CXDB instance list at `GET /api/cxdb/instances`
 
-  The browser SPA:
-  - Renders DOT → SVG via @hpcc-js/wasm-graphviz (esm.sh CDN, pinned version)
-  - Decodes msgpack via @msgpack/msgpack (jsDelivr CDN, pinned version)
+  The React SPA:
+  - Renders DOT → SVG via @hpcc-js/wasm-graphviz (npm package, bundled by Vite)
+  - Decodes msgpack via @msgpack/msgpack (npm package, bundled by Vite)
   - Polls CXDB every 3s for execution status and overlays colors onto SVG nodes
   - Shows a detail panel when a node is clicked
   - Supports multiple pipeline tabs
@@ -176,9 +244,10 @@ rules:
   - "Human gate question must direct operator to /kilroy:status and .ai/postmortem_latest.md"
   - "Edge condition expressions MUST have spaces around operators, e.g. context.retry_count >= 3 not context.retry_count>=3"
   - "All fallible Rust functions must return Result<T, E> — no unwrap()/expect()/panic!() outside test code (enforced by Clippy lints in Cargo.toml)"
-  - "index.html must be a single file with inline CSS and JS — no npm, no bundler, no TypeScript, no framework"
-  - "CDN URLs must be pinned to exact versions as specified in the spec (Section 4.1 and 4.1.1)"
-  - "Rust code lives in server/ — lib.rs declares modules, main.rs is a thin entry point, index.html is in server/assets/"
+  - "Frontend must build before Rust: pnpm build outputs to server/assets/, then cargo build embeds via include_dir"
+  - "TypeScript strict mode must be enabled (strict: true in tsconfig.json)"
+  - "Rust code lives in server/ — lib.rs declares modules, main.rs is a thin entry point"
+  - "Frontend code lives in frontend/ — React 18, TypeScript, Vite, Tailwind CSS v3, pnpm v9"
 
 required_gates:
   - id: fix_fmt
@@ -190,12 +259,27 @@ required_gates:
   - id: verify_clippy
     tool_command: "mise exec -- sh -c 'cd server && cargo clippy -- -D warnings -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::unwrap_in_result'"
     timeout: "120s"
+  - id: verify_ui_install
+    tool_command: "mise exec -- sh -c 'cd frontend && pnpm install --frozen-lockfile'"
+    timeout: "120s"
+  - id: verify_ui_build
+    tool_command: "mise exec -- sh -c 'cd frontend && pnpm build'"
+    timeout: "120s"
+  - id: verify_ui_lint
+    tool_command: "mise exec -- sh -c 'cd frontend && pnpm lint'"
+    timeout: "60s"
+  - id: verify_ui_test_unit
+    tool_command: "mise exec -- sh -c 'cd frontend && pnpm test:unit'"
+    timeout: "120s"
   - id: verify_build
     tool_command: "mise exec -- sh -c 'cd server && cargo build'"
     timeout: "120s"
   - id: verify_tests
     tool_command: "mise exec -- sh -c 'cd server && cargo test'"
     timeout: "120s"
+  - id: verify_e2e
+    tool_command: "mise exec -- sh -c 'cd frontend && pnpm test:e2e'"
+    timeout: "300s"
 
 model_stylesheet: |
   * { llm_model: claude-sonnet-4-6; llm_provider: anthropic; max_tokens: 65536; }

@@ -4,7 +4,7 @@
 
 - [ ] `cargo run -- --dot <path>` (from `server/`) or `make run` starts the server and prints the URL
 - [ ] Multiple `--dot` flags register multiple pipelines
-- [ ] `GET /` serves the dashboard HTML
+- [ ] `GET /` serves the dashboard (Vite-built assets embedded via `include_dir`)
 - [ ] `GET /dots/{name}` serves registered DOT files, returns 404 for others
 - [ ] `GET /dots/{name}/nodes` returns parsed DOT node attributes as JSON
 - [ ] `GET /dots/{name}/edges` returns parsed DOT edges with labels as JSON
@@ -45,11 +45,22 @@
 - [ ] DOT file changes are picked up on tab switch (no server restart needed)
 - [ ] DOT syntax errors display an error message instead of crashing
 
+## Frontend
+
+- [ ] `pnpm build` (from `frontend/`) produces valid output in `server/assets/` without errors
+- [ ] `pnpm lint` passes with zero warnings
+- [ ] TypeScript compilation (`tsc --noEmit`) passes with zero errors
+- [ ] Vitest unit tests pass (`pnpm test:unit`) with coverage thresholds met
+- [ ] Playwright E2E tests pass (`pnpm test:e2e`)
+- [ ] All interactive elements have `data-testid` attributes
+- [ ] React components follow hooks-based architecture (no class components)
+- [ ] Named exports throughout, barrel `index.ts` files for each directory
+- [ ] `@/` path alias used for all internal imports
+
 ## Testing
 
-- [ ] Browser integration tests pass (`cargo test --features browser -- --test-threads=1` or `make test-browser`)
-- [ ] Application loads in headless Chrome without blocking JS errors
-- [ ] Graphviz WASM initializes and SVG renders with expected node IDs
+- [ ] Playwright E2E tests pass (`make ui-test-e2e`)
+- [ ] Application loads, Graphviz WASM initializes, and SVG renders with expected node IDs
 - [ ] Pipeline tabs render and node click opens detail panel
 
 ## Code Quality (ROP Enforcement)
