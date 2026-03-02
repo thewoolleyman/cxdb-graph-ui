@@ -9,9 +9,11 @@ You are revising the CXDB Graph UI specification based on critique feedback.
 
 ## Step 1: Read the Specification
 
-Read the specification file:
+Read all specification files across all three directories:
 
 - All files under `specification/intent/` (see `specification/intent/README.md` for index)
+- All files under `specification/constraints/` (invariants, testing requirements, definition of done, non-goals)
+- All files under `specification/contracts/` (server API, CXDB upstream API)
 
 ## Step 2: Read the Holdout Scenarios
 
@@ -51,7 +53,7 @@ $ARGUMENTS
 Process ALL unacknowledged critique files for version N together in a single revision pass. For each issue across all critique files:
 
 1. Evaluate whether the feedback is valid and should be incorporated
-2. If valid, edit the appropriate file under `specification/intent/` **in place** — these are living documents, not versioned
+2. If valid, edit the appropriate file under `specification/` **in place** — these are living documents, not versioned. Changes may target any subdirectory: `intent/`, `constraints/`, or `contracts/`.
 3. Keep edits focused and surgical — don't rewrite sections that aren't affected by the critique
 4. When multiple critics raise the same issue, address it once and reference it in all acknowledgements
 
@@ -85,7 +87,7 @@ Use this format for each acknowledgement:
 {Description of what changed and where, OR reasoning for why it was not addressed}
 
 Changes:
-- All files under `specification/intent/` (see `specification/intent/README.md` for index): {what changed}
+- `specification/{path/to/file.md}`: {what changed}
 
 ## Issue #2: ...
 
