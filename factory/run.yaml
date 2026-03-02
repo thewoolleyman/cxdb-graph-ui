@@ -27,4 +27,9 @@ git:
 
 setup:
   timeout_ms: 300000
-  commands: []
+  commands:
+    # Hide holdout scenarios from factory agents via sparse checkout.
+    # Uses \041 (octal for '!') because shells on macOS backslash-escape '!'
+    # even inside single quotes. We write the sparse-checkout pattern file
+    # directly because `git sparse-checkout set` also escapes '!' in negation patterns.
+    - "GITDIR=$(git rev-parse --git-dir) && mkdir -p \"$GITDIR/info\" && /usr/bin/printf '/*\\n\\041/holdout-scenarios\\n' > \"$GITDIR/info/sparse-checkout\" && git config --worktree core.sparseCheckout true && git read-tree -mu HEAD"

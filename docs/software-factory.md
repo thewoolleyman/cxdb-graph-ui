@@ -137,7 +137,7 @@ Our setup adds a true holdout layer on top of Kilroy's built-in validation.
 
 **How the holdout works:**
 
-The pipeline receives the specification file (`specification/intent/cxdb-graph-ui-spec.md`). The behavioral scenarios in `holdout-scenarios/cxdb-graph-ui-holdout-scenarios.md` are never copied to the worktree. The implementing agent must produce correct behavior from the specification alone.
+The pipeline receives the specification file (`specification/intent/cxdb-graph-ui-spec.md`). The `holdout-scenarios/` directory is excluded from the factory worktree via git sparse checkout (configured in `factory/run.yaml` setup commands). The implementing agent must produce correct behavior from the specification alone.
 
 **Kilroy's three validation tiers:**
 
