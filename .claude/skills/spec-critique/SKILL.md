@@ -33,9 +33,11 @@ Parse `$ARGUMENTS` for named `KEY=VALUE` parameters. Ignore non-parameter text (
 
 ## Step 2: Read the Specification
 
-Read the specification file:
+Read all specification files across all three directories:
 
 - All files under `specification/intent/` (see `specification/intent/README.md` for index)
+- All files under `specification/constraints/` (invariants, testing requirements, definition of done, non-goals)
+- All files under `specification/contracts/` (server API, CXDB upstream API)
 
 ## Step 3: Read the Holdout Scenarios
 
