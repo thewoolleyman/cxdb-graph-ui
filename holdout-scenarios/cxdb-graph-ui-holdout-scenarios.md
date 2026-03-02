@@ -837,8 +837,8 @@ Then fetchFirstTurn issues exactly 50 paginated GET /turns requests (one per pag
 
 ### Scenario: Start with single DOT file
 ```
-Given Go is installed
-When the user runs: go run ui/main.go --dot /path/to/pipeline.dot
+Given Rust is installed
+When the user runs: cargo run -- --dot /path/to/pipeline.dot (from server/ directory)
 Then the server starts on port 9030
   And prints "Kilroy Pipeline UI: http://127.0.0.1:9030"
   And serves the DOT file at /dots/pipeline.dot
@@ -846,21 +846,21 @@ Then the server starts on port 9030
 
 ### Scenario: Start with custom port and CXDB address
 ```
-When the user runs: go run ui/main.go --dot pipeline.dot --port 9035 --cxdb http://10.0.0.5:9010
+When the user runs: cargo run -- --dot pipeline.dot --port 9035 --cxdb http://10.0.0.5:9010
 Then the server starts on port 9035
   And proxies CXDB requests to http://10.0.0.5:9010 at /api/cxdb/0/
 ```
 
 ### Scenario: No DOT file provided
 ```
-When the user runs: go run ui/main.go
+When the user runs: cargo run --
 Then the server exits with a non-zero code
   And prints an error message with usage help
 ```
 
 ### Scenario: Duplicate DOT basenames rejected
 ```
-When the user runs: go run ui/main.go --dot pipelines/alpha/pipeline.dot --dot pipelines/beta/pipeline.dot
+When the user runs: cargo run -- --dot pipelines/alpha/pipeline.dot --dot pipelines/beta/pipeline.dot
 Then the server exits with a non-zero code
   And prints an error identifying the conflicting basename "pipeline.dot"
 ```
@@ -868,7 +868,7 @@ Then the server exits with a non-zero code
 ### Scenario: Duplicate graph IDs rejected
 ```
 Given two DOT files with different basenames but both containing "digraph alpha_pipeline {"
-When the user runs: go run ui/main.go --dot a.dot --dot b.dot
+When the user runs: cargo run -- --dot a.dot --dot b.dot
 Then the server exits with a non-zero code
   And prints an error identifying the duplicate graph ID "alpha_pipeline"
 ```
@@ -889,7 +889,7 @@ Then the DOT file is fetched successfully
 ### Scenario: Anonymous graph rejected at server startup
 ```
 Given a DOT file contains "digraph {" with no graph identifier
-When the user runs: go run ui/main.go --dot /path/to/anonymous.dot
+When the user runs: cargo run -- --dot /path/to/anonymous.dot
 Then the server exits with a non-zero code
   And prints an error stating that named graphs are required for discovery
 ```

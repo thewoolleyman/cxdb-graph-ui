@@ -2,7 +2,7 @@
 
 ## Core Functionality
 
-- [ ] `go run ui/main.go --dot <path>` starts the server and prints the URL
+- [ ] `cargo run -- --dot <path>` (from `server/`) or `make run` starts the server and prints the URL
 - [ ] Multiple `--dot` flags register multiple pipelines
 - [ ] `GET /` serves the dashboard HTML
 - [ ] `GET /dots/{name}` serves registered DOT files, returns 404 for others
@@ -47,10 +47,27 @@
 
 ## Testing
 
-- [ ] Browser integration tests pass (`go test -tags browser -count=1 -timeout 120s ./ui/...`)
+- [ ] Browser integration tests pass (`cargo test --features browser -- --test-threads=1` or `make test-browser`)
 - [ ] Application loads in headless Chrome without blocking JS errors
 - [ ] Graphviz WASM initializes and SVG renders with expected node IDs
 - [ ] Pipeline tabs render and node click opens detail panel
+
+## Code Quality (ROP Enforcement)
+
+- [ ] All fallible functions return `Result<T, E>` — no panics in non-test code
+- [ ] `AppError` enum covers all error categories with `thiserror` derives
+- [ ] `AppResult<T>` type alias is used consistently across modules
+- [ ] Clippy ROP lints (`unwrap_used`, `expect_used`, `panic`, `unwrap_in_result`) are set to `deny` in `Cargo.toml`
+- [ ] `cargo clippy -- -D warnings` passes with zero warnings
+- [ ] `cargo fmt --check` passes (standard Rust formatting)
+- [ ] `make precommit` passes (runs fmt-check, clippy, test)
+
+## Rust Idioms
+
+- [ ] Code follows standard Rust naming conventions (snake_case functions/variables, CamelCase types, SCREAMING_SNAKE_CASE constants)
+- [ ] Public API types derive standard traits (`Debug`, `Clone`, `Serialize`/`Deserialize` where appropriate)
+- [ ] Async code uses `tokio` runtime with `axum` handlers returning `impl IntoResponse`
+- [ ] No `unsafe` code without explicit justification
 
 ## Security
 

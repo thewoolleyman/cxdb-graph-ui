@@ -3,7 +3,7 @@ repo_path: .
 output_dot: pipeline.dot
 
 graph_id: cxdb_graph_ui_pipeline
-graph_goal: "a Go HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per all files under specification/ (intent, contracts, and constraints)"
+graph_goal: "a Rust HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per all files under specification/ (intent, contracts, and constraints)"
 topology: no-fanout
 default_max_retry: 3
 retry_target: implement
@@ -25,9 +25,9 @@ nodes:
     shape: parallelogram
   - id: check_fmt
     shape: diamond
-  - id: verify_vet
+  - id: verify_clippy
     shape: parallelogram
-  - id: check_vet
+  - id: check_clippy
     shape: diamond
   - id: verify_build
     shape: parallelogram
@@ -72,22 +72,22 @@ edges:
   - from: verify_fmt
     to: check_fmt
   - from: check_fmt
-    to: verify_vet
+    to: verify_clippy
     condition: "outcome = success"
   - from: check_fmt
     to: postmortem
     condition: "outcome = fail && context.failure_class != transient_infra"
   - from: check_fmt
     to: postmortem
-  - from: verify_vet
-    to: check_vet
-  - from: check_vet
+  - from: verify_clippy
+    to: check_clippy
+  - from: check_clippy
     to: verify_build
     condition: "outcome = success"
-  - from: check_vet
+  - from: check_clippy
     to: postmortem
     condition: "outcome = fail && context.failure_class != transient_infra"
-  - from: check_vet
+  - from: check_clippy
     to: postmortem
   - from: verify_build
     to: check_build
@@ -141,14 +141,22 @@ edges:
 goal: |
   Implement the CXDB Graph UI per the specification at `specification/` (intent, contracts, and constraints).
 
-  The deliverables are two files in `ui/`:
-  - `ui/main.go` — Go HTTP server (standard library only, no external deps)
-  - `ui/index.html` — Browser SPA (single HTML file, inline CSS/JS, CDN-loaded deps)
-  - `ui/go.mod` — Go module file (module name: cxdb-graph-ui, no require directives)
+  The deliverables are in `server/`:
+  - `server/Cargo.toml` — Rust crate manifest with dependencies and [lints.clippy] ROP enforcement
+  - `server/src/main.rs` — Thin binary entry point (CLI parsing, server startup)
+  - `server/src/lib.rs` — Library crate declaring all public modules
+  - `server/src/error.rs` — AppError enum with thiserror, AppResult<T> type alias
+  - `server/src/config.rs` — Config struct with clap derives for CLI arguments
+  - `server/src/server.rs` — axum router, route handlers
+  - `server/src/dot_parser.rs` — DOT file parsing (nodes, edges, comments, normalization)
+  - `server/src/cxdb_proxy.rs` — CXDB reverse proxy handler
+  - `server/assets/index.html` — Browser SPA (single HTML file, inline CSS/JS, CDN-loaded deps)
+  - `Cargo.toml` — Workspace root with [workspace] members = ["server"]
+  - `Makefile` — Top-level build targets (build, test, clippy, fmt-check, precommit)
 
   The server:
-  - Accepts `--port`, `--cxdb` (repeatable), and `--dot` (repeatable) flags
-  - Serves `index.html` (embedded via `//go:embed`)
+  - Accepts `--port`, `--cxdb` (repeatable), and `--dot` (repeatable) flags via clap
+  - Serves `index.html` (embedded via `include_str!()`)
   - Serves DOT files at `GET /dots/{name}` (read fresh each request)
   - Parses and serves node attributes at `GET /dots/{name}/nodes` (JSON)
   - Parses and serves edges at `GET /dots/{name}/edges` (JSON)
@@ -167,26 +175,26 @@ rules:
   - "After default_max_retry exhausted, route to a shape=hexagon human gate instead of failing"
   - "Human gate question must direct operator to /kilroy:status and .ai/postmortem_latest.md"
   - "Edge condition expressions MUST have spaces around operators, e.g. context.retry_count >= 3 not context.retry_count>=3"
-  - "The server must use only Go standard library — no external packages, no require directives in go.mod"
+  - "All fallible Rust functions must return Result<T, E> — no unwrap()/expect()/panic!() outside test code (enforced by Clippy lints in Cargo.toml)"
   - "index.html must be a single file with inline CSS and JS — no npm, no bundler, no TypeScript, no framework"
   - "CDN URLs must be pinned to exact versions as specified in the spec (Section 4.1 and 4.1.1)"
-  - "Both ui/main.go and ui/index.html must be in the ui/ directory (co-located for //go:embed)"
+  - "Rust code lives in server/ — lib.rs declares modules, main.rs is a thin entry point, index.html is in server/assets/"
 
 required_gates:
   - id: fix_fmt
-    tool_command: "mise exec -- sh -c 'cd ui && gofmt -w .'"
+    tool_command: "mise exec -- sh -c 'cd server && cargo fmt'"
     max_retries: 0
   - id: verify_fmt
-    tool_command: "mise exec -- sh -c 'out=$(cd ui && gofmt -l .); test -z \"$out\" || { echo \"Files need formatting: $out\"; exit 1; }'"
+    tool_command: "mise exec -- sh -c 'cd server && cargo fmt --check'"
     max_retries: 0
-  - id: verify_vet
-    tool_command: "mise exec -- sh -c 'cd ui && go vet ./...'"
-    timeout: "60s"
+  - id: verify_clippy
+    tool_command: "mise exec -- sh -c 'cd server && cargo clippy -- -D warnings -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::unwrap_in_result'"
+    timeout: "120s"
   - id: verify_build
-    tool_command: "mise exec -- sh -c 'cd ui && go build ./...'"
+    tool_command: "mise exec -- sh -c 'cd server && cargo build'"
     timeout: "120s"
   - id: verify_tests
-    tool_command: "mise exec -- sh -c 'cd ui && go test ./...'"
+    tool_command: "mise exec -- sh -c 'cd server && cargo test'"
     timeout: "120s"
 
 model_stylesheet: |

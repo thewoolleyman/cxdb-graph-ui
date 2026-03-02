@@ -40,7 +40,7 @@
 
    **API Contract**
 
-16. **`/edges` expands chain syntax.** A DOT edge chain `a -> b -> c [label="x"]` is expanded into two independent edges: `(a, b, "x")` and `(b, c, "x")`. No direct edge from `a` to `c` is emitted. Each segment inherits the label from the chain's attribute block. This invariant is verified at the API layer (Go test or curl), not via the UI.
+16. **`/edges` expands chain syntax.** A DOT edge chain `a -> b -> c [label="x"]` is expanded into two independent edges: `(a, b, "x")` and `(b, c, "x")`. No direct edge from `a` to `c` is emitted. Each segment inherits the label from the chain's attribute block. This invariant is verified at the API layer (Rust test or curl), not via the UI.
 
 17. **`/edges` strips port suffixes.** Port syntax (`node_id:port` or `node_id:port:compass`) in edge endpoints is stripped: `a:out -> b:in` produces edge `{source: "a", target: "b", label: null}`. This invariant is verified at the API layer.
 

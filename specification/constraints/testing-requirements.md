@@ -2,25 +2,28 @@
 
 The implementation requires four distinct testing layers. All four layers must pass before the implementation is considered complete.
 
-## 12.1 Go Unit Tests — Server Layer
+## 12.1 Rust Unit Tests — Server Layer
 
-**Coverage target: 100% line and branch coverage** for all Go code in `ui/`.
+**Coverage target: 100% line and branch coverage** for all Rust code in `server/`.
 
 **Tooling:**
 ```bash
-go test -cover -coverprofile=coverage.out ./...
-go tool cover -func=coverage.out
+cargo tarpaulin --out html --fail-under 100
+```
+or:
+```bash
+cargo llvm-cov --fail-under-lines 100
 ```
 
-**Scope:** All server handlers (`handleRoot`, `handleDots`, `handleAPIDots`, `handleAPICXDB`), DOT parsing functions (`parseNodes`, `parseEdges`, `extractGraphID`, `stripComments`, `parseAttrList`, `parseDotToken`, `parseAttrValue`), startup validation (duplicate basenames, duplicate graph IDs, anonymous graphs, missing `--dot`), and the CXDB proxy logic.
+**Scope:** All server handlers (`handle_root`, `handle_dots`, `handle_api_dots`, `handle_api_cxdb`), DOT parsing functions (`parse_nodes`, `parse_edges`, `extract_graph_id`, `strip_comments`, `parse_attr_list`, `parse_dot_token`, `parse_attr_value`), startup validation (duplicate basenames, duplicate graph IDs, anonymous graphs, missing `--dot`), and the CXDB proxy logic.
 
-**Must run without** a live CXDB instance or browser. The test suite belongs in `ui/main_test.go` using `package main` so unexported parsing functions are directly testable.
+**Must run without** a live CXDB instance or browser. Unit tests live in `#[cfg(test)] mod tests` blocks within each module, giving direct access to private functions. Integration tests live in `server/tests/`.
 
-**Enforcement:** The `script/smoke-test-suite-fast` script runs `go test ./...` and must pass before any commit is landed. Once the Go codebase has a test suite, coverage enforcement is added to the fast suite.
+**Enforcement:** `make test` runs `cargo test` and must pass before any commit is landed. The Clippy gate (`cargo clippy -- -D warnings`) enforces the ROP lints from `specification/constraints/railway-oriented-programming-requirements.md`. `make precommit` runs `make fmt-check && make clippy && make test`.
 
 ## 12.2 JavaScript Unit Tests — Client Logic Layer
 
-**Coverage target: 100% line and branch coverage** for all JavaScript in `ui/index.html`.
+**Coverage target: 100% line and branch coverage** for all JavaScript in `server/assets/index.html`.
 
 **Pre-requisite:** JavaScript logic must be extracted from inline `<script>` tags into importable ES modules before this layer can be implemented. The inline-script constraint of the "No build toolchain" principle (Section 1.2) applies to the deployed artifact, not to the development and test workflow — the source can be modular ES modules that are inlined (or concatenated) as part of a simple build step.
 
@@ -37,15 +40,15 @@ vitest run --coverage --coverage.provider=v8 --coverage.100
 
 **Purpose:** Verify that the assembled application actually loads and renders in a real browser. This layer catches CDN failures, WASM initialization errors, and module-level import breakages that unit tests cannot detect.
 
-**Tooling:** `chromedp` (pure Go, headless Chrome via DevTools Protocol). Tests live within the Go test suite and require no Node.js or external test runner.
+**Tooling:** `headless_chrome`, `chromiumoxide`, or `fantoccini` (Rust crates for headless browser testing). Tests live in the Rust integration test suite (`server/tests/` directory) and require no Node.js or external test runner.
 
 ```bash
-go test -tags browser -count=1 -timeout 120s ./ui/...
+cargo test --features browser -- --test-threads=1
 ```
 
-**Build tag isolation:** Tests use `//go:build browser` so that the fast unit test suite (`go test ./...`) is unaffected. Browser tests run only when explicitly invoked with `-tags browser`.
+**Feature flag isolation:** Tests use `#[cfg(feature = "browser")]` so that the fast unit test suite (`cargo test`) is unaffected. Browser tests run only when explicitly invoked with `--features browser`.
 
-**In-process server:** Tests start the real Go server on a random port (`:0` or `httptest.NewServer`), eliminating external process management. A fixture DOT file is used as the `--dot` input.
+**In-process server:** Tests bind to `127.0.0.1:0` with `tokio::net::TcpListener` and run the `axum` server in-process, eliminating external process management. A fixture DOT file is used as the `--dot` input.
 
 **Minimum required assertions:**
 - The page loads without JavaScript errors that block module execution
@@ -58,7 +61,7 @@ go test -tags browser -count=1 -timeout 120s ./ui/...
 
 **Pipeline integration:** A dedicated pipeline gate (e.g., `verify_browser`) runs the browser test command after `verify_tests`. This keeps the fast unit test loop clean while ensuring browser rendering is verified before `review_final`.
 
-**Enforcement:** The `script/smoke-test-suite-slow` script (or equivalent) runs `go test -tags browser -count=1 -timeout 120s ./ui/...` and must pass before a pipeline run is considered successful.
+**Enforcement:** `make test-browser` runs `cargo test --features browser -- --test-threads=1` and must pass before a pipeline run is considered successful.
 
 ## 12.4 Playwright UI Tests — Integration Layer
 
@@ -79,7 +82,7 @@ The following table maps scenario categories to their required testing layer:
 | Scenario Category | Testing Layer |
 |---|---|
 | DOT Rendering — visual (SVG shapes, tab labels, HTML escaping) | Playwright (12.4) |
-| DOT Rendering — API contract (edge chain JSON, port stripping, parse error bodies) | Go tests (12.1) |
+| DOT Rendering — API contract (edge chain JSON, port stripping, parse error bodies) | Rust tests (12.1) |
 | Application loads and renders (CDN deps, WASM init, SVG output) | Browser integration (12.3) |
 | CXDB Status Overlay (node colors, pulsing, stale detection) | Playwright + mock CXDB (12.4) |
 | Pipeline Discovery state machine (ULID selection, gap recovery, CQL flag, etc.) | JS unit tests (12.2) |
@@ -87,4 +90,4 @@ The following table maps scenario categories to their required testing layer:
 | Detail Panel — CXDB turn format (StageStarted/Finished/Failed output strings) | JS unit tests (12.2) |
 | CXDB Connection Handling (unreachable → message, partial connectivity indicator) | Playwright + mock CXDB (12.4) |
 | Server startup validation (exit code, error messages) | Bash subprocess (12.4 skill) |
-| Server API format (`/api/dots`, `/api/cxdb/instances`, `/dots/{name}` 404) | Go tests (12.1) |
+| Server API format (`/api/dots`, `/api/cxdb/instances`, `/dots/{name}` 404) | Rust tests (12.1) |

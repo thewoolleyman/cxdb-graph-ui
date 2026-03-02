@@ -22,7 +22,7 @@ The CXDB Graph UI solves this by rendering the DOT pipeline as an interactive SV
 
 ## 2. Architecture
 
-The system has two components: a Go HTTP server and a browser-side single-page application.
+The system has two components: a Rust HTTP server and a browser-side single-page application.
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -39,7 +39,7 @@ The system has two components: a Go HTTP server and a browser-side single-page a
          │               │              │
          ▼               ▼              ▼
 ┌──────────────────────────────────────────────────┐
-│  Go Server (main.go)                             │
+│  Rust Server                                     │
 │                                                  │
 │  GET /              → index.html                 │
 │  GET /dots/{name}   → DOT file from --dot flags  │
@@ -52,8 +52,8 @@ The system has two components: a Go HTTP server and a browser-side single-page a
     └─────────────┘         └─────────────┘
 ```
 
-**Why Go.** Go is already a dependency in the Attractor/Kilroy ecosystem. The server uses only the standard library — no external packages. A minimal `go.mod` is required (Go 1.16+ defaults to module-aware mode and refuses to compile without one). The `go.mod` lives in `ui/` alongside `main.go` with module name `cxdb-graph-ui` and a minimum Go version matching the host toolchain (e.g., `go 1.21`). It runs with `go run ui/main.go`.
+**Why Rust.** Rust provides memory safety without garbage collection, a strong type system with algebraic data types (`Result<T, E>`, `Option<T>`) for railway-oriented error handling, and zero-cost abstractions. The server uses `axum` for HTTP routing and handlers, `tokio` for the async runtime, `hyper` as the underlying HTTP implementation, `clap` for CLI argument parsing, and `thiserror` for structured error types. Dependencies are declared in `server/Cargo.toml`. The application is built and run with `cargo build` / `cargo run` from the `server/` directory, or via top-level `make build` / `make run`.
 
 **Why browser-side DOT rendering.** The `@hpcc-js/wasm-graphviz` library compiles Graphviz to WebAssembly and runs entirely in the browser. This avoids requiring the `dot` binary on the host, supports interactive SVG manipulation, and renders DOT changes without server restart.
 
-**Why a proxy for CXDB.** CXDB's REST endpoints (contexts, turns) do not set CORS headers. The SSE endpoint (`/v1/events`) does set `Access-Control-Allow-Origin: *`, but the UI uses polling, not SSE (see `specification/constraints/non-goals.md`). The browser cannot fetch from a different origin for the REST endpoints. The Go server reverse-proxies `/api/cxdb/*` to CXDB, putting all requests on a single origin. When multiple CXDB instances are configured, the server proxies each under a numeric index (`/api/cxdb/0/*`, `/api/cxdb/1/*`, etc.).
+**Why a proxy for CXDB.** CXDB's REST endpoints (contexts, turns) do not set CORS headers. The SSE endpoint (`/v1/events`) does set `Access-Control-Allow-Origin: *`, but the UI uses polling, not SSE (see `specification/constraints/non-goals.md`). The browser cannot fetch from a different origin for the REST endpoints. The server reverse-proxies `/api/cxdb/*` to CXDB, putting all requests on a single origin. When multiple CXDB instances are configured, the server proxies each under a numeric index (`/api/cxdb/0/*`, `/api/cxdb/1/*`, etc.).

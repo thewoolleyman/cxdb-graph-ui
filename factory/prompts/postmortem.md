@@ -12,12 +12,12 @@ One of the pipeline stages failed. Read the failure diagnostics and create `.ai/
 
 **Read the full specification:**
 - All files under `specification/intent/` — Overview, architecture, server, DOT rendering, CXDB integration, status overlay, detail panel, UI layout
-- All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements
+- All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements, ROP requirements
 - All files under `specification/contracts/` — Server API (downstream) and CXDB API (upstream)
 
 **Read failure diagnostics:**
 - `.ai/review_final.md` — If review failed, read this for specific AC failures
-- Source files that failed (`ui/main.go`, `ui/index.html`, `ui/go.mod`)
+- Source files that failed (under `server/src/` and `server/assets/index.html`)
 
 ## Files to Write
 
@@ -26,10 +26,10 @@ One of the pipeline stages failed. Read the failure diagnostics and create `.ai/
 ## What to Do
 
 1. Identify the failure mode:
-   - **Format failure** — `gofmt` reports files needing formatting
-   - **Vet failure** — `go vet` reports issues (e.g., invalid struct tags, unreachable code, shadowed variables)
-   - **Build failure** — `go build` fails (compilation error, missing package, import cycle)
-   - **Test failure** — `go test` panics or assertions fail
+   - **Format failure** — `cargo fmt --check` reports files needing formatting
+   - **Clippy failure** — `cargo clippy -- -D warnings` reports issues (ROP lint violations like unwrap/expect/panic in non-test code, unused variables, type mismatches)
+   - **Build failure** — `cargo build` fails (compilation error, missing dependency, type error)
+   - **Test failure** — `cargo test` panics or assertions fail
    - **Review failure** — Missing functionality, wrong behavior, incomplete spec coverage (see `.ai/review_final.md`)
 
 2. Root cause analysis:
@@ -42,12 +42,12 @@ One of the pipeline stages failed. Read the failure diagnostics and create `.ai/
    - **Evidence** — Exact error messages, line numbers, failing test output
    - **Root Cause** — Technical explanation
    - **Repair Guidance** — Specific steps for the implement node:
-     - Which files to modify (`ui/main.go`, `ui/index.html`, or `ui/go.mod`)
+     - Which files to modify (e.g., `server/src/dot_parser.rs`, `server/assets/index.html`)
      - What to change (be specific: file + line range + what to fix)
      - What NOT to change (preserve working code)
    - **Verification** — How to confirm the fix worked
 
-4. Be specific. Don't say "fix the DOT parser", say "main.go line 142: `parseNodeAttrs` does not handle `+` string concatenation — add a loop that joins consecutive quoted fragments when a `+` token follows a closing quote"
+4. Be specific. Don't say "fix the DOT parser", say "server/src/dot_parser.rs line 142: `parse_node_attrs` does not handle `+` string concatenation — add a loop that joins consecutive quoted fragments when a `+` token follows a closing quote"
 
 ## Acceptance Checks
 

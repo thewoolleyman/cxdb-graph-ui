@@ -141,7 +141,7 @@ The pipeline receives the specification files (all files under `specification/in
 
 **Kilroy's three validation tiers:**
 
-**Tier 1 — Deterministic tool gates (strongest):** Shell commands that check build, tests, and formatting. Pass or fail, no LLM interpretation. For this project: `go vet ./...`, `go test ./...`, `go build ./...`. Objective and ungameable.
+**Tier 1 — Deterministic tool gates (strongest):** Shell commands that check build, tests, and formatting. Pass or fail, no LLM interpretation. For this project: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo build`, `cargo test`. The Clippy gate enforces ROP lints (no unwrap/expect/panic) from `[lints.clippy]` in `server/Cargo.toml`. Objective and ungameable.
 
 **Tier 2 — Multi-agent LLM review (independent):** Three separate reviewer agents, each reading the same Definition of Done, each producing an APPROVED/REJECTED verdict. A consensus node requires 2 of 3 approvals.
 
@@ -173,7 +173,8 @@ The spec file is the single source of truth. The holdout scenarios are withheld 
 
 ## Prerequisites
 
-- Go (to build Kilroy and this project)
+- Rust toolchain (for the CXDB Graph UI server)
+- Go (to build the Kilroy CLI)
 - Docker (for CXDB)
 - Ruby 3+ (for pipeline generation scripts)
 - `claude` CLI installed and authenticated

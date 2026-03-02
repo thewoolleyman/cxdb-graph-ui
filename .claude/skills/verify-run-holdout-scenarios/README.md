@@ -41,7 +41,7 @@ Available scenarios are listed in the top comment of `mock-cxdb.js`.
 | CXDB Status Overlay | 21 | Playwright + mock CXDB |
 | Detail Panel | 12 | Playwright + mock CXDB |
 | CXDB Connection Handling | 10 | Playwright + mock CXDB |
-| Server CLI | 6 | Shell (go build + exit code) |
+| Server CLI | 6 | Shell (cargo build + exit code) |
 | Deferred (complex mocking) | ~9 | — |
 
 ## Deferred Scenarios

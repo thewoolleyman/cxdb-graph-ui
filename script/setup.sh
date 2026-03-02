@@ -14,13 +14,12 @@ else
   git clone https://github.com/thewoolleyman/kilroy.git "$KILROY_DIR"
 fi
 
-# Install Go dependencies (if go.mod exists)
-if [ -f "$REPO_ROOT/go.mod" ]; then
-  echo "Downloading Go modules …"
-  (cd "$REPO_ROOT" && go mod download)
-  echo "✓ Go modules downloaded"
+# Check Rust toolchain
+if command -v cargo &> /dev/null; then
+  echo "✓ Rust toolchain available: $(rustc --version)"
 else
-  echo "✓ No go.mod yet — skipping module download"
+  echo "✗ Rust toolchain not found — install via https://rustup.rs/"
+  exit 1
 fi
 
 # Clone cxdb repo (needed to build the Docker image kilroy expects)

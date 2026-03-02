@@ -26,8 +26,8 @@ as interactive SVG graphs with real-time execution status from [CXDB](https://gi
 The DOT graph is the pipeline definition; CXDB holds the execution trace. The UI overlays one on the
 other — nodes are colored by their execution state, and clicking a node shows its CXDB activity.
 
-**Tech stack:** Go (standard library only) HTTP server + single HTML file with vanilla JavaScript and
-Graphviz WASM (CDN-loaded). No build toolchain, no npm, no framework.
+**Tech stack:** Rust HTTP server (axum/tokio) with railway-oriented programming + single HTML file with vanilla JavaScript and
+Graphviz WASM (CDN-loaded). No frontend build toolchain, no npm, no framework.
 
 ---
 
@@ -69,11 +69,11 @@ Shell scripts for environment setup, infrastructure management, and testing.
 
 | Script | What it does |
 |---|---|
-| `setup.sh` | One-time workspace bootstrap: downloads Go modules (if go.mod exists), clones the CXDB repo, and builds the CXDB Docker image. Pass `--rebuild-cxdb` to force a Docker image rebuild. |
+| `setup.sh` | One-time workspace bootstrap: checks Rust toolchain, clones the CXDB repo, and builds the CXDB Docker image. Pass `--rebuild-cxdb` to force a Docker image rebuild. |
 | `start-cxdb.sh` | Starts the CXDB Docker container by delegating to `../kilroy/script/start-cxdb.sh` with line-buffered output for real-time logging. |
 | `stop-cxdb.sh` | Stops the CXDB Docker container (`kilroy-cxdb`). Respects `KILROY_CXDB_CONTAINER_NAME` env var. |
 | `start-cxdb-ui.sh` | Opens the CXDB web UI by delegating to `../kilroy/script/start-cxdb-ui.sh`. Forces the UI URL to port 9120 (nginx frontend) instead of 9110 (raw API). |
-| `smoke-test-suite-full` | Runs the full smoke test suite: `go vet ./...` and `go test ./...`. Exits non-zero on any failure. |
+| `smoke-test-suite-full` | Runs the full smoke test suite: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo build`, and `cargo test`. Exits non-zero on any failure. |
 
 ## Path conventions
 
@@ -98,7 +98,7 @@ Reference documentation for the project. **Keep these in sync when skills, workf
 
 ## Kilroy (`../kilroy`)
 
-Go CLI for running AI software-factory pipelines. Converts English requirements into checkpoint-aware pipelines executed by AI agents in isolated git worktrees.
+CLI (written in Go) for running AI software-factory pipelines. Converts English requirements into checkpoint-aware pipelines executed by AI agents in isolated git worktrees.
 
 **Core flow:** YAML config + prompt files → deterministic `compile_dot.rb` → Graphviz DOT graph → `validate` → `run` (node-by-node in worktree with checkpoint commits) → `resume` on failure. The LLM-based `ingest` command is only used in bootstrap mode (no config YAML exists).
 

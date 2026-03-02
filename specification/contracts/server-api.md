@@ -1,14 +1,16 @@
 # Server API (Downstream Contract)
 
-This document defines the HTTP API surface of the CXDB Graph UI server — the contract between the Go server and the browser SPA.
+This document defines the HTTP API surface of the CXDB Graph UI server — the contract between the Rust server and the browser SPA.
 
 ---
 
 ## Command-Line Interface
 
 ```
-go run ui/main.go [OPTIONS]
+cargo run -- [OPTIONS]
 ```
+
+Run from the `server/` directory, or use `make run` from the repo root.
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
@@ -23,24 +25,27 @@ If no `--cxdb` flags are provided, the default (`http://127.0.0.1:9110`) is used
 **Examples:**
 
 ```bash
-# Single pipeline, default CXDB
-go run ui/main.go --dot /path/to/pipeline-alpha.dot
+# Single pipeline, default CXDB (from server/ directory)
+cargo run -- --dot /path/to/pipeline-alpha.dot
+
+# Or using the Makefile from repo root
+make run -- --dot /path/to/pipeline-alpha.dot
 
 # Multiple pipelines, single CXDB
-go run ui/main.go \
+cargo run -- \
   --dot /path/to/pipeline-alpha.dot \
   --dot /path/to/pipeline-beta.dot \
   --dot /path/to/pipeline-gamma.dot
 
 # Multiple pipelines, multiple CXDB instances
-go run ui/main.go \
+cargo run -- \
   --dot /path/to/pipeline-alpha.dot \
   --dot /path/to/pipeline-beta.dot \
   --cxdb http://127.0.0.1:9110 \
   --cxdb http://127.0.0.1:9111
 
 # Custom CXDB address
-go run ui/main.go --dot pipeline.dot --cxdb http://10.0.0.5:9110
+cargo run -- --dot pipeline.dot --cxdb http://10.0.0.5:9110
 ```
 
 The server prints the URL on startup: `Kilroy Pipeline UI: http://127.0.0.1:9030`
@@ -51,9 +56,9 @@ The server prints the URL on startup: `Kilroy Pipeline UI: http://127.0.0.1:9030
 
 ### `GET /` — Dashboard
 
-Serves `index.html` embedded in the binary via Go's `//go:embed` directive. The `main.go` file embeds `index.html` at compile time using `//go:embed index.html`, serving it from the embedded filesystem. This ensures the asset is always available regardless of the working directory — `go run ui/main.go` compiles the binary in a temp directory, so runtime file resolution relative to the source would fail. Returns 500 if the embed fails to load (should not happen in a correctly compiled binary).
+Serves `index.html` embedded in the binary at compile time using `include_str!()` or the `rust-embed` crate, serving it from the embedded data. The `include_str!()` macro resolves paths relative to the source file at compile time, so the embedded content is always available regardless of the working directory at runtime. Returns 500 if the embed fails to load (should not happen in a correctly compiled binary).
 
-**`index.html` file location.** The `//go:embed` directive resolves paths relative to the source file's package directory. Therefore `index.html` must reside at `ui/index.html`, co-located with `ui/main.go`. Placing `index.html` anywhere else (e.g., at the repository root) will cause a compile error: `pattern index.html: no matching files found`. Both files must be in the same directory (`ui/`).
+**`index.html` file location.** `index.html` must reside at a path reachable by the `include_str!()` macro relative to the embedding source file (typically in `server/assets/`). The embedding source file and the asset must be within the same crate.
 
 ### `GET /dots/{name}` — DOT Files
 

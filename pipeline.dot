@@ -1,7 +1,7 @@
 digraph cxdb_graph_ui_pipeline {
   graph [
-    config_sha256="f7dcb933501e7640d061ba35b01227d282924706e6927d4a71251c89d5a83e02",
-    goal="a Go HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per all files under specification/ (intent, contracts, and constraints)",
+    config_sha256="9199f490c7df853833af7ab0920e9c615684072db8250570a1961678c6ecfd73",
+    goal="a Rust HTTP server and browser-based single-page application that renders Attractor pipeline DOT files as interactive SVGs with real-time CXDB execution status overlays, per all files under specification/ (intent, contracts, and constraints)",
     rankdir=LR,
     default_max_retry=3,
     retry_target="implement",
@@ -29,9 +29,8 @@ Implement the CXDB Graph UI per the specification under `specification/` (intent
 
 The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT files as interactive SVG graphs with real-time execution status from CXDB. It has two components:
 
-1. **`ui/main.go`** — A Go HTTP server (standard library only) that serves the SPA, DOT files, parsed node/edge data, and proxies CXDB API requests.
-2. **`ui/index.html`** — A browser SPA (single HTML file, inline CSS/JS, no build toolchain) that renders DOT → SVG via Graphviz WASM and overlays CXDB execution state onto graph nodes.
-3. **`ui/go.mod`** — Minimal Go module file (module name: `cxdb-graph-ui`, no external dependencies).
+1. **`server/`** — A Rust HTTP server using axum/tokio that serves the SPA, DOT files, parsed node/edge data, and proxies CXDB API requests. All fallible operations return `Result<T, E>` with railway-oriented error handling (see `specification/constraints/railway-oriented-programming-requirements.md`).
+2. **`server/assets/index.html`** — A browser SPA (single HTML file, inline CSS/JS, no build toolchain) that renders DOT → SVG via Graphviz WASM and overlays CXDB execution state onto graph nodes.
 
 ## Files to Read
 
@@ -40,16 +39,27 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 
 **Then read the full specification:**
 - All files under `specification/intent/` — Overview, architecture, server, DOT rendering, CXDB integration, status overlay, detail panel, UI layout
-- All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements
+- All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements, ROP requirements
 - All files under `specification/contracts/` — Server API (downstream) and CXDB API (upstream)
 
 **If repair iteration, also read the files mentioned in the postmortem.**
 
 ## Files to Write
 
-- `ui/go.mod` — Go module file: `module cxdb-graph-ui` with Go version matching host toolchain (1.21+), no require directives
-- `ui/main.go` — Go HTTP server
-- `ui/index.html` — Browser SPA
+### Workspace root
+- `Cargo.toml` — Workspace manifest: `[workspace] resolver = \"2\"` with `members = [\"server\"]`
+- `Makefile` — Top-level build targets per `specification/intent/server.md` Section 3.4
+
+### server/
+- `server/Cargo.toml` — Crate manifest with dependencies (axum, tokio, hyper, clap, thiserror, serde, serde_json, tower-http) and `[lints.clippy]` enforcing ROP (unwrap_used = \"deny\", expect_used = \"deny\", panic = \"deny\", unwrap_in_result = \"deny\")
+- `server/src/main.rs` — Thin binary entry point: CLI parsing via clap, Config construction, server startup, graceful shutdown
+- `server/src/lib.rs` — Library crate declaring all public modules
+- `server/src/error.rs` — `AppError` enum (thiserror), `AppResult<T>` type alias, `From` impls for upstream errors
+- `server/src/config.rs` — `Config` struct with clap derives for `--dot`, `--cxdb`, `--port`
+- `server/src/server.rs` — axum router, all route handlers returning `impl IntoResponse`
+- `server/src/dot_parser.rs` — DOT file parsing (nodes, edges, comments, graph ID extraction, normalization)
+- `server/src/cxdb_proxy.rs` — CXDB reverse proxy handler
+- `server/assets/index.html` — Browser SPA
 
 ## What to Do
 
@@ -62,44 +72,52 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 
 **If postmortem absent (fresh implementation):**
 
-### ui/go.mod
-- Module name: `cxdb-graph-ui`
-- Go version: `go 1.21` (or match host toolchain version)
-- No `require` directives — standard library only
+### Workspace root
+- `Cargo.toml` with `[workspace]` section
+- `Makefile` with targets: build, release, test, test-browser, clippy, fmt, fmt-check, check, clean, run, precommit
 
-### ui/main.go
+### server/Cargo.toml
+- Crate name: `cxdb-graph-ui`
+- Edition: `2021`
+- Dependencies: axum, tokio (features: full), hyper, clap (features: derive), thiserror, serde (features: derive), serde_json, tower-http (features: as needed for proxy)
+- `[lints.clippy]` section with ROP lints set to \"deny\"
+
+### server/src/error.rs
+- `AppError` enum with variants for: DotParse, FileIo, CxdbProxy, CliValidation, HttpHandler, Embed
+- Each variant carries context for actionable error messages
+- `From` impls for `std::io::Error`, `hyper::Error`, etc.
+- `impl IntoResponse for AppError` mapping variants to HTTP status codes
+- `pub type AppResult<T> = Result<T, AppError>;`
+
+### server/src/config.rs
+- `Config` struct with clap derives for `--port` (u16, default 9030), `--cxdb` (Vec<String>, default [\"http://127.0.0.1:9110\"]), `--dot` (Vec<PathBuf>, required)
+- Startup validation: at least one --dot, no duplicate basenames, no duplicate graph IDs, no anonymous graphs
+
+### server/src/server.rs
 Implement all routes per `specification/contracts/server-api.md`:
-- `GET /` — Serve embedded `index.html` via `//go:embed index.html`
-- `GET /dots/{name}` — Serve registered DOT files (read fresh each request)
+- `GET /` — Serve embedded `index.html` via `include_str!()`
+- `GET /dots/{name}` — Serve registered DOT files (read fresh each request via `tokio::fs::read_to_string`)
 - `GET /dots/{name}/nodes` — Return JSON map of node ID → attributes (shape, class, prompt, tool_command, question, goal_gate)
 - `GET /dots/{name}/edges` — Return JSON array of edges (source, target, label)
 - `GET /api/cxdb/{index}/*` — Reverse-proxy to the corresponding CXDB instance
 - `GET /api/dots` — Return JSON list of registered DOT filenames (ordered)
 - `GET /api/cxdb/instances` — Return JSON list of CXDB URLs
 
-CLI flags:
-- `--port` (int, default 9030)
-- `--cxdb` (repeatable string, default `http://127.0.0.1:9110`)
-- `--dot` (repeatable string, required)
+Server properties:
+- Bind to `0.0.0.0:{port}` via `tokio::net::TcpListener`
+- Print `Kilroy Pipeline UI: http://127.0.0.1:{port}` on startup
+- Stateless — no caching
+- All handlers return `Result` or `impl IntoResponse` — no panics
 
-Startup checks (exit non-zero on violation):
-- At least one `--dot` flag required
-- No duplicate base filenames across `--dot` paths
-- No duplicate graph IDs across registered DOT files (parse graph ID using regex from `specification/contracts/server-api.md`; reject anonymous graphs)
-
+### server/src/dot_parser.rs
 DOT parsing (`specification/contracts/server-api.md`):
 - Strip `//` line comments and `/* */` block comments (per spec comment-stripping rules)
 - Parse node attributes: quoted and unquoted values, `+` string concatenation, multi-line quoted strings, escape decoding (`\\\"` → `\"`, `\\n` → newline, `\\\\` → `\\`)
 - Parse edge statements: `->` chains expanded, port syntax stripped, same attribute parsing rules
 - Normalize node/edge IDs: strip outer quotes, resolve escape sequences, trim whitespace
+- All parse functions return `AppResult<T>` — parse errors produce `AppError::DotParse` with context
 
-Server properties:
-- Bind to `0.0.0.0:{port}`
-- Print `Kilroy Pipeline UI: http://127.0.0.1:{port}` on startup
-- Stateless — no caching
-- Standard library only — no imports outside `go` standard library
-
-### ui/index.html
+### server/assets/index.html
 Implement the full SPA per the intent specification (Sections 4–8):
 
 **CDN imports (pinned versions, ES modules):**
@@ -139,14 +157,16 @@ import { decode } from \"https://cdn.jsdelivr.net/npm/@msgpack/msgpack@3.0.0-bet
 
 ## Acceptance Checks
 
-- `ui/go.mod` exists with module `cxdb-graph-ui`, no require directives
-- `ui/main.go` compiles with `go build ./...` from `ui/`
-- `ui/main.go` passes `go vet ./...` from `ui/`
-- `ui/index.html` exists co-located with `ui/main.go`
+- `Cargo.toml` (workspace root) and `server/Cargo.toml` exist and are valid
+- `Makefile` exists with required targets
+- `cargo build` succeeds from `server/`
+- `cargo clippy -- -D warnings` passes (enforces ROP: no unwrap/expect/panic outside tests)
+- `cargo fmt --check` passes
+- `cargo test` passes
+- `server/assets/index.html` exists
 - All 7 routes implemented
 - DOT parser handles comments, multi-line strings, `+` concatenation, escape sequences
 - Startup rejects duplicate basenames, duplicate graph IDs, anonymous graphs
-- No external Go packages imported (standard library only)
 - CDN URLs pinned to exact versions from spec
 
 ## Status Contract
@@ -159,14 +179,14 @@ Retry (transient): `{\"status\":\"retry\",\"failure_reason\":\"<reason>\",\"deta
 
 Do not write nested `status.json` files after `cd`."]
   check_implement [shape=diamond]
-  fix_fmt [shape=parallelogram, max_retries=0, tool_command="mise exec -- sh -c 'cd ui && gofmt -w .'"]
-  verify_fmt [shape=parallelogram, max_retries=0, tool_command="mise exec -- sh -c 'out=$(cd ui && gofmt -l .); test -z \"$out\" || { echo \"Files need formatting: $out\"; exit 1; }'"]
+  fix_fmt [shape=parallelogram, max_retries=0, tool_command="mise exec -- sh -c 'cd server && cargo fmt'"]
+  verify_fmt [shape=parallelogram, max_retries=0, tool_command="mise exec -- sh -c 'cd server && cargo fmt --check'"]
   check_fmt [shape=diamond]
-  verify_vet [shape=parallelogram, tool_command="mise exec -- sh -c 'cd ui && go vet ./...'", timeout="60s"]
-  check_vet [shape=diamond]
-  verify_build [shape=parallelogram, tool_command="mise exec -- sh -c 'cd ui && go build ./...'", timeout="120s"]
+  verify_clippy [shape=parallelogram, tool_command="mise exec -- sh -c 'cd server && cargo clippy -- -D warnings -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::unwrap_in_result'", timeout="120s"]
+  check_clippy [shape=diamond]
+  verify_build [shape=parallelogram, tool_command="mise exec -- sh -c 'cd server && cargo build'", timeout="120s"]
   check_build [shape=diamond]
-  verify_tests [shape=parallelogram, tool_command="mise exec -- sh -c 'cd ui && go test ./...'", timeout="120s"]
+  verify_tests [shape=parallelogram, tool_command="mise exec -- sh -c 'cd server && cargo test'", timeout="120s"]
   check_tests [shape=diamond]
   verify_browser [shape=box, class="verify", prompt="# Browser Rendering Verification
 
@@ -176,7 +196,7 @@ Verify that the CXDB Graph UI application actually loads and renders a visible g
 
 ## Context
 
-All deterministic gates (fmt, vet, build, tests) have passed. This stage uses the Playwright MCP browser tools to start the server, load the page, and verify that the rendered output is correct.
+All deterministic gates (fmt, clippy, build, tests) have passed. This stage uses the Playwright MCP browser tools to start the server, load the page, and verify that the rendered output is correct.
 
 ## Prerequisites
 
@@ -190,8 +210,8 @@ Build and start the server in the background with the fixture DOT files shipped 
 
 ```bash
 REPO=$(pwd)
-go build -o /tmp/cxdb-graph-ui-verify ./ui/
-/tmp/cxdb-graph-ui-verify \\
+cd server && cargo build --release && cd ..
+./server/target/release/cxdb-graph-ui \\
   --dot \"$REPO/holdout-scenarios/fixtures/simple-pipeline.dot\" \\
   --dot \"$REPO/holdout-scenarios/fixtures/multi-tab-b.dot\" &
 sleep 2
@@ -260,7 +280,7 @@ Use `browser_console_messages` with level \"error\" to check for JavaScript erro
 
 Kill the server process:
 ```bash
-pkill -f cxdb-graph-ui-verify 2>/dev/null || true
+pkill -f cxdb-graph-ui 2>/dev/null || true
 ```
 
 ### Step 8: Report results
@@ -287,19 +307,27 @@ Perform a final semantic review of the CXDB Graph UI implementation to ensure it
 
 ## Context
 
-All deterministic gates (fmt, vet, build, tests, browser) have passed. This is the final semantic fidelity check before marking the pipeline complete.
+All deterministic gates (fmt, clippy, build, tests, browser) have passed. This is the final semantic fidelity check before marking the pipeline complete.
 
 ## Files to Read
 
 **Read the full specification:**
 - All files under `specification/intent/` — Overview, architecture, server, DOT rendering, CXDB integration, status overlay, detail panel, UI layout
-- All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements
+- All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements, ROP requirements
 - All files under `specification/contracts/` — Server API (downstream) and CXDB API (upstream)
 
 **Read the implementation:**
-- `ui/main.go` — Go server implementation
-- `ui/index.html` — Browser SPA implementation
-- `ui/go.mod` — Module file
+- `server/Cargo.toml` — Crate manifest (dependencies, lint config)
+- `server/src/main.rs` — Binary entry point
+- `server/src/lib.rs` — Module declarations
+- `server/src/error.rs` — Error types
+- `server/src/config.rs` — CLI config
+- `server/src/server.rs` — Route handlers
+- `server/src/dot_parser.rs` — DOT parsing
+- `server/src/cxdb_proxy.rs` — CXDB proxy
+- `server/assets/index.html` — Browser SPA
+- `Cargo.toml` — Workspace root
+- `Makefile` — Build targets
 - `.ai/verify_browser.md` — Browser verification results (from previous stage)
 
 ## Files to Write
@@ -309,29 +337,38 @@ All deterministic gates (fmt, vet, build, tests, browser) have passed. This is t
 ## What to Do
 
 1. Verify all deliverables exist:
-   - `ui/main.go`, `ui/index.html`, `ui/go.mod`
+   - `Cargo.toml` (workspace root), `server/Cargo.toml`, `Makefile`
+   - `server/src/main.rs`, `server/src/lib.rs`, `server/src/error.rs`, `server/src/config.rs`, `server/src/server.rs`, `server/src/dot_parser.rs`, `server/src/cxdb_proxy.rs`
+   - `server/assets/index.html`
 
-2. Check server implementation (spec Section 3):
-   - **AC-1**: `--port`, `--cxdb` (repeatable), `--dot` (repeatable, required) CLI flags
+2. Check ROP enforcement (spec `specification/constraints/railway-oriented-programming-requirements.md`):
+   - **AC-R1**: `[lints.clippy]` in `server/Cargo.toml` denies `unwrap_used`, `expect_used`, `panic`, `unwrap_in_result`
+   - **AC-R2**: `AppError` enum exists with thiserror derives and covers all error categories
+   - **AC-R3**: `AppResult<T>` type alias used consistently
+   - **AC-R4**: No `unwrap()`, `expect()`, or `panic!()` in non-test code
+   - **AC-R5**: HTTP handlers return structured error responses (not panics)
+
+3. Check server implementation (spec Section 3):
+   - **AC-1**: `--port`, `--cxdb` (repeatable), `--dot` (repeatable, required) CLI flags via clap
    - **AC-2**: All 7 routes implemented: `GET /`, `/dots/{name}`, `/dots/{name}/nodes`, `/dots/{name}/edges`, `/api/cxdb/{index}/*`, `/api/dots`, `/api/cxdb/instances`
    - **AC-3**: DOT files read fresh on each request (no caching)
-   - **AC-4**: `index.html` embedded via `//go:embed index.html`
+   - **AC-4**: `index.html` embedded via `include_str!()` from `server/assets/`
    - **AC-5**: Startup rejects: duplicate base filenames, duplicate graph IDs, anonymous graphs, missing `--dot`
    - **AC-6**: DOT parser handles comment stripping, multi-line strings, `+` concatenation, escape decoding
    - **AC-7**: Node ID normalization (unquote, unescape, trim)
    - **AC-8**: Edge endpoint port stripping, chain expansion
-   - **AC-9**: Standard library only — no external imports
+   - **AC-9**: lib.rs + main.rs separation (main.rs is thin entry point)
    - **AC-10**: Prints `Kilroy Pipeline UI: http://127.0.0.1:{port}` on startup
    - **AC-11**: CXDB proxy strips `/api/cxdb/{index}` prefix and forwards remainder
    - **AC-12**: `/api/dots` returns filenames in `--dot` flag order
 
-3. Check browser verification passed (previous stage):
+4. Check browser verification passed (previous stage):
    - **AC-22**: `.ai/verify_browser.md` exists and reports all checks passed
    - **AC-23**: Graphviz WASM loaded successfully (no stuck \"Loading Graphviz...\")
    - **AC-24**: SVG rendered with expected nodes, tabs showed correct graph IDs, node click opened detail panel
    - **AC-25**: No blocking JavaScript errors (CDN 404s, uncaught exceptions)
 
-4. Check browser SPA (spec Sections 4–8):
+5. Check browser SPA (spec Sections 4–8):
    - **AC-13**: CDN URLs pinned to exact versions (esm.sh for wasm-graphviz, jsDelivr for msgpack)
    - **AC-14**: DOT rendered to SVG via `Graphviz.load()` + `gv.layout(dot, \"svg\", \"dot\")`
    - **AC-15**: Pipeline tabs from `/api/dots`, labeled with graph ID (fallback: filename)
@@ -342,12 +379,12 @@ All deterministic gates (fmt, vet, build, tests, browser) have passed. This is t
    - **AC-20**: Detail panel shows node attributes on click; user content via textContent/escaped HTML
    - **AC-21**: Graceful degradation when CXDB unreachable (graph still renders)
 
-5. Write `.ai/review_final.md` with:
-   - Section for each major component (server routes, DOT parsing, browser integration tests, browser rendering, status overlay, detail panel)
+6. Write `.ai/review_final.md` with:
+   - Section for each major component (ROP compliance, server routes, DOT parsing, browser rendering, status overlay, detail panel)
    - Pass/fail for each AC above
    - List any gaps with specific AC identifiers
 
-6. If ANY acceptance criteria fail, set `failure_signature` to comma-separated sorted list of failed AC IDs (e.g. \"AC-3,AC-7\")
+7. If ANY acceptance criteria fail, set `failure_signature` to comma-separated sorted list of failed AC IDs (e.g. \"AC-3,AC-7\")
 
 ## Acceptance Checks
 
@@ -379,12 +416,12 @@ One of the pipeline stages failed. Read the failure diagnostics and create `.ai/
 
 **Read the full specification:**
 - All files under `specification/intent/` — Overview, architecture, server, DOT rendering, CXDB integration, status overlay, detail panel, UI layout
-- All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements
+- All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements, ROP requirements
 - All files under `specification/contracts/` — Server API (downstream) and CXDB API (upstream)
 
 **Read failure diagnostics:**
 - `.ai/review_final.md` — If review failed, read this for specific AC failures
-- Source files that failed (`ui/main.go`, `ui/index.html`, `ui/go.mod`)
+- Source files that failed (under `server/src/` and `server/assets/index.html`)
 
 ## Files to Write
 
@@ -393,10 +430,10 @@ One of the pipeline stages failed. Read the failure diagnostics and create `.ai/
 ## What to Do
 
 1. Identify the failure mode:
-   - **Format failure** — `gofmt` reports files needing formatting
-   - **Vet failure** — `go vet` reports issues (e.g., invalid struct tags, unreachable code, shadowed variables)
-   - **Build failure** — `go build` fails (compilation error, missing package, import cycle)
-   - **Test failure** — `go test` panics or assertions fail
+   - **Format failure** — `cargo fmt --check` reports files needing formatting
+   - **Clippy failure** — `cargo clippy -- -D warnings` reports issues (ROP lint violations like unwrap/expect/panic in non-test code, unused variables, type mismatches)
+   - **Build failure** — `cargo build` fails (compilation error, missing dependency, type error)
+   - **Test failure** — `cargo test` panics or assertions fail
    - **Review failure** — Missing functionality, wrong behavior, incomplete spec coverage (see `.ai/review_final.md`)
 
 2. Root cause analysis:
@@ -409,12 +446,12 @@ One of the pipeline stages failed. Read the failure diagnostics and create `.ai/
    - **Evidence** — Exact error messages, line numbers, failing test output
    - **Root Cause** — Technical explanation
    - **Repair Guidance** — Specific steps for the implement node:
-     - Which files to modify (`ui/main.go`, `ui/index.html`, or `ui/go.mod`)
+     - Which files to modify (e.g., `server/src/dot_parser.rs`, `server/assets/index.html`)
      - What to change (be specific: file + line range + what to fix)
      - What NOT to change (preserve working code)
    - **Verification** — How to confirm the fix worked
 
-4. Be specific. Don't say \"fix the DOT parser\", say \"main.go line 142: `parseNodeAttrs` does not handle `+` string concatenation — add a loop that joins consecutive quoted fragments when a `+` token follows a closing quote\"
+4. Be specific. Don't say \"fix the DOT parser\", say \"server/src/dot_parser.rs line 142: `parse_node_attrs` does not handle `+` string concatenation — add a loop that joins consecutive quoted fragments when a `+` token follows a closing quote\"
 
 ## Acceptance Checks
 
@@ -450,13 +487,13 @@ Options:
   check_implement -> postmortem
   fix_fmt -> verify_fmt
   verify_fmt -> check_fmt
-  check_fmt -> verify_vet [condition="outcome = success"]
+  check_fmt -> verify_clippy [condition="outcome = success"]
   check_fmt -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
   check_fmt -> postmortem
-  verify_vet -> check_vet
-  check_vet -> verify_build [condition="outcome = success"]
-  check_vet -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
-  check_vet -> postmortem
+  verify_clippy -> check_clippy
+  check_clippy -> verify_build [condition="outcome = success"]
+  check_clippy -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]
+  check_clippy -> postmortem
   verify_build -> check_build
   check_build -> verify_tests [condition="outcome = success"]
   check_build -> postmortem [condition="outcome = fail && context.failure_class != transient_infra"]

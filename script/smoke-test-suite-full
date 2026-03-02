@@ -18,13 +18,15 @@ run_step() {
   echo
 }
 
-# Go vet/test — only run if ui/ exists (created by the Kilroy implement node)
-if [ -d "${REPO_ROOT}/ui" ]; then
-  run_step "go vet" bash -c "cd '${REPO_ROOT}/ui' && go vet ./..."
-  run_step "go test" bash -c "cd '${REPO_ROOT}/ui' && go test ./..."
+# Rust fmt/clippy/build/test — only run if server/Cargo.toml exists (created by the Kilroy implement node)
+if [ -f "${REPO_ROOT}/server/Cargo.toml" ]; then
+  run_step "cargo fmt --check" bash -c "cd '${REPO_ROOT}/server' && cargo fmt --check"
+  run_step "cargo clippy" bash -c "cd '${REPO_ROOT}/server' && cargo clippy -- -D warnings -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::unwrap_in_result"
+  run_step "cargo build" bash -c "cd '${REPO_ROOT}/server' && cargo build"
+  run_step "cargo test" bash -c "cd '${REPO_ROOT}/server' && cargo test"
 else
-  echo "==> go vet/test"
-  echo "    (skipped: ui/ not yet created)"
+  echo "==> cargo fmt/clippy/build/test"
+  echo "    (skipped: server/Cargo.toml not yet created)"
   echo
 fi
 

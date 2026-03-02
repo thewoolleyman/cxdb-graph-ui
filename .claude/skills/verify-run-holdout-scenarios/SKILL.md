@@ -49,7 +49,7 @@ Scenarios not covered here (deferred due to mocking complexity):
 ## Prerequisites
 
 Verify before starting:
-1. Go is installed: `go version`
+1. Rust is installed: `cargo --version`
 2. Playwright MCP tools are available (you must have `playwright_navigate`, `playwright_screenshot`, `playwright_click`, `playwright_evaluate`)
 3. Working directory is the repo root (`pwd` ends in `cxdb-graph-ui`)
 4. All fixture files exist: `ls holdout-scenarios/fixtures/`
@@ -77,7 +77,7 @@ pkill -f "cxdb-graph-ui" 2>/dev/null || true; sleep 1
 Start the server in the background. Always use absolute paths:
 ```bash
 REPO=$(pwd)
-go run ui/main.go --dot "$REPO/holdout-scenarios/fixtures/<files>" &
+cd server && cargo run -- --dot "$REPO/holdout-scenarios/fixtures/<files>" &
 sleep 2
 ```
 
@@ -348,13 +348,13 @@ Note: The "One of multiple CXDB instances unreachable" scenario requires restart
 
 ## Batch 11: Server CLI Scenarios
 
-These test the Go server's process startup behavior. Do NOT use Playwright. Use shell commands only.
+These test the Rust server's process startup behavior. Do NOT use Playwright. Use shell commands only.
 
 Kill any running test server first: `pkill -f "cxdb-graph-ui" 2>/dev/null || true`
 
 Build the binary once for reliable exit code testing:
 ```bash
-go build -o /tmp/cxdb-graph-ui-test ./ui/
+cd server && cargo build --release && cp target/release/cxdb-graph-ui /tmp/cxdb-graph-ui-test
 ```
 
 ### Start with single DOT file

@@ -6,7 +6,7 @@ Verify that the CXDB Graph UI application actually loads and renders a visible g
 
 ## Context
 
-All deterministic gates (fmt, vet, build, tests) have passed. This stage uses the Playwright MCP browser tools to start the server, load the page, and verify that the rendered output is correct.
+All deterministic gates (fmt, clippy, build, tests) have passed. This stage uses the Playwright MCP browser tools to start the server, load the page, and verify that the rendered output is correct.
 
 ## Prerequisites
 
@@ -20,8 +20,8 @@ Build and start the server in the background with the fixture DOT files shipped 
 
 ```bash
 REPO=$(pwd)
-go build -o /tmp/cxdb-graph-ui-verify ./ui/
-/tmp/cxdb-graph-ui-verify \
+cd server && cargo build --release && cd ..
+./server/target/release/cxdb-graph-ui \
   --dot "$REPO/holdout-scenarios/fixtures/simple-pipeline.dot" \
   --dot "$REPO/holdout-scenarios/fixtures/multi-tab-b.dot" &
 sleep 2
@@ -90,7 +90,7 @@ Use `browser_console_messages` with level "error" to check for JavaScript errors
 
 Kill the server process:
 ```bash
-pkill -f cxdb-graph-ui-verify 2>/dev/null || true
+pkill -f cxdb-graph-ui 2>/dev/null || true
 ```
 
 ### Step 8: Report results
