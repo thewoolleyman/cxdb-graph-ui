@@ -1,0 +1,10 @@
+digraph beta_pipeline {
+  rankdir=LR
+  begin [shape=Msquare]
+  build [shape=box]
+  test [shape=diamond]
+  deploy [shape=doublecircle]
+  begin -> build
+  build -> test
+  test -> deploy
+}

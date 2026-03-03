@@ -1,0 +1,11 @@
+digraph simple_pipeline {
+  rankdir=LR
+  start [shape=Msquare]
+  implement [shape=box]
+  review [shape=diamond]
+  finish [shape=doublecircle]
+  start -> implement
+  implement -> review
+  review -> finish [label="approved"]
+  review -> implement [label="retry"]
+}
