@@ -2,9 +2,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-UI_DIR="${REPO_ROOT}/ui"
-BINARY="${UI_DIR}/cxdb-graph-ui"
+BINARY="${REPO_ROOT}/server/target/release/cxdb-graph-ui"
 PORT="${PORT:-9030}"
+CXDB_URL="${KILROY_CXDB_HTTP_BASE_URL:-http://127.0.0.1:9110}"
 
 "${REPO_ROOT}/script/build.sh"
 
@@ -18,7 +18,7 @@ if [ "${#DOT_FLAGS[@]}" -eq 0 ]; then
   echo "Warning: no .dot files found in repo root — server will require --dot flags passed manually."
 fi
 
-"${BINARY}" --port "${PORT}" "${DOT_FLAGS[@]+"${DOT_FLAGS[@]}"}" &
+"${BINARY}" --port "${PORT}" --cxdb "${CXDB_URL}" "${DOT_FLAGS[@]+"${DOT_FLAGS[@]}"}" &
 SERVER_PID=$!
 
 if [[ "$(uname)" == "Darwin" ]]; then
