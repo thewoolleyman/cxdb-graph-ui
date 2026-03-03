@@ -1,0 +1,42 @@
+[package]
+name = "cxdb-graph-ui"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "cxdb-graph-ui"
+path = "src/main.rs"
+
+[lib]
+name = "cxdb_graph_ui"
+path = "src/lib.rs"
+
+[dependencies]
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
+hyper = { version = "1", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full"] }
+http-body-util = "0.1"
+clap = { version = "4", features = ["derive"] }
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+include_dir = "0.7"
+mime_guess = "2"
+regex = "1"
+reqwest = { version = "0.12", features = ["stream"] }
+bytes = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["full"] }
+axum-test = "15"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+unwrap_in_result = "deny"

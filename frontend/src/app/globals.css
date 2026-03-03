@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .node-pending polygon,
+  .node-pending ellipse,
+  .node-pending path {
+    fill: #e0e0e0;
+  }
+  .node-running polygon,
+  .node-running ellipse,
+  .node-running path {
+    fill: #90caf9;
+    animation: pulse 1.5s infinite;
+  }
+  .node-complete polygon,
+  .node-complete ellipse,
+  .node-complete path {
+    fill: #a5d6a7;
+  }
+  .node-error polygon,
+  .node-error ellipse,
+  .node-error path {
+    fill: #ef9a9a;
+  }
+  .node-stale polygon,
+  .node-stale ellipse,
+  .node-stale path {
+    fill: #ffcc80;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Make SVG nodes look clickable */
+g.node {
+  cursor: pointer;
+}
+
+g.node:hover polygon,
+g.node:hover ellipse,
+g.node:hover path {
+  stroke-width: 2.5;
+}
