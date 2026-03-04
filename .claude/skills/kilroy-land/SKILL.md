@@ -126,9 +126,50 @@ Ask the user:
 
 If the user says yes, invoke the `verify:run-holdout-scenarios` skill, and report the result.
 
-If there were failures, the report should contain a summary and also the path to the critique versioned file which was created by the spec:critique skill from the verification.
+If all holdout scenarios pass, proceed to Step 9.
 
-If the holdout scenario verification fails, stop and report. Do NOT push. The user can inspect failures and decide what to do. The squashed changes are already committed on the local branch, so no work is lost.
+If there were failures, **triage each failure** into one of three categories:
+
+1. **Spec gap** — the specification does not define the expected behavior. The spec needs revision before the next pipeline run can succeed.
+2. **Unimplemented spec** — the specification clearly defines the behavior (pseudocode, algorithm, data format) but the implementation does not follow it. The next pipeline run can fix this immediately.
+3. **Both** — the spec is partially there but incomplete. Include in both artifacts.
+
+Then produce the appropriate artifacts:
+
+- **If there are spec gaps:** Invoke `spec:critique` (existing behavior, unchanged). Report the path to the critique versioned file.
+
+- **If there are unimplemented specs:** Write `.ai/unimplemented_specifications.md` with a structured entry for each unimplemented-spec failure. Each entry must include:
+  - A descriptive title
+  - **Specification reference:** exact file path, section number, and algorithm/pseudocode name
+  - **What the spec requires:** the specific behavior defined in the spec
+  - **What the implementation does:** the observed incorrect behavior
+  - **Holdout scenario(s) affected:** which scenarios failed due to this
+  - **Evidence:** screenshot filename or error message
+  - **Implementation fix required in:** the file(s) and function(s) that need to change
+
+  Format:
+  ```markdown
+  # Unimplemented Specifications
+
+  Source: holdout scenario verification during landing of run <run_id>
+  Date: <date>
+
+  ## Unimplemented: <title>
+  **Specification reference:** `<file_path>`, <Section> — `<algorithm_name>`
+  **What the spec requires:** <description>
+  **What the implementation does:** <description>
+  **Holdout scenarios affected:** <list>
+  **Evidence:** <screenshot or error>
+  **Implementation fix required in:** <file(s) and function(s)>
+  ```
+
+- **If there are both:** Write both artifacts. A single failure can appear in both if the spec is partially there but incomplete.
+
+Report both artifacts to the user, explaining what each addresses:
+- **Critique** → needs spec revision before the next run (invoke `spec:revise` or `spec:critique-revise-loop`)
+- **Unimplemented specs** → the next pipeline run (`/kilroy:run`) can fix these immediately because the spec already defines the correct behavior
+
+If holdout scenario verification fails, stop and report. Do NOT push. The user can inspect failures and decide what to do. The squashed changes are already committed on the local branch, so no work is lost.
 
 ## Step 9: Push
 

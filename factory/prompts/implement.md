@@ -2,9 +2,16 @@
 
 ## Task
 
-**CRITICAL: Read `.ai/postmortem_latest.md` first if it exists.**
-- If postmortem exists: This is a REPAIR iteration. Fix only the specific gaps/failures identified. Do not regenerate working code.
-- If postmortem absent: This is a FRESH implementation. Execute the specification from scratch.
+**CRITICAL: Read repair artifacts first if they exist.**
+- `.ai/postmortem_latest.md` — gate failure analysis from a previous pipeline iteration (build, clippy, test, lint failures)
+- `.ai/unimplemented_specifications.md` — specification gaps found during post-landing holdout verification (code compiles and passes tests but doesn't match the spec)
+
+If EITHER exists: This is a REPAIR iteration.
+  - Read both files (whichever exist)
+  - `postmortem_latest.md`: fix gate failures (format, clippy, build, test, review)
+  - `unimplemented_specifications.md`: implement the referenced specification sections — each entry points to exact spec file, section, and algorithm
+  - Do not regenerate working code
+If NEITHER exists: This is a FRESH implementation. Execute the specification from scratch.
 
 Implement the CXDB Graph UI per the specification under `specification/` (intent, contracts, and constraints).
 
@@ -19,13 +26,14 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 
 **ALWAYS READ FIRST:**
 - `.ai/postmortem_latest.md` — If present, this is a repair iteration. Read this BEFORE reading anything else.
+- `.ai/unimplemented_specifications.md` — If present, this is a repair iteration. Contains unimplemented spec sections found during holdout verification.
 
 **Then read the full specification:**
 - All files under `specification/intent/` — Overview, architecture, server, DOT rendering, CXDB integration, status overlay, detail panel, UI layout
 - All files under `specification/constraints/` — Invariants, non-goals, definition of done, testing requirements, ROP requirements
 - All files under `specification/contracts/` — Server API (downstream) and CXDB API (upstream)
 
-**If repair iteration, also read the files mentioned in the postmortem.**
+**If repair iteration, also read the files mentioned in the postmortem and/or unimplemented specifications.**
 
 ## Files to Write
 
@@ -56,12 +64,14 @@ The CXDB Graph UI is a local web dashboard that renders Attractor pipeline DOT f
 
 ## What to Do
 
-**If `.ai/postmortem_latest.md` exists:**
-1. Read postmortem first — understand what failed
-2. Read only the specific files mentioned in the postmortem
-3. Make surgical fixes to address the identified failures
+**If `.ai/postmortem_latest.md` or `.ai/unimplemented_specifications.md` exists:**
+1. Read both repair artifacts (whichever exist) — understand what failed
+2. Read only the specific files mentioned in the repair artifacts
+3. Make surgical fixes to address the identified failures:
+   - `postmortem_latest.md` failures: fix gate failures (format, clippy, build, test, review)
+   - `unimplemented_specifications.md` failures: implement the referenced specification sections exactly as the spec defines them
 4. Do NOT regenerate modules that are working
-5. Do NOT change code that isn't related to the failure
+5. Do NOT change code that isn't related to the failures
 
 **If postmortem absent (fresh implementation):**
 
