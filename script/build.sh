@@ -5,6 +5,6 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SERVER_DIR="${REPO_ROOT}/server"
 
 echo "==> Building cxdb-graph-ui..."
-cd "${SERVER_DIR}"
+cd "${REPO_ROOT}"
 cargo build --release
-echo "==> Build complete: ${SERVER_DIR}/target/release/cxdb-graph-ui"
+echo "==> Build complete: ${REPO_ROOT}/target/release/cxdb-graph-ui"
