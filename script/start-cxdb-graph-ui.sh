@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BINARY="${REPO_ROOT}/server/target/release/cxdb-graph-ui"
+BINARY="${REPO_ROOT}/target/release/cxdb-graph-ui"
 PORT="${PORT:-9030}"
 CXDB_URL="${KILROY_CXDB_HTTP_BASE_URL:-http://127.0.0.1:9110}"
 
