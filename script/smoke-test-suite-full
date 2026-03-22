@@ -18,6 +18,10 @@ run_step() {
   echo
 }
 
+# Gitignore compliance — no tracked files should match .gitignore
+run_step "no gitignored files tracked" bash -c \
+  "cd '${REPO_ROOT}' && ! git ls-files -ic --exclude-standard | grep -q ."
+
 # Rust fmt/clippy/build/test — only run if server/Cargo.toml exists (created by the Kilroy implement node)
 if [ -f "${REPO_ROOT}/server/Cargo.toml" ]; then
   run_step "cargo fmt --check" bash -c "cd '${REPO_ROOT}/server' && cargo fmt --check"

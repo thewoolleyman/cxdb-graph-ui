@@ -8,8 +8,10 @@ tmp
 .claude/settings.local.json
 .claude/memory/
 
-# OpenCode runtime (node_modules, lock files — only commands/ is committed)
-.opencode/node_modules/
+# Node modules (all locations)
+node_modules/
+
+# OpenCode runtime (lock files — only commands/ is committed)
 .opencode/package.json
 .opencode/bun.lock
 .opencode/.gitignore
@@ -20,6 +22,9 @@ tmp
 # Playwright MCP artifacts
 .playwright-mcp/
 /*.png
+
+# Rust/Cargo build output
+target/
 
 # Go binary output
 /cxdb-graph-ui

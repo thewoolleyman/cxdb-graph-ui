@@ -93,7 +93,20 @@ For each commit, check if it changed files:
 git diff-tree --no-commit-id --name-only -r <commit_hash>
 ```
 
-Collect the node names from commits that had actual file changes (non-empty diff-tree output). Then commit the squashed changes:
+Collect the node names from commits that had actual file changes (non-empty diff-tree output).
+
+Before committing, remove any gitignored files that were pulled in by the squash-merge:
+
+```bash
+ignored=$(git ls-files -ic --exclude-standard)
+if [ -n "$ignored" ]; then
+  echo "Removing gitignored files from staging area:"
+  echo "$ignored"
+  echo "$ignored" | xargs git reset HEAD --
+fi
+```
+
+Then commit the squashed changes:
 
 ```bash
 git commit -m "attractor(<run_id>): landed pipeline run
