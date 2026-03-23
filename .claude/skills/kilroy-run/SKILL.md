@@ -36,6 +36,7 @@ Before running, show:
 
 ```bash
 env -u CLAUDECODE direnv exec "$PWD" ../kilroy/kilroy attractor run \
+  --skip-cli-headless-warning \
   --graph pipeline.dot \
   --config factory/run.yaml
 ```
