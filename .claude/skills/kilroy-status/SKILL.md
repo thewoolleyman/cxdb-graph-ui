@@ -36,7 +36,7 @@ Use it automatically.
 
 ## Check status
 
-**Note:** All `kilroy` commands must be wrapped with `direnv exec "$PWD"` so that `ANTHROPIC_API_KEY` and other `.env` variables are available (Claude Code's non-interactive shell does not auto-load direnv). Additionally, prefix with `env -u CLAUDECODE` to unset the nested-session guard variable, since Kilroy internally invokes `claude` and would otherwise fail with "cannot be launched inside another Claude Code session".
+**Note:** All `kilroy` commands must be wrapped with `direnv exec "$PWD"` so that `.env` variables (like `KILROY_CXDB_HOST`) are available (Claude Code's non-interactive shell does not auto-load direnv). Additionally, prefix with `env -u CLAUDECODE` to unset the nested-session guard variable, since Kilroy internally invokes `claude` and would otherwise fail with "cannot be launched inside another Claude Code session".
 
 ```bash
 env -u CLAUDECODE direnv exec "$PWD" ../kilroy/kilroy attractor status --logs-root ~/.local/state/kilroy/attractor/runs/<run_id>

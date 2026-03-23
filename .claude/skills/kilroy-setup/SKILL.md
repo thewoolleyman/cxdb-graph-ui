@@ -14,14 +14,13 @@ Verify the following are installed and report each result:
 
 - `go` — required to build Kilroy
 - `ruby` — required for pipeline generation scripts
-- `claude` — the Claude CLI, required by Kilroy to run agents
-- `ANTHROPIC_API_KEY` environment variable is set (do NOT print the value)
+- `claude` — the Claude CLI, required by Kilroy to run agents. Must be authenticated (`claude auth status` should show `loggedIn: true`). Kilroy uses `backend: cli` so it authenticates via the CLI's OAuth session (e.g. Max plan), not an API key.
 - Tailscale connectivity — `ping -c 1 $KILROY_CXDB_HOST`
 
 **Note:** The `.env` file is loaded via `direnv`. Claude Code's non-interactive shell does not trigger direnv hooks automatically, so use `direnv exec "$PWD"` to wrap any command that needs to check or use environment variables from `.env`. Additionally, prefix with `env -u CLAUDECODE` to unset the nested-session guard variable, since Kilroy internally invokes `claude` and would otherwise fail with "cannot be launched inside another Claude Code session". For example:
 
 ```bash
-env -u CLAUDECODE direnv exec "$PWD" sh -c '[ -n "$ANTHROPIC_API_KEY" ] && echo "set" || echo "NOT set"'
+env -u CLAUDECODE claude auth status
 ```
 
 If any are missing, report which ones and stop. Do not proceed to build.

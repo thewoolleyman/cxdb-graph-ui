@@ -18,7 +18,7 @@ llm:
   cli_profile: real
   providers:
     anthropic:
-      backend: api
+      backend: cli
       failover: []
 
 git:

@@ -48,7 +48,7 @@ def usage
 
       BOOTSTRAP — when no config YAML exists. Uses LLM to generate initial
         DOT, then extracts prompts alongside the config YAML.
-        Requires: kilroy binary, CXDB running, ANTHROPIC_API_KEY.
+        Requires: kilroy binary, CXDB running, Claude CLI authenticated.
 
     Options:
       --force    Recompile even if config YAML hasn't changed (checksum match).
@@ -118,7 +118,7 @@ class StepTracker
         lines << "  - kilroy attractor ingest failed. Common causes:"
         lines << "    - Hit max turns (increase with KILROY_INGEST_MAX_TURNS=50)"
         lines << "    - CXDB not running (check: curl -sf http://$KILROY_CXDB_HOST:9110/healthz)"
-        lines << "    - ANTHROPIC_API_KEY not set (check via direnv)"
+        lines << "    - Claude CLI not authenticated (check: claude auth status)"
         lines << "  - Re-run the generation."
       when :patch
         lines << "  - patch_dot.rb failed. The DOT file may have unexpected structure."

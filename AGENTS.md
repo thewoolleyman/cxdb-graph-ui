@@ -41,7 +41,7 @@ Slash-command skills that automate specification and Kilroy pipeline workflows.
 |---|---|
 | `spec:critique` | Critiques the spec against its goals, invariants, and holdout scenarios. Writes versioned critique files to `specification-critiques/`. |
 | `spec:revise` | Revises the spec based on unacknowledged critique feedback. Edits the spec in place and writes acknowledgement files. |
-| `kilroy:setup` | One-time setup: builds Kilroy binary from `../kilroy`, verifies CXDB is reachable on the central server (`$KILROY_CXDB_HOST`) via Tailscale, verifies prereqs (go, ruby, claude CLI, API key). |
+| `kilroy:setup` | One-time setup: builds Kilroy binary from `../kilroy`, verifies CXDB is reachable on the central server (`$KILROY_CXDB_HOST`) via Tailscale, verifies prereqs (go, ruby, claude CLI auth). |
 | `kilroy:generate-pipeline` | Compiles pipeline DOT from YAML config + prompt markdown files. Deterministic — no LLM involved. Runs `compile_dot.rb` → `verify_dot.rb` → `kilroy attractor validate`. |
 | `kilroy:run` | Runs pre-flight checks, confirms with user, then executes `kilroy attractor run`. Creates an isolated worktree, runs all pipeline nodes with checkpoint commits. |
 | `kilroy:status` | Lists existing runs, checks status, offers to resume or stop interrupted pipelines. State in `~/.local/state/kilroy/attractor/runs/`. |

@@ -177,10 +177,8 @@ The spec file is the single source of truth. The holdout scenarios are withheld 
 
 - Rust toolchain (for the CXDB Graph UI server)
 - Go (to build the Kilroy CLI)
-- Docker (for CXDB)
 - Ruby 3+ (for pipeline generation scripts)
-- `claude` CLI installed and authenticated
-- `ANTHROPIC_API_KEY` environment variable (handled by direnv in this repo)
+- `claude` CLI installed and authenticated (Max plan or OAuth — Kilroy uses `backend: cli`)
 
 ## Running Pipelines Manually
 

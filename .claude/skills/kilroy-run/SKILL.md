@@ -18,7 +18,7 @@ Verify all of these before running. Stop and report if any fail:
 2. CXDB is reachable: `curl -sf http://$KILROY_CXDB_HOST:9110/healthz > /dev/null` (suggest `/kilroy:setup`)
 3. The pipeline DOT file `pipeline.dot` exists (suggest `/kilroy:generate-pipeline`)
 4. The run config `factory/run.yaml` exists
-5. `ANTHROPIC_API_KEY` is set (use `direnv exec "$PWD" sh -c '[ -n "$ANTHROPIC_API_KEY" ]'` to check — Claude Code's shell does not auto-load `.env` via direnv)
+5. Claude CLI is authenticated: `env -u CLAUDECODE claude auth status` should show `loggedIn: true`. Kilroy uses `backend: cli` so it authenticates via the CLI's OAuth session (e.g. Max plan), not an API key.
 6. The pipeline DOT file only uses `anthropic` as `llm_provider`. Grep for `llm_provider:` in the DOT file — if any provider other than `anthropic` is found (e.g. `openrouter`), stop and tell the user to re-run `/kilroy:generate-pipeline`. Only `anthropic` is configured in the run config.
 
 ## Confirm with user
@@ -40,7 +40,7 @@ env -u CLAUDECODE direnv exec "$PWD" ../kilroy/kilroy attractor run \
   --config factory/run.yaml
 ```
 
-Run this command with `run_in_background: true` on the Bash tool. The `direnv exec "$PWD"` prefix ensures `ANTHROPIC_API_KEY` (and any other `.env` variables) are loaded into the Kilroy process. The `env -u CLAUDECODE` prefix unsets the nested-session guard variable, since Kilroy internally invokes `claude` and would otherwise fail with "cannot be launched inside another Claude Code session".
+Run this command with `run_in_background: true` on the Bash tool. The `direnv exec "$PWD"` prefix ensures `.env` variables (like `KILROY_CXDB_HOST`) are loaded into the Kilroy process. The `env -u CLAUDECODE` prefix unsets the nested-session guard variable, since Kilroy internally invokes `claude` and would otherwise fail with "cannot be launched inside another Claude Code session".
 
 ### Step 2: Start monitoring loop
 
