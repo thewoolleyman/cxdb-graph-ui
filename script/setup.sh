@@ -22,27 +22,24 @@ else
   exit 1
 fi
 
-# Clone cxdb repo (needed to build the Docker image kilroy expects)
-CXDB_DIR="${CXDB_DIR:-$WORKSPACE_DIR/cxdb}"
-CXDB_IMAGE="${KILROY_CXDB_IMAGE:-cxdb/cxdb:local}"
+# Verify KILROY_CXDB_HOST is set
+if [[ -z "${KILROY_CXDB_HOST:-}" ]]; then
+  echo "✗ KILROY_CXDB_HOST is not set."
+  echo "  Add it to .env (e.g. KILROY_CXDB_HOST=your-tailscale-hostname.ts.net)"
+  exit 1
+fi
+echo "✓ KILROY_CXDB_HOST=$KILROY_CXDB_HOST"
 
-if [ -d "$CXDB_DIR" ]; then
-  echo "✓ cxdb repo already exists at $CXDB_DIR"
+# Verify CXDB is reachable on the central server via Tailscale
+CXDB_URL="${KILROY_CXDB_HTTP_BASE_URL:-http://${KILROY_CXDB_HOST}:9110}"
+echo "Checking remote CXDB at $CXDB_URL ..."
+if curl -sf -m 5 "$CXDB_URL/healthz" >/dev/null 2>&1; then
+  echo "✓ CXDB is healthy at $CXDB_URL"
 else
-  echo "Cloning strongdm/cxdb into $CXDB_DIR …"
-  git clone https://github.com/strongdm/cxdb.git "$CXDB_DIR"
+  echo "✗ CXDB is not reachable at $CXDB_URL"
+  echo "  Ensure you are connected to Tailscale and CXDB is running on the server."
+  echo "  To start it: ssh \$KILROY_CXDB_HOST 'kilroy cxdb start cxdb-graph-ui'"
+  exit 1
 fi
 
-# Build CXDB Docker image
-if docker image inspect "$CXDB_IMAGE" >/dev/null 2>&1; then
-  echo "✓ Docker image $CXDB_IMAGE already exists"
-  if [[ "${1:-}" == "--rebuild-cxdb" ]]; then
-    echo "Rebuilding as requested …"
-  else
-    exit 0
-  fi
-fi
-
-echo "Building $CXDB_IMAGE from $CXDB_DIR (this takes a few minutes) …"
-docker build -t "$CXDB_IMAGE" "$CXDB_DIR"
-echo "✓ Docker image $CXDB_IMAGE built successfully"
+# Generate run config with correct CXDB host

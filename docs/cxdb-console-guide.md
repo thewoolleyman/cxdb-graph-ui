@@ -1,6 +1,6 @@
 # CXDB Console Guide
 
-CXDB (Context Debugger) is an AI context store that persists the conversational context (turns, blobs, metadata) that AI agents produce during Kilroy pipeline runs. The web console at `http://127.0.0.1:9120/` provides a real-time operational view.
+CXDB (Context Debugger) is an AI context store that persists the conversational context (turns, blobs, metadata) that AI agents produce during Kilroy pipeline runs. The web console at `http://$KILROY_CXDB_HOST:9120/` (accessible via Tailscale) provides a real-time operational view.
 
 ## Opening the Console
 
@@ -10,7 +10,7 @@ From this repo, run:
 script/start-cxdb-ui.sh
 ```
 
-This starts the CXDB frontend (served by nginx on port 9120) and opens it in your browser. The CXDB server itself must already be running (via `script/start-cxdb.sh` or as part of `script/setup.sh`).
+This opens the CXDB frontend in your browser. CXDB runs on the central server (`$KILROY_CXDB_HOST`) and is accessible via Tailscale. Ensure the instance is running (`kilroy cxdb status` on the server).
 
 ## Dashboard Overview
 

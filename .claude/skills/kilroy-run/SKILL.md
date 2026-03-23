@@ -15,7 +15,7 @@ The pipeline file is `pipeline.dot` and the run config is `factory/run.yaml`, bo
 Verify all of these before running. Stop and report if any fail:
 
 1. `../kilroy/kilroy` binary exists (suggest `/kilroy:setup`)
-2. CXDB is running: `curl -sf http://localhost:9110/healthz > /dev/null` (suggest `/kilroy:setup`)
+2. CXDB is reachable: `curl -sf http://$KILROY_CXDB_HOST:9110/healthz > /dev/null` (suggest `/kilroy:setup`)
 3. The pipeline DOT file `pipeline.dot` exists (suggest `/kilroy:generate-pipeline`)
 4. The run config `factory/run.yaml` exists
 5. `ANTHROPIC_API_KEY` is set (use `direnv exec "$PWD" sh -c '[ -n "$ANTHROPIC_API_KEY" ]'` to check — Claude Code's shell does not auto-load `.env` via direnv)

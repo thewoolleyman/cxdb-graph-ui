@@ -4,8 +4,9 @@ repo:
   path: .
 
 cxdb:
-  binary_addr: 127.0.0.1:9109
-  http_base_url: http://127.0.0.1:9110
+  # Set KILROY_CXDB_HOST in .env to your server's Tailscale hostname.
+  binary_addr: ${KILROY_CXDB_HOST}:9109
+  http_base_url: http://${KILROY_CXDB_HOST}:9110
   autostart:
     enabled: false
 

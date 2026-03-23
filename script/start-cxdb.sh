@@ -1,21 +1,31 @@
 #!/usr/bin/env bash
-# Wrapper: delegates to the start-cxdb.sh in the kilroy repo.
-# Forces line-buffered stdout/stderr so output appears immediately.
+# Verify that the remote CXDB instance is reachable via Tailscale.
+# CXDB runs on the central server, managed by `kilroy cxdb start`.
+# Set KILROY_CXDB_HOST in .env to your server's Tailscale hostname.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-KILROY_DIR="${KILROY_DIR:-$(cd "$SCRIPT_DIR/../../kilroy" && pwd)}"
-
-# Use non-default ports so this project's CXDB doesn't conflict with others.
-export KILROY_CXDB_BINARY_ADDR="${KILROY_CXDB_BINARY_ADDR:-127.0.0.1:9109}"
-export KILROY_CXDB_HTTP_BASE_URL="${KILROY_CXDB_HTTP_BASE_URL:-http://127.0.0.1:9110}"
-export KILROY_CXDB_UI_ADDR="${KILROY_CXDB_UI_ADDR:-127.0.0.1:9120}"
-export KILROY_CXDB_CONTAINER_NAME="${KILROY_CXDB_CONTAINER_NAME:-kilroy-cxdb-graph-ui}"
-
-# stdbuf forces line-buffering so callers see output in real time.
-if command -v stdbuf >/dev/null 2>&1; then
-  exec stdbuf -oL -eL "$KILROY_DIR/scripts/start-cxdb.sh" "$@"
-else
-  # macOS may not have stdbuf; script(1) forces a pty which flushes.
-  exec script -q /dev/null "$KILROY_DIR/scripts/start-cxdb.sh" "$@"
+if [[ -z "${KILROY_CXDB_HOST:-}" ]]; then
+  echo "KILROY_CXDB_HOST is not set." >&2
+  echo "Add it to .env (e.g. KILROY_CXDB_HOST=your-tailscale-hostname.ts.net)" >&2
+  exit 1
 fi
+
+CXDB_HTTP_BASE_URL="${KILROY_CXDB_HTTP_BASE_URL:-http://${KILROY_CXDB_HOST}:9110}"
+CXDB_BINARY_ADDR="${KILROY_CXDB_BINARY_ADDR:-${KILROY_CXDB_HOST}:9109}"
+CXDB_UI_URL="${KILROY_CXDB_UI_URL:-http://${KILROY_CXDB_HOST}:9120}"
+
+echo "Checking remote CXDB at $CXDB_HTTP_BASE_URL ..."
+
+if curl -sf -m 5 "$CXDB_HTTP_BASE_URL/healthz" >/dev/null 2>&1; then
+  echo "cxdb ready: http=$CXDB_HTTP_BASE_URL binary=$CXDB_BINARY_ADDR ui=$CXDB_UI_URL"
+  exit 0
+fi
+
+echo "CXDB is not reachable at $CXDB_HTTP_BASE_URL" >&2
+echo "" >&2
+echo "The CXDB instance runs on the central server (\$KILROY_CXDB_HOST=$KILROY_CXDB_HOST)." >&2
+echo "Ensure:" >&2
+echo "  1. You are connected to Tailscale" >&2
+echo "  2. The CXDB instance is running: ssh $KILROY_CXDB_HOST 'kilroy cxdb status'" >&2
+echo "  3. Or start it: ssh $KILROY_CXDB_HOST 'kilroy cxdb start cxdb-graph-ui'" >&2
+exit 1

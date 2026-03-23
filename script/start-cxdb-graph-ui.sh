@@ -4,7 +4,14 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BINARY="${REPO_ROOT}/target/release/cxdb-graph-ui"
 PORT="${PORT:-9030}"
-CXDB_URL="${KILROY_CXDB_HTTP_BASE_URL:-http://127.0.0.1:9110}"
+
+if [[ -z "${KILROY_CXDB_HOST:-}" ]]; then
+  echo "KILROY_CXDB_HOST is not set." >&2
+  echo "Add it to .env (e.g. KILROY_CXDB_HOST=your-tailscale-hostname.ts.net)" >&2
+  exit 1
+fi
+
+CXDB_URL="${KILROY_CXDB_HTTP_BASE_URL:-http://${KILROY_CXDB_HOST}:9110}"
 
 "${REPO_ROOT}/script/build.sh"
 

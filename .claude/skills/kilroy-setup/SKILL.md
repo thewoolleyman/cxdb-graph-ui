@@ -1,6 +1,6 @@
 ---
 name: kilroy:setup
-description: Build the Kilroy binary, start CXDB, and verify all prerequisites for running Kilroy pipelines.
+description: Build the Kilroy binary, verify CXDB is reachable on the central server via Tailscale, and verify all prerequisites for running Kilroy pipelines.
 user-invocable: true
 ---
 
@@ -13,10 +13,10 @@ This repo is the current working directory. The Kilroy source repo is at `../kil
 Verify the following are installed and report each result:
 
 - `go` — required to build Kilroy
-- `docker` — required for CXDB
 - `ruby` — required for pipeline generation scripts
 - `claude` — the Claude CLI, required by Kilroy to run agents
 - `ANTHROPIC_API_KEY` environment variable is set (do NOT print the value)
+- Tailscale connectivity — `ping -c 1 $KILROY_CXDB_HOST`
 
 **Note:** The `.env` file is loaded via `direnv`. Claude Code's non-interactive shell does not trigger direnv hooks automatically, so use `direnv exec "$PWD"` to wrap any command that needs to check or use environment variables from `.env`. Additionally, prefix with `env -u CLAUDECODE` to unset the nested-session guard variable, since Kilroy internally invokes `claude` and would otherwise fail with "cannot be launched inside another Claude Code session". For example:
 
@@ -36,21 +36,17 @@ Verify the binary was produced: `../kilroy/kilroy --version`
 
 If the build fails, report the error and stop.
 
-## Step 3: Start CXDB
+## Step 3: Verify CXDB
+
+CXDB runs on the central server (`$KILROY_CXDB_HOST`), managed by `kilroy cxdb`. Verify it is reachable:
 
 ```bash
-./script/start-cxdb.sh
+curl -sf http://$KILROY_CXDB_HOST:9110/healthz > /dev/null
 ```
 
-This script is idempotent — it reuses a healthy container. CXDB runs on `:9109` (binary protocol) and `:9110` (HTTP API).
-
-After the script completes, verify CXDB is responding:
-
-```bash
-curl -sf http://localhost:9110/healthz > /dev/null
-```
-
-If the curl fails, report that CXDB did not start and suggest checking Docker.
+If the curl fails, report that CXDB is not reachable and suggest:
+- Ensure you are connected to Tailscale
+- Start the instance on the server: `ssh vps 'kilroy cxdb start cxdb-graph-ui'`
 
 ## Step 4: Report
 
